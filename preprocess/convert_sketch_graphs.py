@@ -81,15 +81,15 @@ def get_split_name(path):
     return split_name
 
 
-def convert_sketch(index, seq, split_name):
+def convert_sketch(index, seq, split_name, norm):
     """Convert a sketch from the SketchGraphs dataset"""
     sketch = sketch_from_sequence(seq)
     sketch_name = f"{split_name}_{index:08}"
     sketch_obj = SketchSG(sketch, sketch_name)
-    return sketch_obj.convert()
+    return sketch_obj.convert(normalize=norm)
 
 
-def convert_split(file, split_name, filter_filenames, limit, output_dir):
+def convert_split(file, output_dir, split_name, filter_filenames, limit, norm):
     """Convert the sketches of a given SketchGraphs dataset split"""
     seq_data = flat_array.load_dictionary_flat(file)
     seq_count = len(seq_data["sequences"])
@@ -106,21 +106,22 @@ def convert_split(file, split_name, filter_filenames, limit, output_dir):
     for filename in tqdm(filter_filenames[:seq_limit]):
         index = get_index(filename)
         seq = seq_data["sequences"][index]
-        sketch_obj_dict = convert_sketch(index, seq, split_name)
+        sketch_obj_dict = convert_sketch(index=index, seq=seq, split_name=split_name, norm=norm)
         sketch_obj_dicts.append(sketch_obj_dict)
 
     np.save(output_dir / f"sg_obj_{split_name}.npy", sketch_obj_dicts)
 
 
-def main(args, sg_files, output_dir):
-    split_to_filenames = load_filter(args.filter)
+def main(sg_files, output_dir, filter_path, limit, norm):
+    split_to_filenames = load_filter(filter_path)
 
     start_time = time.time()
 
     for sg_file in sg_files:
         split_name = get_split_name(sg_file)
         filter_filenames = split_to_filenames[split_name]
-        convert_split(sg_file, split_name, filter_filenames, args.limit, output_dir)
+        convert_split(file=sg_file, output_dir=output_dir, split_name=split_name,
+                      filter_filenames=filter_filenames, limit=limit, norm=norm)
 
     print(f"Processing Time: {time.time() - start_time} secs")
 
@@ -133,8 +134,11 @@ if __name__ == "__main__":
     parser.add_argument("--filter", type=str, required=True,
                         help="File containing indices of deduped sketches ('train_test.json')")
     parser.add_argument("--limit", type=int, help="Only process this number of designs")
+    parser.add_argument("--no-norm",  action='store_true', help="Disables normalization of vertices.")
     args = parser.parse_args()
 
     output_dir = get_output_dir(args)
     sg_files = get_files(args)
-    main(args, sg_files, output_dir)
+
+    main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter,
+         limit=args.limit, norm=(not args.no_norm))

@@ -15,6 +15,7 @@ importlib.reload(sketch_base)
 from sketch_base import SketchBase
 
 from sketchgraphs.data._entity import Arc, Circle, Line
+from geometry_utils import center_and_scale
 
 
 class SketchSG(SketchBase):
@@ -28,8 +29,8 @@ class SketchSG(SketchBase):
         super().__init__()
         self.sketch = sketch
         self.sketch_name = sketch_name
-    
-    def convert(self):
+
+    def convert(self, normalize=True):
         """Convert to SketchDL obj format"""
         super().convert(None)
 
@@ -61,11 +62,15 @@ class SketchSG(SketchBase):
             # We want to return None and not write an obj
             # as this is expected behaviour from SketchGraphs
             if construction_count != 0:
-                return None    
+                return None
 
         vertices = np.array([(pt.x, pt.y) for pt in self.point_map.values()])
         curves = np.array(curves, dtype=np.uint16)
-        return dict(sketch_name=self.sketch_name, vertices=vertices, curves=curves)
+
+        if normalize:
+            vertices = center_and_scale(vertices)
+
+        return dict(name=self.sketch_name, vertices=vertices, curves=curves)
 
     def convert_line(self, line: Line):
         """Convert a single line"""
@@ -108,12 +113,12 @@ class SketchSG(SketchBase):
     def convert_arc(self, arc: Arc):
         """Convert a single arc"""
         start_x, start_y = arc.start_point
-        end_x, end_y = arc.end_point        
+        end_x, end_y = arc.end_point
         # Get points with an index
         start = self.get_point(start_x, start_y)
         mid_raw = self.get_arc_mid_point(arc)
         mid = self.get_point(mid_raw.x, mid_raw.y, weld=False)
         end = self.get_point(end_x, end_y)
         self.add_edge(start.index, mid.index)
-        self.add_edge(mid.index, end.index)   
+        self.add_edge(mid.index, end.index)
         return [start.index, mid.index, end.index, 0]
