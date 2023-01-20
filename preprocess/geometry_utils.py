@@ -32,7 +32,7 @@ def center_and_scale(vertices):
     Convert vertices to values in [-0.5, 0.5]
     """
     vertices = center_vertices(vertices)
-    scale = np.max(vertices.min(axis=0) - vertices.max(axis=0))
+    scale = np.max(vertices.max(axis=0) - vertices.min(axis=0))
     return vertices / scale
 
 
