@@ -1,4 +1,4 @@
-from dataset.base_dataset import SketchGraphsDataset, SketchGraphsCollator
+from dataset.sg_dataset import SketchGraphsDataset, SketchGraphsCollator
 from models.byt5 import get_byt5_model, get_new_byt5_model
 from transformers import Seq2SeqTrainer, TrainingArguments
 import time
