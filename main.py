@@ -47,6 +47,7 @@ def main(args):
 
     training_args = TrainingArguments(
         per_device_train_batch_size=hps['batch_size'],
+        per_device_eval_batch_size=hps['batch_size'],
         gradient_accumulation_steps=1,
         save_steps=50000,
         num_train_epochs=5,

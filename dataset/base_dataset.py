@@ -35,9 +35,17 @@ class SketchGraphsCollator:
         self.tokenizer = tokenizer
         self.max_length = max_length
 
-    def __call__(self, batch):
+    def __call__(self, input_output_pairs):
+        input_strings = [x for x, _ in input_output_pairs]
+        output_strings = [y for _, y in input_output_pairs]
+
+        tokenized_input = self.tokenizer(input_strings, padding=True, max_length=self.max_length, return_tensors='pt')
+        tokenized_output = self.tokenizer(output_strings, padding=True, max_length=self.max_length, return_tensors='pt')
+
         ret = {
-            "input_ids": self.tokenizer([x for x, y in batch], padding=True, max_length=self.max_length, return_tensors='pt').input_ids,
-            "labels": self.tokenizer([y for x, y in batch], padding=True, max_length=self.max_length, return_tensors='pt').input_ids,
+            "input_ids": tokenized_input.input_ids,
+            "attention_mask": tokenized_input.attention_mask,
+            "labels": tokenized_output.input_ids,
         }
+
         return ret
