@@ -19,8 +19,8 @@ def load_model(name):
     return tokenizer, model
 
 
-def load_dataset(dataset_path):
-    train_dataset = SketchGraphsDataset(dataset_path)
+def load_dataset(dataset_path, subset_range=None):
+    train_dataset = SketchGraphsDataset(dataset_path, subset_range=subset_range)
     return train_dataset
 
 
@@ -41,14 +41,13 @@ def main(args):
     print("Loading data...")
     start_time = time.time()
     dataset_dir = Path(args.data)
-    train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy")
-    data_collator = SketchGraphsCollator(tokenizer)
+    train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=hps.get('subset_range'))
+    data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=hps.get('max_length'))
     print(f"Data loading time was {int(time.time() - start_time)} seconds")
 
     training_args = TrainingArguments(
-        per_device_train_batch_size=2,
+        per_device_train_batch_size=hps['batch_size'],
         gradient_accumulation_steps=1,
-        # save_steps=100,
         save_steps=50000,
         num_train_epochs=5,
         output_dir=save_checkpoint,
