@@ -1,13 +1,14 @@
 from dataset.sg_dataset import SketchGraphsDataset, SketchGraphsCollator
 from models.byt5 import get_byt5_model, get_new_byt5_model
-from transformers import Seq2SeqTrainer, TrainingArguments
+from transformers import Seq2SeqTrainer, TrainingArguments, Seq2SeqTrainingArguments
 import time
 from datetime import date
 import argparse
 import torch
 from pathlib import Path
 from experiment_log import experiment_name_to_hps
-
+from metrics import get_compute_metrics
+import comet_ml
 
 def load_model(name):
     if name == 'byt5-base':
@@ -25,11 +26,17 @@ def load_dataset(dataset_path, subset_range=None):
 
 
 def main(args):
-    save_checkpoint = Path(args.chkpt) / date.today().strftime("%m-%d-%y")
+    exp_name = args.exp_name
+    exp_run_name = exp_name + '-' + date.today().strftime("%m-%d-%y")
+    save_checkpoint = Path(args.chkpt) / exp_run_name
 
-    print(f"Loading experiment '{args.exp_name}'")
-    hps = experiment_name_to_hps[args.exp_name]
+    print(f"Loading experiment '{exp_name}'")
+    hps = experiment_name_to_hps[exp_name]
     print(hps)
+    batch_size = hps['batch_size']
+    subset_range = hps.get('subset_range')
+    max_length = hps.get('max_length')
+    eval_temp = hps.get('eval_temp', 1)
 
     print("Loading model...")
     start_time = time.time()
@@ -41,27 +48,37 @@ def main(args):
     print("Loading data...")
     start_time = time.time()
     dataset_dir = Path(args.data)
-    train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=hps.get('subset_range'))
-    data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=hps.get('max_length'))
+    train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=subset_range)
+    val_dataset = load_dataset(dataset_dir / "sg_obj_val.npy", subset_range=subset_range)
+    # val_dataset.data = val_dataset.data[:8]
+    data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
     print(f"Data loading time was {int(time.time() - start_time)} seconds")
 
-    training_args = TrainingArguments(
-        per_device_train_batch_size=hps['batch_size'],
-        per_device_eval_batch_size=hps['batch_size'],
+    comet_ml.init(project_name="cad-llm")
+
+    training_args = Seq2SeqTrainingArguments(
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
         gradient_accumulation_steps=1,
-        save_steps=50000,
         num_train_epochs=5,
-        output_dir=save_checkpoint,
+        save_total_limit=2,
+        save_steps=5000,
+        output_dir=str(save_checkpoint),
+        logging_first_step=True,
+        evaluation_strategy="steps",
+        eval_steps=1000,
+        # eval_steps=1,
+        generation_max_length=max_length,
     )
 
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=None,
+        eval_dataset=val_dataset,
         tokenizer=tokenizer,
-        compute_metrics=None,
-        data_collator=data_collator
+        compute_metrics=get_compute_metrics(exp_name=exp_run_name, tokenizer=tokenizer, temp=eval_temp),
+        data_collator=data_collator,
     )
 
     print("Training model...")
@@ -81,8 +98,8 @@ def main(args):
 
 
 # Example usage:
-# python main.py --data /home/ec2-user/SageMaker/efs/data/sg_normalized --chkpt /home/ec2-user/SageMaker/efs/cad_llm_checkpoints
-
+# python main.py --exp-name cad_llm_v0 --data /home/ec2-user/SageMaker/efs/data/sg_normalized --chkpt /home/ec2-user/SageMaker/efs/cad_llm_checkpoints
+# python main.py --exp-name cad_llm_v0 --data ~/data/sg_normalized --chkpt ~/cad_llm_checkpoints
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp-name", type=str, required=True,

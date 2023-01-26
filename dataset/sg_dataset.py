@@ -38,14 +38,11 @@ class SketchGraphsCollator:
     def __call__(self, input_output_pairs):
         input_strings = [x for x, _ in input_output_pairs]
         output_strings = [y for _, y in input_output_pairs]
-
         tokenized_input = self.tokenizer(input_strings, padding=True, max_length=self.max_length, return_tensors='pt')
         tokenized_output = self.tokenizer(output_strings, padding=True, max_length=self.max_length, return_tensors='pt')
-
-        ret = {
+        batch = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
             "labels": tokenized_output.input_ids,
         }
-
-        return ret
+        return batch
