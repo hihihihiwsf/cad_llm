@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 import numpy as np
-from dataset.transforms import add_quantized, add_entities, add_subset, add_input_output
+from dataset.transforms import add_quantized, add_entities, add_random_input_output
 
 
 class SketchGraphsDataset(Dataset):
@@ -23,8 +23,7 @@ class SketchGraphsDataset(Dataset):
             add_entities(example)
 
         # Overwrite input output from previous epoch
-        add_subset(example, self.subset_range)
-        add_input_output(example)
+        add_random_input_output(example, subset_range=self.subset_range)
 
     def __len__(self):
         return len(self.data)
