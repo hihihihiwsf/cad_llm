@@ -16,7 +16,7 @@ experiment_name_to_hps = {
     'cad_llm_v1': {
         # Added masks to padded input
         'modal': 'byt5-base',
-        'batch_size': 8,
+        'batch_size': 2,
         'subset_range': [.2, .8],
         'max_length': 128,
         'eval_temp': 1,

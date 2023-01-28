@@ -50,11 +50,17 @@ def main(args):
     dataset_dir = Path(args.data)
     train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=subset_range)
     val_dataset = load_dataset(dataset_dir / "sg_obj_val.npy", subset_range=subset_range)
-    # val_dataset.data = val_dataset.data[:8]
+    # val_dataset._data = val_dataset.data[:8]
     data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
     print(f"Data loading time was {int(time.time() - start_time)} seconds")
 
     comet_ml.init(project_name="cad-llm")
+    compute_metrics = get_compute_metrics(
+        exp_name=exp_run_name,
+        dataset=val_dataset.get_data(),
+        tokenizer=tokenizer,
+        temp=eval_temp
+    )
 
     training_args = Seq2SeqTrainingArguments(
         per_device_train_batch_size=batch_size,
@@ -77,7 +83,7 @@ def main(args):
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         tokenizer=tokenizer,
-        compute_metrics=get_compute_metrics(exp_name=exp_run_name, tokenizer=tokenizer, temp=eval_temp),
+        compute_metrics=compute_metrics,
         data_collator=data_collator,
     )
 
@@ -98,8 +104,8 @@ def main(args):
 
 
 # Example usage:
-# python main.py --exp-name cad_llm_v0 --data /home/ec2-user/SageMaker/efs/data/sg_normalized --chkpt /home/ec2-user/SageMaker/efs/cad_llm_checkpoints
-# python main.py --exp-name cad_llm_v0 --data ~/data/sg_normalized --chkpt ~/cad_llm_checkpoints
+# python main.py --exp-name cad_llm_v1 --data /home/ec2-user/SageMaker/efs/data/sg_normalized --chkpt /home/ec2-user/SageMaker/efs/cad_llm_checkpoints
+# python main.py --exp-name cad_llm_v1 --data ~/data/sg_normalized --chkpt ~/cad_llm_checkpoints
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp-name", type=str, required=True,

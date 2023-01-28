@@ -6,14 +6,14 @@ from dataset.transforms import add_quantized, add_entities, add_subset, add_inpu
 class SketchGraphsDataset(Dataset):
     def __init__(self, path, quantize_n_bits=6, subset_range=None):
         data = np.load(path, allow_pickle=True)
-        self.data = [x for x in data if len(x['curves']) >= 2]
-        print(f"Filtered to {len(self.data)} sketches with 2 or more curves from {len(data)} sketches")
+        self._data = [x for x in data if len(x['curves']) >= 2]
+        print(f"Filtered to {len(self._data)} sketches with 2 or more curves from {len(data)} sketches")
         self.quantize_n_bits = quantize_n_bits
         self.subset_range = subset_range or [0, 1]
         assert self.subset_range[0] >= 0 and self.subset_range[1] <= 1
 
     def __getitem__(self, index):
-        example = self.data[index]
+        example = self._data[index]
         self._transform(example)
         return (example['input'], example['output'])
 
@@ -26,8 +26,11 @@ class SketchGraphsDataset(Dataset):
         add_subset(example, self.subset_range)
         add_input_output(example)
 
+    def get_missing_entities(self):
+        return [example['completion'] for example in self._data]
+
     def __len__(self):
-        return len(self.data)
+        return len(self._data)
 
 
 class SketchGraphsCollator:
@@ -38,8 +41,8 @@ class SketchGraphsCollator:
     def __call__(self, input_output_pairs):
         input_strings = [x for x, _ in input_output_pairs]
         output_strings = [y for _, y in input_output_pairs]
-        tokenized_input = self.tokenizer(input_strings, padding=True, max_length=self.max_length, return_tensors='pt')
-        tokenized_output = self.tokenizer(output_strings, padding=True, max_length=self.max_length, return_tensors='pt')
+        tokenized_input = self.tokenizer(input_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
+        tokenized_output = self.tokenizer(output_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
         batch = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,

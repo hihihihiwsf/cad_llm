@@ -4,6 +4,9 @@ import torch
 
 
 def sample_tokens_from_predictions(predictions, temp):
+    if temp == 0:
+        return predictions.argmax(-1)
+
     # Sample from model output
     decoder_output, _ = predictions  # (decoder_output, maybe_encoder_output??)
     batch_size, label_token_count, vocab_size = decoder_output.shape
@@ -17,25 +20,28 @@ def sample_tokens_from_predictions(predictions, temp):
     return predicted_tokens
 
 
-def compute_metrics(eval_pred, exp_name, tokenizer, temp):
+def compute_metrics(eval_pred, exp_name, dataset, tokenizer, temp):
     # eval_pred is of type transformers.EvalPrediction
-    assert temp > 0, "Not implemented for temp=0"
     experiment = comet_ml.get_global_experiment()
     experiment.set_name(exp_name)
-    print("In compute_metrics")
+
     # Get labels
     labels = eval_pred.label_ids
     predicted_tokens = sample_tokens_from_predictions(eval_pred.predictions, temp=temp)
 
     token_accuracy = (predicted_tokens.numpy() == labels).mean()
 
-    sample_size = 20
+    # string_samples = tokenizer.batch_decode(predicted_tokens, skip_special_tokens=True)
+    sample_size = 8
     string_samples = tokenizer.batch_decode(predicted_tokens[:sample_size, :], skip_special_tokens=True)
-    print("First 5 batch_decode results", string_samples)
-    experiment.log_text(string_samples)
+    missing_entitites = dataset.get_missing_entities()
+
+    print("Sampled outputs", string_samples)
+    print("Sampled outputs", string_samples)
+    experiment.log_text(string_samples, dataset.get_batch_entities())
 
     return {"token_accuracy": token_accuracy}
 
 
-def get_compute_metrics(exp_name, tokenizer, temp):
-    return partial(compute_metrics, exp_name=exp_name, tokenizer=tokenizer, temp=temp)
+def get_compute_metrics(exp_name, dataset, tokenizer, temp):
+    return partial(compute_metrics, exp_name=exp_name, dataset=dataset, tokenizer=tokenizer, temp=temp)

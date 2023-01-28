@@ -55,4 +55,8 @@ def add_input_output(example):
 
 
 def repr_entities(entities):
-    return ";".join((",".join((f"{x},{y}" for x, y in ent)) for ent in entities)) + ';'
+    return ";".join(repr_entity(ent) for ent in entities) + ';'
+
+
+def repr_entity(entity):
+    return ",".join(f"{x},{y}" for x, y in entity)
