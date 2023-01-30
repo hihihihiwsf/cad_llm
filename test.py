@@ -4,10 +4,6 @@ from main import load_model, load_dataset
 def test_load_model():
     tokenizer, model = load_model("byt5-base")
     assert model.num_parameters() == 581653248
-    print(dir(model))
-
-    print(model.dummy_inputs)
-    print(model.dummy_inputs.shape)
     print("success - test_load_model")
 
 

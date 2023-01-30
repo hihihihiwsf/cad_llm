@@ -34,17 +34,24 @@ class SketchGraphsCollator:
         self.tokenizer = tokenizer
         self.max_length = max_length
 
+    def tokenize(self, strings):
+        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
+
     def __call__(self, input_output_pairs):
         input_strings = [x for x, _ in input_output_pairs]
         output_strings = [y for _, y in input_output_pairs]
 
-        tokenized_input = self.tokenizer(input_strings, padding=True, max_length=self.max_length, return_tensors='pt')
-        tokenized_output = self.tokenizer(output_strings, padding=True, max_length=self.max_length, return_tensors='pt')
+        tokenized_input = self.tokenize(input_strings)
+        tokenized_output = self.tokenize(output_strings)
+
+        labels = tokenized_output.input_ids
+        # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
+        labels[labels == self.tokenizer.pad_token_id] = -100
 
         ret = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
-            "labels": tokenized_output.input_ids,
+            "labels": labels,
         }
 
         return ret
