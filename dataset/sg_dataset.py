@@ -48,6 +48,10 @@ class SketchGraphsDataset(Dataset):
         example['output'] = Entity.entities_to_string(example['output_entities'])
         return example
 
+    def get_completions(self, index):
+        example = self.data[index]
+        return {ent.to_string() for ent in example['completion_entities']}
+
     def __len__(self):
         return len(self.data)
 
@@ -71,10 +75,9 @@ class SketchGraphsCollator:
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
 
-        ret = {
+        batch = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
             "labels": labels,
         }
-
-        return ret
+        return batch
