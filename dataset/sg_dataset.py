@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 import numpy as np
-from dataset.transforms import add_quantized, add_entities, add_random_input_output
-
+from dataset.utils import get_quantized, choose_random_io_indices
+from dataset.entity import Entity
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, path, quantize_n_bits=6, subset_range=None):
@@ -19,11 +19,34 @@ class SketchGraphsDataset(Dataset):
 
     def _transform(self, example):
         if 'entities' not in example:
-            add_quantized(example, self.quantize_n_bits)
-            add_entities(example)
+            self._add_entities(example)
 
         # Overwrite input output from previous epoch
-        add_random_input_output(example, subset_range=self.subset_range)
+        self._add_random_input_output(example)
+
+    def _add_entities(self, example):
+        """
+        Add 'entities' - a list of lists combining the information in vertices and curves
+        """
+        vertices = example['vertices']
+        if self.quantize_n_bits:
+            vertices = get_quantized(vertices, self.quantize_n_bits)
+        point_lists = [[tuple(vertices[i - 1]) for i in c if i] for c in example['curves']]
+
+        example['entities'] = [Entity(points=points) for points in point_lists]
+        return example
+
+    def _add_random_input_output(self, example):
+        entities = example['entities']
+        rand_indices = choose_random_io_indices(len(entities), subset_range=self.subset_range)
+
+        example['subset_entities'] = [entities[i] for i in rand_indices['subset']]
+        example['completion_entities'] = [entities[i] for i in rand_indices['completion']]
+        example['output_entities'] = [entities[i] for i in rand_indices['output']]
+
+        example['input'] = Entity.entities_to_string(example['subset_entities'])
+        example['output'] = Entity.entities_to_string(example['output_entities'])
+        return example
 
     def __len__(self):
         return len(self.data)
