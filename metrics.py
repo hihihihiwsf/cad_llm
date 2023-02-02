@@ -38,6 +38,8 @@ def compute_metrics(eval_pred, exp_name, dataset, tokenizer, temperature):
     log_sample_size = 4
     for i in range(len(dataset)):
         sample = tokenizer.decode(predicted_tokens[i, :], skip_special_tokens=True)
+        if ';' in sample:
+            sample = sample.split(';')[0] + ';'
         completion_strings = dataset.get_completions(index=i)
 
         correct = sample in completion_strings
