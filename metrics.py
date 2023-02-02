@@ -35,7 +35,7 @@ def compute_metrics(eval_pred, exp_name, dataset, tokenizer, temperature):
     token_accuracy = (predicted_tokens.numpy() == labels).mean()
 
     total_correct = 0
-    log_sample_size = 8
+    log_sample_size = 4
     for i in range(len(dataset)):
         sample = tokenizer.decode(predicted_tokens[i, :], skip_special_tokens=True)
         completion_strings = dataset.get_completions(index=i)
@@ -44,7 +44,7 @@ def compute_metrics(eval_pred, exp_name, dataset, tokenizer, temperature):
         total_correct += int(correct)
 
         if i < log_sample_size:
-            info = f"sample: {sample}\n, completions: {completion_strings}\n, correct: {correct}\n"
+            info = f"sample: {sample}\ncompletions: {completion_strings}\ncorrect: {correct}\n"
             print(info)
             if experiment:
                 experiment.log_text(info)

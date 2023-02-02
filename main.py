@@ -50,10 +50,11 @@ def main(args):
     dataset_dir = Path(args.data)
     train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=subset_range)
     val_dataset = load_dataset(dataset_dir / "sg_obj_val.npy", subset_range=subset_range)
+    val_dataset.data = val_dataset.data[:256]
     data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
     print(f"Data loading time was {int(time.time() - start_time)} seconds")
 
-    comet_ml.init(project_name="cad-llm")
+    comet_ml.init(project_name="cad-llm-test-v1")
 
     compute_metrics = get_compute_metrics(
         exp_name=exp_run_name,
@@ -66,14 +67,14 @@ def main(args):
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
         gradient_accumulation_steps=1,
-        num_train_epochs=5,
+        num_train_epochs=3,
         save_total_limit=2,
         save_steps=5000,
         output_dir=str(save_checkpoint),
         logging_first_step=True,
         evaluation_strategy="steps",
-        # eval_steps=1000,
-        eval_steps=1,
+        eval_steps=1000,
+        # eval_steps=1,
         generation_max_length=max_length,
     )
 
