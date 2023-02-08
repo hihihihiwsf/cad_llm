@@ -38,7 +38,7 @@ def compute_metrics(eval_pred, exp_name, dataset, tokenizer, temperature):
     log_sample_size = 8
     for i in range(len(dataset)):
         sample = tokenizer.decode(predicted_tokens[i, :], skip_special_tokens=True)
-        completion_strings = dataset.get_completions(index=i)
+        completion_strings = dataset.get_sketch(index=i).get_completion_strings()
 
         correct = sample in completion_strings
         total_correct += int(correct)
