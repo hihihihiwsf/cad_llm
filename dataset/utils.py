@@ -12,9 +12,9 @@ def get_quantized(vertices, n_bits):
     return (vertices * quantize_range).astype("int32")
 
 
-def choose_random_io_indices(n, subset_range):
+def choose_random_subset(n, subset_range):
     """
-    Choose a random nonempty subset of curves for input, and one curve from the remaining for the output.
+    Choose a random nonempty proper subset of indices
     Note: subset_range is not guaranteed to hold for edge cases
     """
     assert n >= 2
@@ -29,6 +29,4 @@ def choose_random_io_indices(n, subset_range):
 
     rand_size = random.randint(min_size, max_size)
     subset = random.sample(range(n), rand_size)
-    completion = [i for i in range(n) if i not in subset]
-    output = random.sample(completion, 1)
-    return dict(subset=subset, completion=completion, output=output)
+    return subset

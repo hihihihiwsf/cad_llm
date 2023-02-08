@@ -1,37 +1,54 @@
-from utils import choose_random_io_indices
-from entity import Entity
+from utils import choose_random_subset
+from sketch_llm import SketchLLM
+import numpy as np
 
-string_entities = '-11,29,-6,-23;-6,-23,5,-31,11,-18;'
-point_lists = [
-    ((-11, 29), (-6, -23)),
-    ((-6, -23), (5, -31), (11, -18)),
-]
+sketch_dict = {
+    'name': 'val_00043061',
+    'vertices': np.array([
+        [0.5,  0.28],
+        [-0.5,  0.28],
+        [0.5, -0.28],
+        [-0.5, -0.28]
+    ]),
+    'curves': np.array([
+        [1, 2, 0, 0],
+        [3, 4, 0, 0],
+        [1, 3, 0, 0],
+        [2, 4, 0, 0]
+    ]),
+}
+
+expected_entities = ['-31,-17,-31,17;', '-31,-17,31,-17;', '-31,17,31,17;', '31,-17,31,17;']
 
 
-def test_entities_to_string():
-    entities = [Entity(points) for points in point_lists]
-    res = Entity.entities_to_string(entities)
-    assert string_entities == res, f"Expected: {string_entities}\n Found: {res}"
-    print("success - test_entities_to_string")
+def test_sketch():
+    sketch = SketchLLM(sketch_dict, quantize_n_bits=6)
+    sketch.add_entities()
+    all_sorted_entity_strings = [ent.to_string() for ent in sketch.entities]
+    assert all_sorted_entity_strings == expected_entities
+
+    input_text, output_text = sketch.generate_random_input_output(subset_range=[0, 1])
+    input_entities = set([s + ";" for s in input_text.split(";") if s])
+    completion_entities = sketch.get_completion_strings()
+
+    assert input_entities.union(completion_entities) == set(all_sorted_entity_strings)
+    assert input_entities.intersection(completion_entities) == set()
+    assert output_text in completion_entities
+
+    print("success - test_sketch")
 
 
-def test_choose_random_input_output_indices():
+def test_choose_random_subset():
     n = 10
-    indices = choose_random_io_indices(n, (0, 1))
-    subset_indices = set(indices['subset'])
-    completion_indices = set(indices['completion'])
-    output_indices = set(indices['output'])
+    subset = choose_random_subset(n, (0, 1))
+    assert 1 < len(subset) < n, f"len(subset) = {len(subset)}"
 
-    assert subset_indices.intersection(completion_indices) == set()
-    assert subset_indices.union(completion_indices) == set(range(n))
-    assert output_indices.intersection(completion_indices) == output_indices
-
-    choose_random_io_indices(n, (0.4, 0.6))
-    assert 0.4 <= len(indices['subset']) / n <= 0.6
+    subset = choose_random_subset(n, (0.4, 0.6))
+    assert 0.4 <= len(subset) / n <= 0.6
 
     print("success - test_choose_random_input_output_indices")
 
 
 if __name__ == '__main__':
-    test_entities_to_string()
-    test_choose_random_input_output_indices()
+    test_choose_random_subset()
+    test_sketch()
