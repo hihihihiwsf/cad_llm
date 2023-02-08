@@ -10,13 +10,7 @@ def test_load_model():
 def test_load_data():
     val_dataset = load_dataset("/Users/katzm/data/sg_normalized/sg_obj_val.npy")
     assert len(val_dataset) == 39344, f"Expected 39344 found {len(val_dataset)}"
-
-    subset_range = [.2, .8]
-    d = load_dataset("/Users/katzm/data/sg_normalized/sg_obj_val.npy", subset_range=subset_range)
-    [d[i] for i in range(10)]  # process elements
-    # print(d[0])
-    # fractions = [(len(d.data[i].input_indices) / len(d.data[i].curves)) for i in range(10)]
-    # print(fractions)
+    [val_dataset[i] for i in range(10)]  # process elements without breaking
     print("success - test_load_data")
 
 

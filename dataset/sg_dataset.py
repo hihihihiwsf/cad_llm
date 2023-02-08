@@ -6,17 +6,26 @@ from dataset.sketch_llm import SketchLLM
 class SketchGraphsDataset(Dataset):
     def __init__(self, path, quantize_n_bits=6, subset_range=None):
         data = np.load(path, allow_pickle=True)
-        self.data = [SketchLLM(x, quantize_n_bits=quantize_n_bits) for x in data]
-        self.data = [s for s in self.data if len(s.curves) >= 2]
+        self.data = [SketchLLM(sketch_dict, quantize_n_bits=quantize_n_bits) for sketch_dict in data]
+        self.data = [sketch for sketch in self.data if len(sketch.curves) >= 2]
         print(f"Filtered to {len(self.data)} sketches with 2 or more curves from {len(data)} sketches")
 
         self.subset_range = subset_range or [0, 1]
         assert self.subset_range[0] >= 0 and self.subset_range[1] <= 1
 
     def __getitem__(self, index):
+        """
+        Generates input/output by selecting a subset of entities
+        Note: Overrides subset selection info from previous calls
+
+        Returns (input_text, output_text)
+        """
         return self.data[index].generate_random_input_output(subset_range=self.subset_range)
 
-    def _get_sketch(self, index):
+    def get_sketch(self, index):
+        """
+        Returns the SketchLLM object at index
+        """
         return self.data[index]
 
     def __len__(self):
