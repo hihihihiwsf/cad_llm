@@ -19,6 +19,5 @@ experiment_name_to_hps = {
         'batch_size': 4,
         'subset_range': [.2, .8],
         'max_length': 128,
-        'eval_temperature': 1,
     },
 }

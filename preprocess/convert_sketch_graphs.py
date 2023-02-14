@@ -4,11 +4,10 @@ Convert the SketchGraphs Dataset sketches
 into a npy file containing obj-file like data
 
 """
-
-# hack for running locally
-import os
-
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+# # hack for running locally
+# import os
+#
+# os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 from pathlib import Path
 import time
