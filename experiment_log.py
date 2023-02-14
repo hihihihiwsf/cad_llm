@@ -19,13 +19,17 @@ experiment_name_to_hps = {
         'batch_size': 12,
         'subset_range': [.2, .8],
         'max_length': 128,
-        'eval_temperature': 1,
     },
     'cad_llm_no_pretrain_v1': {
         'modal': 'byt5-base-new',
         'batch_size': 12,
         'subset_range': [.2, .8],
         'max_length': 128,
-        'eval_temperature': 1,
+    },
+    'cad_llm_v1_all_ents': {
+        'modal': 'byt5-base',
+        'batch_size': 12,
+        'subset_range': [.2, .8],
+        'max_length': 128,
     },
 }

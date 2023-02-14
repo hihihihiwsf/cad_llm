@@ -5,10 +5,12 @@ import time
 from datetime import date
 import argparse
 import torch
+from torch.utils.data import DataLoader
 from pathlib import Path
 from experiment_log import experiment_name_to_hps
 from metrics import get_compute_metrics
 import comet_ml
+
 
 def load_model(name):
     if name == 'byt5-base':
@@ -50,18 +52,13 @@ def main(args):
     dataset_dir = Path(args.data)
     train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=subset_range)
     val_dataset = load_dataset(dataset_dir / "sg_obj_val.npy", subset_range=subset_range)
-    val_dataset.data = val_dataset.data[:256]
     data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=False)
     print(f"Data loading time was {int(time.time() - start_time)} seconds")
 
     comet_ml.init(project_name="cad-llm-test-v1")
 
-    compute_metrics = get_compute_metrics(
-        exp_name=exp_run_name,
-        dataset=val_dataset,
-        tokenizer=tokenizer,
-        temperature=eval_temperature,
-    )
+    compute_metrics = get_compute_metrics(exp_name=exp_run_name, model=model, dataloader=val_dataloader)
 
     training_args = Seq2SeqTrainingArguments(
         per_device_train_batch_size=batch_size,
