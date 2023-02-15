@@ -28,7 +28,7 @@ experiment_name_to_hps = {
     },
     'cad_llm_v1_all_ents': {
         'modal': 'byt5-base',
-        'batch_size': 12,
+        'batch_size': 8,
         'subset_range': [.2, .8],
         'max_length': 128,
     },

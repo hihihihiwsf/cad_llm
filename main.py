@@ -52,6 +52,7 @@ def main(args):
     dataset_dir = Path(args.data)
     train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=subset_range)
     val_dataset = load_dataset(dataset_dir / "sg_obj_val.npy", subset_range=subset_range)
+    val_dataset.data = val_dataset.data[:256]
     data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=False)
     print(f"Data loading time was {int(time.time() - start_time)} seconds")

@@ -1,6 +1,7 @@
 class Entity:
     def __init__(self, points):
         self.points = points
+        self._sort_points()
 
     def _sort_points(self):
         if len(self.points) == 2:
@@ -13,6 +14,8 @@ class Entity:
             # top, right, bottom, left = self.points
             # sort -> left, top, bottom, right
             self.points = sorted(self.points)
+
+        self.points = list(self.points)
         return self.points
 
     def to_string(self):

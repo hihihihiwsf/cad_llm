@@ -41,8 +41,10 @@ class SketchGraphsDataset(Dataset):
         rand_indices = choose_random_io_indices(len(entities), subset_range=self.subset_range)
 
         example['subset_entities'] = [entities[i] for i in rand_indices['subset']]
-        example['completion_entities'] = [entities[i] for i in rand_indices['completion']]
-        example['output_entities'] = [entities[i] for i in rand_indices['output']]
+        # Sorting output_entities only to make fair comparison with v1 with one entity output
+        completion_entities = [entities[i] for i in rand_indices['completion']]
+        example['completion_entities'] = sorted(completion_entities, key=lambda ent: ent.points)
+        example['output_entities'] = sorted(completion_entities, key=lambda ent: ent.points)
 
         example['input'] = Entity.entities_to_string(example['subset_entities'])
         example['output'] = Entity.entities_to_string(example['output_entities'])

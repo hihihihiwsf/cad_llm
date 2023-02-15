@@ -30,7 +30,7 @@ def compute_metrics(eval_pred, exp_name, model, dataloader):
     count = 0
     for batch in dataloader:
         # Generate samples to test accuracy (do not send labels in for generation)
-        labels = batch["labels"]
+        labels = batch["labels"].to(device)
         samples = model.generate(input_ids=batch["input_ids"].to(device),
                                  attention_mask=batch["attention_mask"].to(device),
                                  do_sample=False,
