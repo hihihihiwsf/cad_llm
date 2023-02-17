@@ -4,12 +4,16 @@ import math
 
 def get_quantized(vertices, n_bits):
     """
-    Convert normalized vertices to discrete values in [-(n_bits-1)**2, (n_bits-1)**2 - 1].
+    Convert normalized vertices to discrete values in [-2**(n_bits-1), 2**(n_bits-1) - 1].
     e.g. n_bits=6: [-32, 31]
     This was used in first experiment.
     """
     quantize_range = 2 ** n_bits - 1
     return (vertices * quantize_range).astype("int32")
+
+
+def get_quantized_range(quantize_n_bits):
+    return range(-2 ** (quantize_n_bits - 1), 2 ** (quantize_n_bits - 1))
 
 
 def choose_random_io_indices(n, subset_range):

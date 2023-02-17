@@ -8,6 +8,7 @@ class SketchGraphsDataset(Dataset):
         data = np.load(path, allow_pickle=True)
         self.data = [x for x in data if len(x['curves']) >= 2]
         print(f"Filtered to {len(self.data)} sketches with 2 or more curves from {len(data)} sketches")
+
         self.quantize_n_bits = quantize_n_bits
         self.subset_range = subset_range or [0, 1]
         assert self.subset_range[0] >= 0 and self.subset_range[1] <= 1

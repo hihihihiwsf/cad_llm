@@ -1,7 +1,8 @@
 from utils import choose_random_io_indices
 from entity import Entity
 
-string_entities = '-11,29,-6,-23;-6,-23,5,-31,11,-18;'
+string_entities = "-11,29,-6,-23;-6,-23,5,-31,11,-18;"
+special_tokens_entities = "<-11><29><-6><-23>;<-6><-23><5><-31><11><-18>;"
 point_lists = [
     ((-11, 29), (-6, -23)),
     ((-6, -23), (5, -31), (11, -18)),
@@ -10,8 +11,11 @@ point_lists = [
 
 def test_entities_to_string():
     entities = [Entity(points) for points in point_lists]
-    res = Entity.entities_to_string(entities)
+    res = Entity.entities_to_string(entities, special_tokens=False)
     assert string_entities == res, f"Expected: {string_entities}\n Found: {res}"
+
+    res = Entity.entities_to_string(entities, special_tokens=True)
+    assert special_tokens_entities == res, f"Expected: {string_entities}\n Found: {res}"
     print("success - test_entities_to_string")
 
 

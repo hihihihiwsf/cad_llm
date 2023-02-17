@@ -18,8 +18,10 @@ class Entity:
         self.points = list(self.points)
         return self.points
 
-    def to_string(self):
+    def to_string(self, special_tokens=True):
         self._sort_points()
+        if special_tokens:
+            return "".join(f"<{x}><{y}>" for x, y in self.points) + ";"
         return ",".join(f"{x},{y}" for x, y in self.points) + ";"
 
     @staticmethod
