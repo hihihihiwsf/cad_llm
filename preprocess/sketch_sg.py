@@ -15,7 +15,6 @@ importlib.reload(sketch_base)
 from sketch_base import SketchBase
 
 from sketchgraphs.data._entity import Arc, Circle, Line
-from geometry_utils import center_and_scale
 
 
 class SketchSG(SketchBase):
@@ -30,7 +29,7 @@ class SketchSG(SketchBase):
         self.sketch = sketch
         self.sketch_name = sketch_name
 
-    def convert(self, normalize=True):
+    def convert(self):
         """Convert to SketchDL obj format"""
         super().convert(None)
 
@@ -65,11 +64,6 @@ class SketchSG(SketchBase):
                 return None
 
         vertices = np.array([(pt.x, pt.y) for pt in self.point_map.values()])
-        curves = np.array(curves, dtype=np.uint16)
-
-        if normalize:
-            vertices = center_and_scale(vertices)
-
         return dict(name=self.sketch_name, vertices=vertices, curves=curves)
 
     def convert_line(self, line: Line):
@@ -79,7 +73,7 @@ class SketchSG(SketchBase):
         start = self.get_point(start_x, start_y)
         end = self.get_point(end_x, end_y)
         self.add_edge(start.index, end.index)
-        return [start.index, end.index, 0, 0]
+        return [start.index, end.index]
 
     def convert_circle(self, circle: Circle):
         """Convert a single circle"""
@@ -121,4 +115,4 @@ class SketchSG(SketchBase):
         end = self.get_point(end_x, end_y)
         self.add_edge(start.index, mid.index)
         self.add_edge(mid.index, end.index)
-        return [start.index, mid.index, end.index, 0]
+        return [start.index, mid.index, end.index]
