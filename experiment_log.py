@@ -32,4 +32,10 @@ experiment_name_to_hps = {
         'subset_range': [.2, .8],
         'max_length': 128,
     },
+    'cad_llm_v1_all_ents_q_tkz_const_lr': {
+        'modal': 'byt5-base',
+        'batch_size': 12,
+        'subset_range': [.2, .8],
+        'max_length': 128,
+    },
 }
