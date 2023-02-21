@@ -77,8 +77,8 @@ def main(args):
     print("Loading data...")
     start_time = time.time()
     dataset_dir = Path(args.data)
-    train_dataset = load_dataset(dataset_dir / "sg_obj_train.npy", subset_range=subset_range)
-    val_dataset = load_dataset(dataset_dir / "sg_obj_val.npy", subset_range=subset_range)
+    train_dataset = load_dataset(dataset_dir / "sg_str_train.json", subset_range=subset_range)
+    val_dataset = load_dataset(dataset_dir / "sg_str_val.json", subset_range=subset_range)
     # val_dataset.data = val_dataset.data[:32]
     data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=True)

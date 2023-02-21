@@ -18,6 +18,7 @@ import numpy as np
 from tqdm import tqdm
 from sketchgraphs.data import flat_array, sketch_from_sequence
 import sketch_sg
+from preprocessing import preprocess_sketch
 
 importlib.reload(sketch_sg)
 from sketch_sg import SketchSG
@@ -80,15 +81,16 @@ def get_split_name(path):
     return split_name
 
 
-def convert_sketch(index, seq, split_name, norm):
+def convert_sketch(index, seq, split_name, quantize_bits):
     """Convert a sketch from the SketchGraphs dataset"""
     sketch = sketch_from_sequence(seq)
     sketch_name = f"{split_name}_{index:08}"
     sketch_obj = SketchSG(sketch, sketch_name)
-    return sketch_obj.convert(normalize=norm)
+    sketch_dict = sketch_obj.convert()
+    return preprocess_sketch(sketch_dict=sketch_dict, quantize_bits=quantize_bits)
 
 
-def convert_split(file, output_dir, split_name, filter_filenames, limit, norm):
+def convert_split(file, output_dir, split_name, filter_filenames, limit, quantize_bits):
     """Convert the sketches of a given SketchGraphs dataset split"""
     seq_data = flat_array.load_dictionary_flat(file)
     seq_count = len(seq_data["sequences"])
@@ -101,17 +103,21 @@ def convert_split(file, output_dir, split_name, filter_filenames, limit, norm):
             seq_limit = int(limit * 0.6)
 
     print(f"Converting {seq_limit} {split_name} designs...")
-    sketch_obj_dicts = []
+    sketch_str_dicts = []
     for filename in tqdm(filter_filenames[:seq_limit]):
         index = get_index(filename)
         seq = seq_data["sequences"][index]
-        sketch_obj_dict = convert_sketch(index=index, seq=seq, split_name=split_name, norm=norm)
-        sketch_obj_dicts.append(sketch_obj_dict)
+        sketch_dict = convert_sketch(index=index, seq=seq, split_name=split_name, quantize_bits=quantize_bits)
+        if not sketch_dict:
+            continue
+        sketch_str_dicts.append(sketch_dict)
 
-    np.save(output_dir / f"sg_obj_{split_name}.npy", sketch_obj_dicts)
+    filename = output_dir / f"sg_str_{split_name}.json"
+    with open(filename, "w") as f:
+        json.dump(sketch_str_dicts, f)
 
 
-def main(sg_files, output_dir, filter_path, limit, norm):
+def main(sg_files, output_dir, filter_path, limit, quantize_bits):
     split_to_filenames = load_filter(filter_path)
 
     start_time = time.time()
@@ -120,7 +126,7 @@ def main(sg_files, output_dir, filter_path, limit, norm):
         split_name = get_split_name(sg_file)
         filter_filenames = split_to_filenames[split_name]
         convert_split(file=sg_file, output_dir=output_dir, split_name=split_name,
-                      filter_filenames=filter_filenames, limit=limit, norm=norm)
+                      filter_filenames=filter_filenames, limit=limit, quantize_bits=quantize_bits)
 
     print(f"Processing Time: {time.time() - start_time} secs")
 
@@ -133,11 +139,12 @@ if __name__ == "__main__":
     parser.add_argument("--filter", type=str, required=True,
                         help="File containing indices of deduped sketches ('train_test.json')")
     parser.add_argument("--limit", type=int, help="Only process this number of designs")
-    parser.add_argument("--no-norm",  action='store_true', help="Disables normalization of vertices.")
+    parser.add_argument("--quantize-bits", type=int, default=6,
+                        help="Number of bits to use for quantization (default 6)")
     args = parser.parse_args()
 
     output_dir = get_output_dir(args)
     sg_files = get_files(args)
 
-    main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter,
-         limit=args.limit, norm=(not args.no_norm))
+    main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter, limit=args.limit,
+         quantize_bits=args.quantize_bits)
