@@ -1,30 +1,45 @@
 from torch.utils.data import Dataset
 import numpy as np
-from dataset.sketch_llm import SketchLLM
+import random
+import json
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, path, quantize_n_bits=6, subset_range=None):
-        data = np.load(path, allow_pickle=True)
-        self.data = [SketchLLM(sketch_dict, quantize_n_bits=quantize_n_bits) for sketch_dict in data]
-        self.data = [sketch for sketch in self.data if len(sketch.curves) >= 2]
-        print(f"Filtered to {len(self.data)} sketches with 2 or more curves from {len(data)} sketches")
+    def __init__(self, path, subset_range=None):
+        with open(path, "r") as f:
+            self.data = json.load(f)
 
         self.subset_range = subset_range or [0, 1]
         assert self.subset_range[0] >= 0 and self.subset_range[1] <= 1
 
     def __getitem__(self, index):
         """
-        Generates input/output by selecting a subset of entities
-        Note: Overrides subset selection info from previous calls
-
+        Applies a random mask to the entities of sketch
         Returns (input_text, output_text)
         """
-        return self.data[index].generate_random_input_output(subset_range=self.subset_range)
+        sketch_dict = self.data[index]
+        entities = sketch_dict["entities"]
+        mask = self.get_mask(len(entities))
+        sketch_dict["mask"] = mask
+        input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
+        output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+        return input_text, output_text
+
+    def get_mask(self, n):
+        """
+        Sample a random size for mask and a random mask of size n
+        """
+        mask_size = random.randint(1, n - 1)
+        low, high = self.subset_range
+        mask_size = min(max(mask_size, int(low * n)), int(high * n))
+        mask = np.zeros(n, dtype=bool)
+        mask[:mask_size] = 1
+        np.random.shuffle(mask)
+        return mask
 
     def get_sketch(self, index):
         """
-        Returns the SketchLLM object at index
+        Returns the element at index without resampling a mask
         """
         return self.data[index]
 
@@ -38,7 +53,7 @@ class SketchGraphsCollator:
         self.max_length = max_length
 
     def tokenize(self, strings):
-        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
+        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, input_output_pairs):
         input_strings = [x for x, _ in input_output_pairs]
