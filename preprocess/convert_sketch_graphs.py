@@ -81,16 +81,16 @@ def get_split_name(path):
     return split_name
 
 
-def convert_sketch(index, seq, split_name, quantize_bits):
+def convert_sketch(index, seq, split_name, quantize_bits, new_tokens):
     """Convert a sketch from the SketchGraphs dataset"""
     sketch = sketch_from_sequence(seq)
     sketch_name = f"{split_name}_{index:08}"
     sketch_obj = SketchSG(sketch, sketch_name)
     sketch_dict = sketch_obj.convert()
-    return preprocess_sketch(sketch_dict=sketch_dict, quantize_bits=quantize_bits)
+    return preprocess_sketch(sketch_dict=sketch_dict, quantize_bits=quantize_bits, new_tokens=new_tokens)
 
 
-def convert_split(file, output_dir, split_name, filter_filenames, limit, quantize_bits):
+def convert_split(file, output_dir, split_name, filter_filenames, limit, quantize_bits, new_tokens):
     """Convert the sketches of a given SketchGraphs dataset split"""
     seq_data = flat_array.load_dictionary_flat(file)
     seq_count = len(seq_data["sequences"])
@@ -107,7 +107,8 @@ def convert_split(file, output_dir, split_name, filter_filenames, limit, quantiz
     for filename in tqdm(filter_filenames[:seq_limit]):
         index = get_index(filename)
         seq = seq_data["sequences"][index]
-        sketch_dict = convert_sketch(index=index, seq=seq, split_name=split_name, quantize_bits=quantize_bits)
+        sketch_dict = convert_sketch(index=index, seq=seq, split_name=split_name, quantize_bits=quantize_bits,
+                                     new_tokens=new_tokens)
         if not sketch_dict:
             continue
         sketch_str_dicts.append(sketch_dict)
@@ -117,7 +118,7 @@ def convert_split(file, output_dir, split_name, filter_filenames, limit, quantiz
         json.dump(sketch_str_dicts, f)
 
 
-def main(sg_files, output_dir, filter_path, limit, quantize_bits):
+def main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tokens):
     split_to_filenames = load_filter(filter_path)
 
     start_time = time.time()
@@ -126,7 +127,8 @@ def main(sg_files, output_dir, filter_path, limit, quantize_bits):
         split_name = get_split_name(sg_file)
         filter_filenames = split_to_filenames[split_name]
         convert_split(file=sg_file, output_dir=output_dir, split_name=split_name,
-                      filter_filenames=filter_filenames, limit=limit, quantize_bits=quantize_bits)
+                      filter_filenames=filter_filenames, limit=limit, quantize_bits=quantize_bits,
+                      new_tokens=new_tokens)
 
     print(f"Processing Time: {time.time() - start_time} secs")
 
@@ -141,10 +143,12 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, help="Only process this number of designs")
     parser.add_argument("--quantize-bits", type=int, default=6,
                         help="Number of bits to use for quantization (default 6)")
+    parser.add_argument("--new-tokens", type=int, default=0,
+                        help="Set to nonzero to use new token encoding")
     args = parser.parse_args()
 
     output_dir = get_output_dir(args)
     sg_files = get_files(args)
 
     main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter, limit=args.limit,
-         quantize_bits=args.quantize_bits)
+         quantize_bits=args.quantize_bits, new_tokens=args.new_tokens)
