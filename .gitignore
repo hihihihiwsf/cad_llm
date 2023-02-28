@@ -11,3 +11,4 @@ data/__MACOSX/sg_strings/._.DS_Store
 data/__MACOSX/sg_strings/._sg_str_test.json
 data/__MACOSX/sg_strings/._sg_str_train.json
 data/__MACOSX/sg_strings/._sg_str_val.json
+.vscode/launch.json

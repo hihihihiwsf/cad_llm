@@ -9,6 +9,7 @@ from pathlib import Path
 from experiment_log import experiment_name_to_hps
 from metrics import get_accuracy_counts
 from tqdm import tqdm
+import multiprocessing
 
 print('git test')
 
@@ -35,10 +36,16 @@ def eval_model(model, dataloader, tokenizer):
     print("Sampling from the model to evaluate accuracy (slow) (eval 1 of 2)")
     for batch in tqdm(dataloader):
         labels = batch["labels"].to(device)
-        samples = model.generate(input_ids=batch["input_ids"].to(device),
-                                 attention_mask=batch["attention_mask"].to(device),
-                                 do_sample=False,
-                                 max_new_tokens=labels.shape[1])
+        if args.parallel:
+            samples = model.module.generate(input_ids=batch["input_ids"].to(device),
+                            attention_mask=batch["attention_mask"].to(device),
+                            do_sample=False,
+                            max_new_tokens=labels.shape[1])
+        else:
+            samples = model.generate(input_ids=batch["input_ids"].to(device),
+                                    attention_mask=batch["attention_mask"].to(device),
+                                    do_sample=False,
+                                    max_new_tokens=labels.shape[1])
         stats = get_accuracy_counts(samples=samples, labels=labels, tokenizer=tokenizer)
     tqdm.write("Done")
     accuracy = stats["accurate_count"] / len(dataloader.dataset)
@@ -67,6 +74,7 @@ def main(args):
     batch_size = hps['batch_size']
     subset_range = hps.get('subset_range')
     max_length = hps.get('max_length')
+    num_cpus = multiprocessing.cpu_count()
 
     print("Loading model...")
     start_time = time.time()
@@ -84,8 +92,8 @@ def main(args):
     val_dataset = load_dataset(dataset_dir / "sg_str_val.json", subset_range=subset_range)
     # val_dataset.data = val_dataset.data[:32]
     data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=True, num_workers=num_cpus)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=False, num_workers=num_cpus)
 
     print(f"Data loading time was {int(time.time() - start_time)} seconds")
 
@@ -97,7 +105,8 @@ def main(args):
     log_steps = 500
 
     print("Training model...")
-
+    if args.parallel:
+        model = torch.nn.DataParallel(model, device_ids=[0,1,2,3], output_device=1)
     num_training_steps = num_epochs * len(train_dataloader)
     progress_bar = tqdm(range(num_training_steps))
     step = 0
@@ -107,7 +116,7 @@ def main(args):
         for batch in train_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
             outputs = model(**batch)
-            loss = outputs.loss
+            loss = outputs.loss.mean()
             loss.backward()
 
             optimizer.step()
@@ -144,5 +153,7 @@ if __name__ == "__main__":
                         help="Input folder containing the SketchGraphs preprocessed .npy files")
     parser.add_argument("--chkpt", type=str, required=True,
                         help="Output folder to save checkpoints (loading not implemented)")
+    parser.add_argument("--parallel", action='store_true', help="Calling 4 gpus if set")
+
     args = parser.parse_args()
     main(args)
