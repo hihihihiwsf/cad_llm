@@ -5,10 +5,9 @@ import torch
 import time
 from datetime import date
 import argparse
-
 from pathlib import Path
 from experiment_log import experiment_name_to_hps
-from metrics import count_accurate
+from metrics import get_accuracy_counts
 from tqdm import tqdm
 
 print('git test')
@@ -30,29 +29,31 @@ def load_dataset(dataset_path, subset_range=None):
     return train_dataset
 
 
-def eval_model(model, val_dataloader, device, batch_size):
-    accurate_count = 0
-    total_eval_loss = 0
-    # with torch.no_grad:
-    for val_batch in val_dataloader:
-        # Calculate eval_loss
-        val_batch = {k: v.to(device) for k, v in val_batch.items()}
-        val_outputs = model(**val_batch)
-        total_eval_loss += float(val_outputs.loss.mean())
+def eval_model(model, dataloader, tokenizer):
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-        # Generate samples to test accuracy (do not send labels in for generation)
-        labels = val_batch["labels"]
-        samples = model.generate(input_ids=val_batch["input_ids"],
-                                 attention_mask=val_batch["attention_mask"],
+    print("Sampling from the model to evaluate accuracy (slow) (eval 1 of 2)")
+    for batch in tqdm(dataloader):
+        labels = batch["labels"].to(device)
+        samples = model.generate(input_ids=batch["input_ids"].to(device),
+                                 attention_mask=batch["attention_mask"].to(device),
                                  do_sample=False,
                                  max_new_tokens=labels.shape[1])
+        stats = get_accuracy_counts(samples=samples, labels=labels, tokenizer=tokenizer)
+    tqdm.write("Done")
+    accuracy = stats["accurate_count"] / len(dataloader.dataset)
+    any_correct = stats["any_correct_count"] / len(dataloader.dataset)
 
-        accurate_count += count_accurate(labels=labels, samples=samples)
+    print("Calculating eval_loss (eval 2 of 2)")
+    total_eval_loss = 0
+    for batch in tqdm(dataloader):
+        batch = {k: v.to(device) for k, v in batch.items()}
+        val_outputs = model(**batch)
+        total_eval_loss += float(val_outputs.loss.mean())
+    tqdm.write("Done")
+    eval_loss = total_eval_loss / len(dataloader.dataset)
 
-    val_size = len(val_dataloader) * batch_size
-    accuracy = accurate_count / val_size
-    eval_loss = total_eval_loss / val_size
-    return {"eval_loss": eval_loss, "accuracy: ": accuracy}
+    return {"eval_loss": eval_loss, "eval_accuracy: ": accuracy, "eval_any_correct": any_correct}
 
 
 def main(args):
@@ -66,7 +67,6 @@ def main(args):
     batch_size = hps['batch_size']
     subset_range = hps.get('subset_range')
     max_length = hps.get('max_length')
-    eval_temperature = hps.get('eval_temperature', 1)
 
     print("Loading model...")
     start_time = time.time()
@@ -118,7 +118,8 @@ def main(args):
             if step == 1 or step % eval_steps == 0:
                 print("Evaluating model...")
                 model.eval()
-                eval_stats = eval_model(model, val_dataloader, device, batch_size)
+                with torch.no_grad():
+                    eval_stats = eval_model(model=model, dataloader=val_dataloader, tokenizer=tokenizer)
                 print("eval_stats: ", eval_stats)
                 # To do: Log eval_stats
                 model.train()
