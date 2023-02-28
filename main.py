@@ -11,6 +11,7 @@ from experiment_log import experiment_name_to_hps
 from metrics import count_accurate
 from tqdm import tqdm
 
+print('git test')
 
 def load_model(name, checkpoint=None):
     if name == 'byt5-base':
