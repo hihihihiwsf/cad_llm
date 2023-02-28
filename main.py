@@ -1,5 +1,5 @@
 from dataset.sg_dataset import SketchGraphsDataset, SketchGraphsCollator
-from models.byt5 import get_byt5_model, get_new_byt5_model
+from models.byt5 import get_byt5_model, get_new_byt5_model, get_byt5_small_model
 from torch.utils.data import DataLoader
 import torch
 import time
@@ -18,6 +18,8 @@ def load_model(name, checkpoint=None):
         tokenizer, model = get_byt5_model(checkpoint)
     elif name == 'byt5-base-new':
         tokenizer, model = get_new_byt5_model()
+    elif name == 'byt5-small':
+        tokenizer, model = get_byt5_small_model()
     else:
         raise Exception(f"Unsupported model '{name}'")
     return tokenizer, model

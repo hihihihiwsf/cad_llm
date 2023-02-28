@@ -20,4 +20,10 @@ experiment_name_to_hps = {
         'subset_range': [.2, .8],
         'max_length': 128,
     },
+    'cad_llm_small_test': {
+        'modal': 'byt5-small',
+        'batch_size': 16,
+        'subset_range': [0, 1],
+        'max_length': 128,
+    },
 }
