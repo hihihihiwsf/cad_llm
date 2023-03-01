@@ -7,8 +7,9 @@ import argparse
 import torch
 from pathlib import Path
 from experiment_log import experiment_name_to_hps
-from metrics import get_compute_metrics
 import comet_ml
+from dataset.utils import get_quantized_range
+
 
 def load_model(name):
     if name == 'byt5-base':
@@ -43,6 +44,9 @@ def main(args):
     tokenizer, model = load_model(hps['modal'])
     if torch.cuda.is_available():
         model.to('cuda')
+        quantize_n_bits = 6
+        tokenizer.add_tokens([f"<{i}>" for i in get_quantized_range(quantize_n_bits)])
+        model.resize_token_embeddings(len(tokenizer))
     print(f"Loading model time was {int(time.time() - start_time)} seconds")
 
     print("Loading data...")
@@ -56,12 +60,7 @@ def main(args):
 
     comet_ml.init(project_name="cad-llm-test-v1")
 
-    compute_metrics = get_compute_metrics(
-        exp_name=exp_run_name,
-        dataset=val_dataset,
-        tokenizer=tokenizer,
-        temperature=eval_temperature,
-    )
+    compute_metrics = None
 
     training_args = Seq2SeqTrainingArguments(
         per_device_train_batch_size=batch_size,
@@ -73,7 +72,7 @@ def main(args):
         output_dir=str(save_checkpoint),
         logging_first_step=True,
         evaluation_strategy="steps",
-        eval_steps=1000,
+        eval_steps=5000,
         # eval_steps=1,
         generation_max_length=max_length,
     )

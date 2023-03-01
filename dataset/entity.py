@@ -17,7 +17,7 @@ class Entity:
 
     def to_string(self):
         self._sort_points()
-        return ",".join(f"{x},{y}" for x, y in self.points) + ";"
+        return "".join(f"<{x}><{y}>" for x, y in self.points) + ";"
 
     @staticmethod
     def entities_to_string(entities):

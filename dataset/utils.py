@@ -12,6 +12,10 @@ def get_quantized(vertices, n_bits):
     return (vertices * quantize_range).astype("int32")
 
 
+def get_quantized_range(quantize_n_bits):
+    return range(-2 ** (quantize_n_bits - 1), 2 ** (quantize_n_bits - 1))
+
+
 def choose_random_io_indices(n, subset_range):
     """
     Choose a random nonempty subset of curves for input, and one curve from the remaining for the output.
