@@ -47,6 +47,11 @@ def main(args):
         quantize_n_bits = 6
         tokenizer.add_tokens([f"<{i}>" for i in get_quantized_range(quantize_n_bits)])
         model.resize_token_embeddings(len(tokenizer))
+        # Initialize new token embeddings
+        embedding_params = model.get_input_embeddings().weight.data
+        for i in range(64):
+            # start with the embedding for 'A', ensures no clash with embedding for ';'
+            embedding_params[-i] = embedding_params[65 + i]
     print(f"Loading model time was {int(time.time() - start_time)} seconds")
 
     print("Loading data...")
