@@ -11,7 +11,6 @@ from metrics import get_accuracy_counts
 from tqdm import tqdm
 import multiprocessing
 
-print('git test')
 
 def load_model(name, checkpoint=None):
     if name == 'byt5-base':
@@ -30,22 +29,17 @@ def load_dataset(dataset_path, subset_range=None):
     return train_dataset
 
 
-def eval_model(model, dataloader, tokenizer):
+def eval_model(model, dataloader, tokenizer, parallel):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     print("Sampling from the model to evaluate accuracy (slow) (eval 1 of 2)")
     for batch in tqdm(dataloader):
         labels = batch["labels"].to(device)
-        if args.parallel:
-            samples = model.module.generate(input_ids=batch["input_ids"].to(device),
-                            attention_mask=batch["attention_mask"].to(device),
-                            do_sample=False,
-                            max_new_tokens=labels.shape[1])
-        else:
-            samples = model.generate(input_ids=batch["input_ids"].to(device),
-                                    attention_mask=batch["attention_mask"].to(device),
-                                    do_sample=False,
-                                    max_new_tokens=labels.shape[1])
+        generate_func = model.module.generate if parallel else model.generate
+        samples = generate_func(input_ids=batch["input_ids"].to(device),
+                                attention_mask=batch["attention_mask"].to(device),
+                                do_sample=False,
+                                max_new_tokens=labels.shape[1])
         stats = get_accuracy_counts(samples=samples, labels=labels, tokenizer=tokenizer)
     tqdm.write("Done")
     accuracy = stats["accurate_count"] / len(dataloader.dataset)
@@ -74,7 +68,7 @@ def main(args):
     batch_size = hps['batch_size']
     subset_range = hps.get('subset_range')
     max_length = hps.get('max_length')
-    num_cpus = multiprocessing.cpu_count()
+    num_cpus = multiprocessing.cpu_count() if args.parallel else 1
 
     print("Loading model...")
     start_time = time.time()
@@ -99,14 +93,14 @@ def main(args):
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5)
 
-    num_epochs = 5
-    eval_steps = 4
+    num_epochs = 1
+    eval_steps = 5000
     save_steps = 5000
     log_steps = 500
 
     print("Training model...")
     if args.parallel:
-        model = torch.nn.DataParallel(model, device_ids=[0,1,2,3], output_device=1)
+        model = torch.nn.DataParallel(model, device_ids=[0, 1, 2, 3], output_device=1)
     num_training_steps = num_epochs * len(train_dataloader)
     progress_bar = tqdm(range(num_training_steps))
     step = 0
@@ -128,7 +122,8 @@ def main(args):
                 print("Evaluating model...")
                 model.eval()
                 with torch.no_grad():
-                    eval_stats = eval_model(model=model, dataloader=val_dataloader, tokenizer=tokenizer)
+                    eval_stats = eval_model(model=model, dataloader=val_dataloader, tokenizer=tokenizer,
+                                            parallel=args.parallel)
                 print("eval_stats: ", eval_stats)
                 # To do: Log eval_stats
                 model.train()
