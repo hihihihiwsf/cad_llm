@@ -1,0 +1,8 @@
+# We assume that there is already a bunch of stuff installed in the sagemaker container already:
+# https://github.com/aws/deep-learning-containers/blob/master/pytorch/training/docker/1.9/py3/cu111/Dockerfile.gpu
+# We target a framework_version='1.9'
+# which should use cuda 11.1
+
+comet_ml
+datasets
+transformers

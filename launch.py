@@ -1,0 +1,104 @@
+"""
+Launch a distributed training job on Sagemaker by passing on arguments to main.py
+"""
+
+
+import os
+from datetime import datetime
+import json
+import sagemaker
+import boto3
+from sagemaker.pytorch import PyTorch
+
+from args.sagemaker_args import get_sagemaker_args
+from args.train_args import get_launching_args
+
+
+def train_sagemaker():
+    """Launch a training job using AWS Sagemaker"""
+
+    sagemaker_args = get_sagemaker_args()
+    train_args = get_launching_args()
+
+    boto_session = boto3.session.Session(
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
+        region_name=os.getenv("$AWS_REGION"),
+    )
+    sagemaker_session = sagemaker.Session(boto_session=boto_session)
+
+    if sagemaker_args.aws_account:
+        role = f"arn:aws:iam::{sagemaker_args.aws_account}:role/mintSageMakerExecutionRole"
+    else:
+        role = sagemaker.get_execution_role(sagemaker_session)
+
+    print("role", role)
+
+    gpu_counts = {
+        "ml.p3.2xlarge": 1,
+        "ml.p3.8xlarge": 4,
+        "ml.p3.16xlarge": 8
+    }
+    processes_per_host = gpu_counts[sagemaker_args.instance_type]
+
+    print("Distributed training with a total of:")
+    print(f"\t{processes_per_host * sagemaker_args.instance_count} workers")
+    print(f"\t{sagemaker_args.instance_count} instances of {sagemaker_args.instance_type}")
+    print(f"\t{processes_per_host} GPU(s) per instance")
+
+    entry_point = f"main.py"
+    exp_name = train_args.exp_name
+    exp_run_name = exp_name.replace("_", "-") + '-' + datetime.now().strftime("%m-%d-%y-%H%M")
+    job_name = f"katzm-{exp_run_name}"
+    output_path = f"s3://{sagemaker_args.s3_bucket}/jobs"
+    print("Job name:", job_name)
+    print("Entry point:", entry_point)
+    print("Output path:", output_path)
+
+    # Maximum runtime in seconds
+    # set this to the account max of 432000 sec / 5 days
+    max_run = 5 * 24 * 60 * 60
+    # Max wait time for spot instances
+    # This appears to have to be >= max_run
+    max_wait = 5 * 24 * 60 * 60 if sagemaker_args.use_spot_instances else None
+
+    hyperparameters = vars(train_args)
+    print("Hyperparameters:")
+    print(json.dumps(hyperparameters, indent=4, sort_keys=True))
+
+    estimator = PyTorch(
+        entry_point=entry_point,
+        source_dir=".",
+        output_path=output_path + "/",
+        code_location=output_path,
+        role=role,
+        sagemaker_session=sagemaker_session,
+        instance_count=sagemaker_args.instance_count,
+        instance_type=sagemaker_args.instance_type,
+        volume_size=500,  # Joint data size alone is 22 GB
+        framework_version='1.9',
+        py_version='py38',
+        hyperparameters=hyperparameters,
+        max_run=max_run,
+        # checkpoint_s3_uri=checkpoint_s3_uri,
+        use_spot_instances=sagemaker_args.use_spot_instances,
+        max_wait=max_wait,
+        debugger_hook_config=False  # Disable debugger
+    )
+
+    # We currently just use a single folder for train/valid/test, lets call it train
+    dataset_path = {
+        "train": f"s3://{sagemaker_args.s3_bucket}/dataset/{sagemaker_args.s3_dataset}"
+    }
+    estimator.fit(
+        dataset_path,
+        job_name=job_name,
+        wait=False
+    )
+    print(f"Dispatched job: {job_name}")
+    return estimator
+
+
+if __name__ == "__main__":
+    train_sagemaker()

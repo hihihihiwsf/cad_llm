@@ -1,15 +1,20 @@
+"""
+Train a CAD LLM model
+"""
+
+
 from dataset.sg_dataset import SketchGraphsDataset, SketchGraphsCollator
 from models.byt5 import get_byt5_model, get_new_byt5_model, get_byt5_small_model
 from torch.utils.data import DataLoader
 import torch
 import time
-from datetime import date
 import argparse
 from pathlib import Path
 from experiment_log import experiment_name_to_hps
 from metrics import get_accuracy_counts
 from tqdm import tqdm
 import multiprocessing
+from args.train_args import get_training_args
 
 
 def load_model(name, checkpoint=None):
@@ -57,40 +62,35 @@ def eval_model(model, dataloader, tokenizer, parallel):
     return {"eval_loss": eval_loss, "eval_accuracy: ": accuracy, "eval_any_correct": any_correct}
 
 
-def main(args):
-    exp_name = args.exp_name
-    exp_run_name = exp_name + '-' + date.today().strftime("%m-%d-%y")
-    save_checkpoint = Path(args.chkpt) / exp_run_name
+def main():
+    args = get_training_args()
 
-    print(f"Loading experiment '{exp_name}'")
-    hps = experiment_name_to_hps[exp_name]
+    print(f"Loading experiment '{args.exp_name}'")
+    hps = experiment_name_to_hps[args.exp_name]
     print(hps)
     batch_size = hps['batch_size']
     subset_range = hps.get('subset_range')
     max_length = hps.get('max_length')
     num_cpus = multiprocessing.cpu_count() if args.parallel else 1
 
+    save_checkpoint = Path(args.chkpt) / args.exp_name
+
     print("Loading model...")
-    start_time = time.time()
     load_checkpoint = None  # To do: add to command line args
     tokenizer, model = load_model(hps['modal'], checkpoint=load_checkpoint)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model.to(device)
 
-    print(f"Loading model time was {int(time.time() - start_time)} seconds")
-
     print("Loading data...")
-    start_time = time.time()
-    dataset_dir = Path(args.data)
+    dataset_dir = Path(args.dataset)
     train_dataset = load_dataset(dataset_dir / "sg_str_train.json", subset_range=subset_range)
     val_dataset = load_dataset(dataset_dir / "sg_str_val.json", subset_range=subset_range)
     # val_dataset.data = val_dataset.data[:32]
     data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=True, num_workers=num_cpus)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=False, num_workers=num_cpus)
-
-    print(f"Data loading time was {int(time.time() - start_time)} seconds")
-
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=True,
+                                  num_workers=num_cpus)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=False,
+                                num_workers=num_cpus)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5)
 
     num_epochs = 1
@@ -138,17 +138,6 @@ def main(args):
 
 
 # Example usage:
-# python main.py --exp-name cad_llm_v1 --data /home/ec2-user/SageMaker/efs/data/sg_normalized --chkpt /home/ec2-user/SageMaker/efs/cad_llm_checkpoints
-# python main.py --exp-name cad_llm_v1 --data ~/data/sg_normalized --chkpt ~/cad_llm_checkpoints
+# python main.py --exp_name cad_llm_test --dataset ~/data/sg_normalized --chkpt ~/cad_llm_checkpoints
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--exp-name", type=str, required=True,
-                        help="Experiment name for lookup in experiment_log.py")
-    parser.add_argument("--data", type=str, required=True,
-                        help="Input folder containing the SketchGraphs preprocessed .npy files")
-    parser.add_argument("--chkpt", type=str, required=True,
-                        help="Output folder to save checkpoints (loading not implemented)")
-    parser.add_argument("--parallel", action='store_true', help="Calling 4 gpus if set")
-
-    args = parser.parse_args()
-    main(args)
+    main()
