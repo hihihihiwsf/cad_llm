@@ -31,8 +31,6 @@ class ByT5Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         outputs = self.model(**batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-
-        # Log the run at every epoch
         self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         return loss
 
@@ -40,8 +38,3 @@ class ByT5Model(pl.LightningModule):
         lr = 3e-5
         optimizer = optim.AdamW(self.model.parameters(), lr=lr)
         return optimizer
-
-    # def prepare_data(self):
-    #     download_data()
-    #     tokenize()
-    # def train_dataloader(self):

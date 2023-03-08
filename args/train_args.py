@@ -1,4 +1,5 @@
 import argparse
+import multiprocessing
 import os
 
 
@@ -6,11 +7,10 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True,
                         help="Experiment name for lookup in experiment_log.py")
-    parser.add_argument("--dataset", type=str, default="dataset/sg_strings", help="Dataset path")
-    parser.add_argument("--chkpt", type=str, default="results/checkpoints",
-                        help="Output folder to save checkpoints (loading not implemented)")
-    # Note: use int flag since we cannot send bool to sagemaker
-    parser.add_argument("--parallel", type=int, default=0, help="Calling 4 gpus if set")
+    parser.add_argument("--results_dir", type=str, default="results", help="Directory to save checkpoints and logs")
+    parser.add_argument("--dataset", type=str, default="data/sg_strings", help="Dataset path")
+    parser.add_argument("--num_workers", type=int, default=-1, help="Number of workers to use in the torch dataloader")
+    parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
     return parser
 
 
@@ -27,7 +27,9 @@ def get_training_args():
     args = parser.parse_args()
     set_sagemaker_args(args)
     # Change flag int args (required by sagemaker) back to bool
-    args.parallel = bool(args.parallel)
+    args.comet = bool(args.comet)
+    if args.num_workers == -1:
+        args.num_workers = multiprocessing.cpu_count()
     return args
 
 
