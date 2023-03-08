@@ -4,65 +4,45 @@ Train a CAD LLM model
 
 
 from dataset.sg_dataset import SketchGraphsDataset, SketchGraphsCollator
-from models.byt5 import get_byt5_model, get_new_byt5_model, get_byt5_small_model
+from models.byt5 import ByT5Model
 from torch.utils.data import DataLoader
-import torch
-import time
-import argparse
-from pathlib import Path
+
 from experiment_log import experiment_name_to_hps
-from metrics import get_accuracy_counts
-from tqdm import tqdm
 import multiprocessing
 from args.train_args import get_training_args
 
+from pathlib import Path
 
-def load_model(name, checkpoint=None):
-    if name == 'byt5-base':
-        tokenizer, model = get_byt5_model(checkpoint)
-    elif name == 'byt5-base-new':
-        tokenizer, model = get_new_byt5_model()
-    elif name == 'byt5-small':
-        tokenizer, model = get_byt5_small_model()
-    else:
-        raise Exception(f"Unsupported model '{name}'")
-    return tokenizer, model
+try:
+    import comet_ml  # Import before torch
+except ImportError:
+    pass
+import torch
+from pytorch_lightning import Trainer
 
 
-def load_dataset(dataset_path, subset_range=None):
-    train_dataset = SketchGraphsDataset(dataset_path, subset_range=subset_range)
-    return train_dataset
 
+def get_trainer(args, loggers, callbacks=None):
+    """Get the PyTorch Lightning Trainer"""
+    log_every_n_steps = 100
 
-def eval_model(model, dataloader, tokenizer, parallel):
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    # loggers = [pl.loggers.CSVLogger(".", name="log")]
+    trainer = Trainer(
+        callbacks=callbacks,
+        accelerator="cpu", #args.gpus,  # cpu / gpu
+        devices=1,
+        # logger=loggers,
+        max_epochs=1,
+        log_every_n_steps=log_every_n_steps,
+        resume_from_checkpoint=None,
+    )
 
-    print("Sampling from the model to evaluate accuracy (slow) (eval 1 of 2)")
-    for batch in tqdm(dataloader):
-        labels = batch["labels"].to(device)
-        generate_func = model.module.generate if parallel else model.generate
-        samples = generate_func(input_ids=batch["input_ids"].to(device),
-                                attention_mask=batch["attention_mask"].to(device),
-                                do_sample=False,
-                                max_new_tokens=labels.shape[1])
-        stats = get_accuracy_counts(samples=samples, labels=labels, tokenizer=tokenizer)
-    tqdm.write("Done")
-    accuracy = stats["accurate_count"] / len(dataloader.dataset)
-    any_correct = stats["any_correct_count"] / len(dataloader.dataset)
-
-    print("Calculating eval_loss (eval 2 of 2)")
-    total_eval_loss = 0
-    for batch in tqdm(dataloader):
-        batch = {k: v.to(device) for k, v in batch.items()}
-        val_outputs = model(**batch)
-        total_eval_loss += float(val_outputs.loss.mean())
-    tqdm.write("Done")
-    eval_loss = total_eval_loss / len(dataloader.dataset)
-
-    return {"eval_loss": eval_loss, "eval_accuracy: ": accuracy, "eval_any_correct": any_correct}
+    return trainer
 
 
 def main():
+    """Entry point for our training script"""
+
     args = get_training_args()
 
     print(f"Loading experiment '{args.exp_name}'")
@@ -77,64 +57,53 @@ def main():
 
     print("Loading model...")
     load_checkpoint = None  # To do: add to command line args
-    tokenizer, model = load_model(hps['modal'], checkpoint=load_checkpoint)
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model.to(device)
+    no_pretrain = hps.get("no_pretrain", False)
+    model_name = hps['modal']
+    model = ByT5Model(model_name=model_name, checkpoint=load_checkpoint, no_pretrain=no_pretrain)
 
     print("Loading data...")
     dataset_dir = Path(args.dataset)
-    train_dataset = load_dataset(dataset_dir / "sg_str_train.json", subset_range=subset_range)
-    val_dataset = load_dataset(dataset_dir / "sg_str_val.json", subset_range=subset_range)
-    # val_dataset.data = val_dataset.data[:32]
-    data_collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=max_length)
+
+    train_dataset = SketchGraphsDataset(dataset_dir=dataset_dir, split="train", subset_range=subset_range)
+    val_dataset = SketchGraphsDataset(dataset_dir=dataset_dir, split="val", subset_range=subset_range)
+
+    data_collator = SketchGraphsCollator(tokenizer=model.tokenizer, max_length=max_length)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=True,
                                   num_workers=num_cpus)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator, shuffle=False,
                                 num_workers=num_cpus)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5)
 
-    num_epochs = 1
-    eval_steps = 5000
-    save_steps = 5000
-    log_steps = 500
+    # # We save the logs to the experiment directory
+    # loggers = util.get_loggers(args, exp_name_dir, args_file)
+    # # Save the args to the checkpoint directory to use to resume
+    # with open(args_file, "w", encoding="utf8") as f:
+    #     json.dump(vars(args), f, indent=4)
 
-    print("Training model...")
-    if args.parallel:
-        model = torch.nn.DataParallel(model, device_ids=[0, 1, 2, 3], output_device=1)
-    num_training_steps = num_epochs * len(train_dataloader)
-    progress_bar = tqdm(range(num_training_steps))
-    step = 0
+    trainer = get_trainer(args, loggers=None, callbacks=None)
+    trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
-    model.train()
-    for epoch in range(num_epochs):
-        for batch in train_dataloader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss.mean()
-            loss.backward()
-
-            optimizer.step()
-            optimizer.zero_grad()
-            progress_bar.update(1)
-            step += 1
-
-            if step == 1 or step % eval_steps == 0:
-                print("Evaluating model...")
-                model.eval()
-                with torch.no_grad():
-                    eval_stats = eval_model(model=model, dataloader=val_dataloader, tokenizer=tokenizer,
-                                            parallel=args.parallel)
-                print("eval_stats: ", eval_stats)
-                # To do: Log eval_stats
-                model.train()
-
-            if step == 0 or step % log_steps == 0:
-                pass
-                # To do: Log loss, step, epoch
-
-            if step == 1 or step % save_steps == 0:
-                print("Saving checkpoint")
-                model.save_pretrained(save_checkpoint)
+    #
+    # exp_dir = Path(args.exp_dir)
+    # exp_name_dir = exp_dir / args.exp_name
+    # if not exp_name_dir.exists():
+    #     exp_name_dir.mkdir(parents=True)
+    # if not exp_name_dir.exists():
+    #     exp_name_dir.mkdir(parents=True)
+    # checkpoint_dir = Path(args.checkpoint_dir)
+    # checkpoint_exp_name_dir = checkpoint_dir / args.exp_name
+    # if not checkpoint_exp_name_dir.exists():
+    #     checkpoint_exp_name_dir.mkdir(parents=True)
+    #
+    # args_file = checkpoint_exp_name_dir / "args.json"
+    # # If we are using Sagemaker, check the checkpoints directory
+    #
+    #
+    # # TRAINING
+    # train_dataset = load_dataset(args, split="train")
+    # val_dataset = load_dataset(args, split="val")
+    #
+    # train_model(args, exp_name_dir, checkpoint_exp_name_dir, loggers, train_dataset, val_dataset)
+    #
 
 
 # Example usage:

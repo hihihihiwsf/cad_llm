@@ -1,23 +1,47 @@
+"""
+ByT5 pytorch lightning model
+"""
+
+
+try:
+    import comet_ml  # Import before torch
+except ImportError:
+    pass
+import torch
+import torch.optim as optim
+import pytorch_lightning as pl
 from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
 
 
-def get_byt5_model(checkpoint=None):
-    tokenizer = AutoTokenizer.from_pretrained('google/byt5-base')
-    checkpoint = checkpoint or 'google/byt5-base'
-    model = T5ForConditionalGeneration.from_pretrained(checkpoint)
-    return tokenizer, model
+class ByT5Model(pl.LightningModule):
+    def __init__(self, model_name="google/byt5-base", checkpoint=None, no_pretrain=False):
+        super().__init__()
 
+        if no_pretrain:
+            config = T5Config.from_pretrained(model_name)
+            model = T5ForConditionalGeneration(config)
+            model._init_weights(model)  # maybe redundant
+        else:
+            checkpoint = checkpoint or model_name
+            model = T5ForConditionalGeneration.from_pretrained(checkpoint)
 
-def get_new_byt5_model():
-    tokenizer = AutoTokenizer.from_pretrained('google/byt5-base')
-    config = T5Config.from_pretrained('google/byt5-base')
-    model = T5ForConditionalGeneration(config)
-    model._init_weights(model)  # maybe redundant
-    return tokenizer, model
+        self.model = model
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+    def training_step(self, batch, batch_idx):
+        outputs = self.model(**batch)
+        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
 
-def get_byt5_small_model(checkpoint=None):
-    tokenizer = AutoTokenizer.from_pretrained('google/byt5-small')
-    checkpoint = checkpoint or 'google/byt5-small'
-    model = T5ForConditionalGeneration.from_pretrained(checkpoint)
-    return tokenizer, model
+        # Log the run at every epoch
+        self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        return loss
+
+    def configure_optimizers(self):
+        lr = 3e-5
+        optimizer = optim.AdamW(self.model.parameters(), lr=lr)
+        return optimizer
+
+    # def prepare_data(self):
+    #     download_data()
+    #     tokenize()
+    # def train_dataloader(self):
