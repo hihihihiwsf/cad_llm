@@ -14,17 +14,18 @@ from args.launch_args import get_launch_args
 from args.main_args import get_main_args_for_launch
 
 
-def train_sagemaker():
+def launch_sagemaker():
     """Launch a training job using AWS Sagemaker"""
 
     launch_args = get_launch_args()
     main_args = get_main_args_for_launch()  # args to pass to main.py
 
+    aws_region = os.getenv("AWS_REGION")
     boto_session = boto3.session.Session(
         aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
         aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
-        region_name=os.getenv("$AWS_REGION"),
+        region_name=aws_region,
     )
     sagemaker_session = sagemaker.Session(boto_session=boto_session)
 
@@ -75,8 +76,8 @@ def train_sagemaker():
         instance_count=launch_args.instance_count,
         instance_type=launch_args.instance_type,
         volume_size=500,  # Joint data size alone is 22 GB
-        framework_version='1.9',
-        py_version='py38',
+        framework_version='1.13',
+        py_version='py39',
         hyperparameters=hyperparameters,
         max_run=max_run,
         # checkpoint_s3_uri=checkpoint_s3_uri,
@@ -95,8 +96,9 @@ def train_sagemaker():
         wait=False
     )
     print(f"Dispatched job: {job_name}")
+    print(f"https://{aws_region}.console.aws.amazon.com/sagemaker/home?region={aws_region}#/jobs/{job_name}")
     return estimator
 
 
 if __name__ == "__main__":
-    train_sagemaker()
+    launch_sagemaker()
