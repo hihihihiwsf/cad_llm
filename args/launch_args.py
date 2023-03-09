@@ -1,13 +1,13 @@
 """
 
-Sagemaker training args
+Sagemaker args for launch.py
 
 """
 
 import argparse
 
 
-def get_sagemaker_args():
+def get_launch_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--aws_profile",
@@ -51,6 +51,5 @@ def get_sagemaker_args():
         default=False,
         help="Train using AWS spot instances",
     )
-
     sagemaker_args, _ = parser.parse_known_args()
     return sagemaker_args

@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import pytorch_lightning as pl
 from experiment_log import experiment_name_to_hps
+from pytorch_lightning.callbacks import ModelCheckpoint
+import aws_utils
 
 
 def get_loggers(args, log_dir):
@@ -30,6 +32,19 @@ def get_loggers(args, log_dir):
         args.comet_experiment_key = comet_logger.experiment.get_key()
         loggers.append(comet_logger)
     return loggers
+
+
+def get_checkpoint_callbacks(log_dir, all_checkpoint_dir, using_sagemaker):
+    checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min", dirpath=log_dir, filename=f"best",
+                                          save_last=True)
+    # Also save in a checkpoint directory that is backed up to s3 during training ??
+    checkpoint_callback.CHECKPOINT_NAME_LAST = "last"
+    all_checkpoint_callback = ModelCheckpoint(dirpath=all_checkpoint_dir, filename="{epoch}", every_n_epochs=1)
+    callbacks = [checkpoint_callback, all_checkpoint_callback]
+    if using_sagemaker:
+        # Sync the checkpoints to s3 manually after each epoch
+        callbacks.append(aws_utils.SyncCheckpoint())
+    return callbacks
 
 
 def get_exp_hyperparams(exp_name, log_dir):

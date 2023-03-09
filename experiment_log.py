@@ -26,7 +26,7 @@ experiment_name_to_hps = {
         'subset_range': [0, 1],
         'max_length': 128,
     },
-    'cad_llm_test': {
+    'cad_llm_test1': {
         'modal': 'google/byt5-base',
         'batch_size': 2,
         'subset_range': [0, 1],

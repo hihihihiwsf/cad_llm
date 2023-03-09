@@ -34,6 +34,12 @@ class ByT5Model(pl.LightningModule):
         self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         return loss
 
+    def validation_step(self, batch, batch_idx):
+        outputs = self.model(**batch)
+        loss = outputs.loss
+        self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        return loss
+
     def configure_optimizers(self):
         lr = 3e-5
         optimizer = optim.AdamW(self.model.parameters(), lr=lr)

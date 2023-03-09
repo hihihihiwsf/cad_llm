@@ -3,6 +3,7 @@
 # We target a framework_version='1.9'
 # which should use cuda 11.1
 
+pytorch-lightning
 comet_ml
 datasets
 transformers
