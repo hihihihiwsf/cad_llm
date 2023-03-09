@@ -2,10 +2,12 @@ from torch.utils.data import Dataset
 import numpy as np
 import random
 import json
+from pathlib import Path
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, path, subset_range=None):
+    def __init__(self, dataset_dir, split, subset_range=None):
+        path = Path(dataset_dir) / f"sg_str_{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
 
