@@ -33,7 +33,7 @@ def main():
     loggers = get_loggers(args=args, log_dir=results_dir)
 
     print("Loading model...")
-    model = ByT5Model(model_name=hps['modal'], checkpoint=None, no_pretrain=hps.get("no_pretrain", False))
+    model = ByT5Model(model_name=hps['modal'], checkpoint=None, no_pretrain=hps.get("no_pretrain", False), args=args)
 
     print("Loading data...")
     dataset_dir = Path(args.dataset)
@@ -49,8 +49,17 @@ def main():
                                           using_sagemaker=args.using_sagemaker)
     print("Training the model...")
     log_every_n_steps = 100
-    trainer = Trainer(callbacks=call_backs, accelerator="auto", devices="auto", strategy="ddp", logger=loggers,
-                      max_epochs=3, log_every_n_steps=log_every_n_steps, resume_from_checkpoint=None)
+    trainer = Trainer(
+        callbacks=call_backs,
+        accelerator="auto",
+        devices="auto",
+        strategy="ddp",
+        logger=loggers,
+        max_epochs=3,
+        log_every_n_steps=log_every_n_steps,
+        val_check_interval=0.25,
+        resume_from_checkpoint=None,
+    )
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
 

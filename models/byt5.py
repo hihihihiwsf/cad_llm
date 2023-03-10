@@ -14,7 +14,7 @@ from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, model_name="google/byt5-base", checkpoint=None, no_pretrain=False):
+    def __init__(self, model_name="google/byt5-base", checkpoint=None, no_pretrain=False, args=None):
         super().__init__()
 
         if no_pretrain:
@@ -27,6 +27,7 @@ class ByT5Model(pl.LightningModule):
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.args = args
 
     def training_step(self, batch, batch_idx):
         outputs = self.model(**batch)
