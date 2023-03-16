@@ -7,10 +7,10 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-import torch
 import torch.optim as optim
 import pytorch_lightning as pl
 from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
+from util import get_quantized_range
 
 
 class ByT5Model(pl.LightningModule):
@@ -28,6 +28,24 @@ class ByT5Model(pl.LightningModule):
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.args = args
+
+        # Using new tokens is the default
+        new_tokens = not (args and args.ascii_encoding)
+        if new_tokens:
+            self.adjust_to_use_new_tokens()
+
+    def adjust_to_use_new_tokens(self):
+        # Add new tokens to the tokenizer
+        quantize_n_bits = 6  # Hard code for now
+        new_tokens = [f"<{i}>" for i in get_quantized_range(quantize_n_bits)]
+        self.tokenizer.add_tokens(new_tokens)
+
+        # Add new token embeddings and initialize using learned embeddings
+        self.model.resize_token_embeddings(len(self.tokenizer))
+        embedding_params = self.model.get_input_embeddings().weight.data
+        for i in range(len(new_tokens)):
+            # start with the embedding for 'A', ensures no clash with embedding for ';'
+            embedding_params[-i] = embedding_params[65 + i]
 
     def training_step(self, batch, batch_idx):
         outputs = self.model(**batch)

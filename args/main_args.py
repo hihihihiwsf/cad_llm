@@ -11,6 +11,8 @@ def get_parser():
     parser.add_argument("--dataset", type=str, default="data/sg_strings", help="Dataset path")
     parser.add_argument("--num_workers", type=int, default=-1, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
+    parser.add_argument("--ascii_encoding", type=int, default=0,
+                        help="Use ascii ByT5 encoding instead of single token encoding")
     return parser
 
 
@@ -27,6 +29,7 @@ def get_training_args():
     args = parser.parse_args()
 
     # Change flag int args (required by sagemaker) back to bool
+    args.ascii_encoding = bool(args.ascii_encoding)
     args.comet = bool(args.comet)
     if args.num_workers == -1:
         args.num_workers = multiprocessing.cpu_count()
