@@ -19,6 +19,7 @@ from tqdm import tqdm
 from sketchgraphs.data import flat_array, sketch_from_sequence
 import sketch_sg
 from preprocessing import preprocess_sketch
+from deduplicate import deduplicate_splits
 
 importlib.reload(sketch_sg)
 from sketch_sg import SketchSG
@@ -90,7 +91,7 @@ def convert_sketch(index, seq, split_name, quantize_bits, new_tokens):
     return preprocess_sketch(sketch_dict=sketch_dict, quantize_bits=quantize_bits, new_tokens=new_tokens)
 
 
-def convert_split(file, output_dir, split_name, filter_filenames, limit, quantize_bits, new_tokens):
+def convert_split(file, split_name, filter_filenames, limit, quantize_bits, new_tokens):
     """Convert the sketches of a given SketchGraphs dataset split"""
     seq_data = flat_array.load_dictionary_flat(file)
     seq_count = len(seq_data["sequences"])
@@ -113,22 +114,33 @@ def convert_split(file, output_dir, split_name, filter_filenames, limit, quantiz
             continue
         sketch_str_dicts.append(sketch_dict)
 
-    filename = output_dir / f"sg_str_{split_name}.json"
-    with open(filename, "w") as f:
-        json.dump(sketch_str_dicts, f)
+    return sketch_str_dicts
+
+
+def save_splits(output_dir, split_to_sketches):
+    for split_name, sketches in split_to_sketches.items():
+        filename = output_dir / f"sg_str_{split_name}.json"
+        with open(filename, "w") as f:
+            json.dump(sketches, f)
 
 
 def main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tokens):
     split_to_filenames = load_filter(filter_path)
+    assert split_to_filenames.keys() == {"train", "val", "test"}, "All splits required for deduplication"
 
     start_time = time.time()
 
+    split_to_sketches = {}
     for sg_file in sg_files:
         split_name = get_split_name(sg_file)
         filter_filenames = split_to_filenames[split_name]
-        convert_split(file=sg_file, output_dir=output_dir, split_name=split_name,
-                      filter_filenames=filter_filenames, limit=limit, quantize_bits=quantize_bits,
-                      new_tokens=new_tokens)
+        sketches = convert_split(file=sg_file, split_name=split_name, filter_filenames=filter_filenames,
+                                 limit=limit, quantize_bits=quantize_bits, new_tokens=new_tokens)
+        split_to_sketches[split_name] = sketches
+
+    split_to_sketches = deduplicate_splits(split_to_sketches)
+
+    save_splits(output_dir, split_to_sketches)
 
     print(f"Processing Time: {time.time() - start_time} secs")
 
@@ -141,9 +153,9 @@ if __name__ == "__main__":
     parser.add_argument("--filter", type=str, required=True,
                         help="File containing indices of deduped sketches ('train_test.json')")
     parser.add_argument("--limit", type=int, help="Only process this number of designs")
-    parser.add_argument("--quantize-bits", type=int, default=6,
+    parser.add_argument("--quantize_bits", type=int, default=6,
                         help="Number of bits to use for quantization (default 6)")
-    parser.add_argument("--new-tokens", type=int, default=0,
+    parser.add_argument("--new_tokens", type=int, default=0,
                         help="Set to nonzero to use new token encoding")
     args = parser.parse_args()
 
