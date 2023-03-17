@@ -71,7 +71,7 @@ class ByT5Model(pl.LightningModule):
 
         for i, sample in enumerate(all_samples):
             # sketch = val_dataset.get_sketch(index=i)
-            sketch = batch['sketch'][i]
+            sketch = batch['sketches'][i]
             i += 1
             label_ents = set([ent for j, ent in enumerate(sketch["entities"]) if not sketch["mask"][j]])
             sample_ents = set(get_entities_from_sample(sample))
@@ -87,12 +87,9 @@ class ByT5Model(pl.LightningModule):
             
         df = pd.DataFrame(info, columns=columns)        
 
-        df["percent_autocompleted"] = df.matching_ent_count / df.missing_ent_count
-        df["percent_useful"] = df.matching_ent_count / df.sample_ent_count
-        df["any_autocompleted"] = (df.matching_ent_count >= 1)
-        df["all_autocompleted"] = (df.matching_ent_count == df.missing_ent_count)
-        df["exact_match"] = (df.matching_ent_count == df.missing_ent_count) & (df.sample_ent_count == df.missing_ent_count)
-        df["bucket_percent_hidden"] = df.percent_hidden.round(decimals=1)
+
+        df["top1_full_sketch"] = (df.matching_ent_count == df.missing_ent_count) & (df.sample_ent_count == df.missing_ent_count)
+
 
         return df
 
@@ -119,12 +116,7 @@ class ByT5Model(pl.LightningModule):
         if batch_idx % 10 == 0:
 
             df = self.calc_metric(batch)
-            self.log(f"percent_autocompleted", np.mean(df["percent_autocompleted"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log(f"percent_useful", np.mean(df["percent_useful"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log(f"any_autocompleted", np.mean(df["any_autocompleted"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log(f"all_autocompleted", np.mean(df["all_autocompleted"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log(f"exact_match", np.mean(df["exact_match"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log(f"bucket_percent_hidden", np.mean(df["bucket_percent_hidden"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"top1_full_sketch", np.mean(df["top1_full_sketch"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
         return loss
 

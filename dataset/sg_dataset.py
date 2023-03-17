@@ -36,7 +36,10 @@ class SketchGraphsDataset(Dataset):
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
-        return input_text, output_text, self.get_sketch(index)
+        sketch_dict['input_text'] = input_text
+        sketch_dict['output_text']= output_text
+        # return input_text, output_text, self.get_sketch(index)
+        return sketch_dict
 
     def get_mask(self, n):
         """
@@ -68,11 +71,9 @@ class SketchGraphsCollator:
     def tokenize(self, strings):
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
 
-    def __call__(self, input_output_pairs):
-        input_strings = [x for x, _, _ in input_output_pairs]
-        output_strings = [y for _, y, _ in input_output_pairs]
-        sktch = [z for _, _, z in input_output_pairs]
-
+    def __call__(self, sketch_dicts):
+        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
+        output_strings = [sketch['output_text'] for sketch in sketch_dicts]
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
 
@@ -84,7 +85,7 @@ class SketchGraphsCollator:
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
             "labels": labels,
-            "sketch": sktch
+            "sketches": sketch_dicts
         }
         return batch
 
