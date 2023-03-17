@@ -113,8 +113,3 @@ class ByT5Model(pl.LightningModule):
         lr = 3e-5
         optimizer = optim.AdamW(self.model.parameters(), lr=lr)
         return optimizer
-
-        print('test')
-        print('test2')
-        print('test3')
-        print('test4')
