@@ -41,8 +41,7 @@ def main():
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
     print("Training the model...")
-    # log_every_n_steps = 100
-    log_every_n_steps = 1
+    log_every_n_steps = 100
     trainer = Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,

@@ -73,6 +73,6 @@ class ByT5Model(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        lr = 3e-5
+        lr = self.args.lr
         optimizer = optim.AdamW(self.model.parameters(), lr=lr)
         return optimizer
