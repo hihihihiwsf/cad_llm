@@ -9,20 +9,25 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     vertices = sketch_dict["vertices"]
     curves = sketch_dict["curves"]
 
-    # filter out sketches with only 1 curve
-    if len(curves) == 1:
-        return None
-
     # quantize vertices
     vertices = normalize_and_quantize_vertices(vertices=vertices, n_bits=quantize_bits)
     # combine vertices and curves back to entities (lists of points)
     entities = [[list(vertices[i - 1]) for i in curve] for curve in curves]
     # sort points in each entity
     entities = [sort_points(points) for points in entities]
+    # convert to tuples for deduplication
+    entities = [tuple(tuple(point) for point in points) for points in entities]
+    # remove duplicate entities
+    entities = list(set(entities))
+    # remove degenerate entities e.g. line with same start and end point
+    entities = [points for points in entities if len(points) == len(set(points))]
+    # filter out sketches with only none or one entity remaining
+    if len(entities) <= 1:
+        return None
     # sort entities
-    entities = sorted(entities)
+    entities.sort()
     # flatten [[x1, y1], [x2, y2], ...] -> [x1, y1, x2, y2, ...]
-    flat_entities = [sum(points, []) for points in entities]
+    flat_entities = [sum(points, tuple()) for points in entities]
     # convert each entity to a string
     if not new_tokens:
         str_entities = [",".join([str(x) for x in ent]) + ";" for ent in flat_entities]

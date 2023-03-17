@@ -7,7 +7,7 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset import SketchGraphsDataset, SketchGraphsCollator
+from dataset.sg_dataset import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
 from torch.utils.data import DataLoader
 from util import get_loggers, get_exp_hyperparams, get_checkpoint_callbacks
@@ -33,17 +33,16 @@ def main():
     loggers = get_loggers(args=args, log_dir=results_dir)
 
     print("Loading model...")
-    model = ByT5Model(model_name=hps['modal'], checkpoint=None, no_pretrain=hps.get("no_pretrain", False))
+    model = ByT5Model(model_name=hps['modal'], checkpoint=None, no_pretrain=hps.get("no_pretrain", False), args=args)
 
     print("Loading data...")
     dataset_dir = Path(args.dataset)
-    train_dataset = SketchGraphsDataset(dataset_dir=dataset_dir, split="train", subset_range=hps.get("subset_range"))
-    val_dataset = SketchGraphsDataset(dataset_dir=dataset_dir, split="val", subset_range=hps.get("subset_range"))
-    data_collator = SketchGraphsCollator(tokenizer=model.tokenizer, max_length=hps.get("max_length"))
-    train_dataloader = DataLoader(train_dataset, batch_size=hps['batch_size'], collate_fn=data_collator, shuffle=True,
-                                  num_workers=args.num_workers)
-    val_dataloader = DataLoader(val_dataset, batch_size=hps['batch_size'], collate_fn=data_collator, shuffle=False,
-                                num_workers=args.num_workers)
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, dataset_dir=dataset_dir, split="train",
+                                                   hps=hps, shuffle=False, num_workers=args.num_workers,
+                                                   ascii_encoding=args.ascii_encoding)
+    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, dataset_dir=dataset_dir, split="val",
+                                                 hps=hps, shuffle=True, num_workers=args.num_workers,
+                                                 ascii_encoding=args.ascii_encoding)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)

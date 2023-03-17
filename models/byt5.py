@@ -15,10 +15,11 @@ import sys
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 import numpy as np
 import pandas as pd
+from util import get_quantized_range
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, model_name="google/byt5-base", checkpoint=None, no_pretrain=False):
+    def __init__(self, model_name="google/byt5-base", checkpoint=None, no_pretrain=False, args=None):
         super().__init__()
 
         if no_pretrain:
@@ -31,6 +32,25 @@ class ByT5Model(pl.LightningModule):
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.args = args
+
+        # Using new tokens is the default
+        new_tokens = not (args and args.ascii_encoding)
+        if new_tokens:
+            self.adjust_to_use_new_tokens()
+
+    def adjust_to_use_new_tokens(self):
+        # Add new tokens to the tokenizer
+        quantize_n_bits = 6  # Hard code for now
+        new_tokens = [f"<{i}>" for i in get_quantized_range(quantize_n_bits)]
+        self.tokenizer.add_tokens(new_tokens)
+
+        # Add new token embeddings and initialize using learned embeddings
+        self.model.resize_token_embeddings(len(self.tokenizer))
+        embedding_params = self.model.get_input_embeddings().weight.data
+        for i in range(len(new_tokens)):
+            # start with the embedding for 'A', ensures no clash with embedding for ';'
+            embedding_params[-i] = embedding_params[65 + i]
 
     
     def calc_metric(self, batch):

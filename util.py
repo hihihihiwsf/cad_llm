@@ -56,3 +56,7 @@ def get_exp_hyperparams(exp_name, log_dir):
     with open(hyperparams_file, "w", encoding="utf8") as f:
         json.dump(hyperparams, f, indent=4)
     return hyperparams
+
+
+def get_quantized_range(quantize_n_bits):
+    return range(-2 ** (quantize_n_bits - 1), 2 ** (quantize_n_bits - 1))
