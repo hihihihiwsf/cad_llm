@@ -19,24 +19,22 @@ from util import get_quantized_range
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, model_name="google/byt5-base", checkpoint=None, no_pretrain=False, args=None):
+    def __init__(self, args):
         super().__init__()
 
-        if no_pretrain:
-            config = T5Config.from_pretrained(model_name)
+        if args.untrained_model:
+            config = T5Config.from_pretrained(args.model_name)
             model = T5ForConditionalGeneration(config)
             model._init_weights(model)  # maybe redundant
         else:
-            checkpoint = checkpoint or model_name
-            model = T5ForConditionalGeneration.from_pretrained(checkpoint)
+            model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
 
-        # Using new tokens is the default
-        new_tokens = not (args and args.ascii_encoding)
-        if new_tokens:
+        # If using single token encoding - adjust tokenizer and model embeddings
+        if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
 
     def adjust_to_use_new_tokens(self):
