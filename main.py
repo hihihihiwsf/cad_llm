@@ -50,7 +50,7 @@ def main():
     print("Training the model...")
     log_every_n_steps = 100
     trainer = Trainer(callbacks=call_backs, accelerator="auto", devices="auto", strategy="ddp", logger=loggers,
-                      max_epochs=3, log_every_n_steps=log_every_n_steps, resume_from_checkpoint=None)
+                      max_epochs=3, log_every_n_steps=log_every_n_steps, resume_from_checkpoint=None, limit_train_batches=0.001, limit_val_batches=0.01, val_check_interval=5)
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
 
