@@ -95,6 +95,7 @@ class ByT5Model(pl.LightningModule):
         loss = outputs.loss
         self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         
+        
         if batch_idx % 10 == 0:
 
             df = self.calc_metric(batch)
