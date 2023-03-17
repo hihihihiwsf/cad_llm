@@ -32,23 +32,14 @@ class ByT5Model(pl.LightningModule):
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-
-    # def on_train_batch_start(self, batch, batch_idx: int):
-    #     # if batch_idx % 300 == 0:
-    #     #     print('1', batch_idx)
-    #     return super().on_train_batch_start(batch, batch_idx)
     
     def calc_metric(self, batch):
-
-
-
 
         labels = batch["labels"].to("cuda")
         all_samples = self.model.generate(input_ids=batch["input_ids"].to("cuda"),
                                 attention_mask=batch["attention_mask"].to("cuda"),
                                 do_sample=False,
                                 max_new_tokens=labels.shape[1])
-        # all_samples += samples
 
         columns=["ent_count", "missing_ent_count", "percent_hidden", "sample_ent_count", "matching_ent_count"]
         info = []
@@ -85,11 +76,9 @@ class ByT5Model(pl.LightningModule):
 
         return df
 
-    #     return super().on_validation_batch_start(batch, batch_idx, dataloader_idx)
 
     def training_step(self, batch, batch_idx):
-        # if batch_idx % 300 == 0:
-        #     print('3', batch_idx)
+
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
@@ -97,16 +86,13 @@ class ByT5Model(pl.LightningModule):
         self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         return loss
 
+
     def validation_step(self, batch, batch_idx):
-        stat = {}
-        if batch_idx % 10 == 0:
-            stat['fake_acc'] = .2
         
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss
-        stat['loss'] = loss
         self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         
         if batch_idx % 10 == 0:
@@ -118,9 +104,9 @@ class ByT5Model(pl.LightningModule):
             self.log(f"all_autocompleted", np.mean(df["all_autocompleted"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             self.log(f"exact_match", np.mean(df["exact_match"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             self.log(f"bucket_percent_hidden", np.mean(df["bucket_percent_hidden"]), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            
 
         return loss
+
 
     def configure_optimizers(self):
         lr = 3e-5
