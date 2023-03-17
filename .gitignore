@@ -8,3 +8,4 @@ results
 lightning_logs
 .vscode/launch.json
 cometml.json
+checkpoints/
