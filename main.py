@@ -10,7 +10,7 @@ except ImportError:
 from dataset.sg_dataset import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
 from torch.utils.data import DataLoader
-from util import get_loggers, get_exp_hyperparams, get_checkpoint_callbacks
+from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
 from pytorch_lightning import Trainer
@@ -29,20 +29,14 @@ def main():
     if not checkpoint_dir.exists():
         checkpoint_dir.mkdir(parents=True)
 
-    hps = get_exp_hyperparams(exp_name=args.exp_name, log_dir=results_dir)
     loggers = get_loggers(args=args, log_dir=results_dir)
 
     print("Loading model...")
-    model = ByT5Model(model_name=hps['modal'], checkpoint=None, no_pretrain=hps.get("no_pretrain", False), args=args)
+    model = ByT5Model(args=args)
 
     print("Loading data...")
-    dataset_dir = Path(args.dataset)
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, dataset_dir=dataset_dir, split="train",
-                                                   hps=hps, shuffle=False, num_workers=args.num_workers,
-                                                   ascii_encoding=args.ascii_encoding)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, dataset_dir=dataset_dir, split="val",
-                                                 hps=hps, shuffle=True, num_workers=args.num_workers,
-                                                 ascii_encoding=args.ascii_encoding)
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=False)
+    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=True)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -50,9 +44,9 @@ def main():
     log_every_n_steps = 100
     trainer = Trainer(
         callbacks=call_backs,
-        accelerator="auto",
-        devices="auto",
-        strategy="ddp",
+        accelerator=args.accelerator,
+        devices=args.devices,
+        strategy=args.strategy,
         logger=loggers,
         max_epochs=3,
         log_every_n_steps=log_every_n_steps,

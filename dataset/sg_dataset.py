@@ -6,24 +6,25 @@ from pathlib import Path
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, dataset_dir, split, subset_range=None, ascii_encoding=False):
-        path = Path(dataset_dir) / f"sg_str_{split}.json"
+    def __init__(self, args, split):
+        path = Path(args.dataset) / f"sg_str_{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
 
         # Sanity check text format
         entity_string = self.data[0]["entities"][0]
-        if not ascii_encoding:
-            error_message = f"Expected format '<-31><17>' not '-31, 17', found '{entity_string}'"
-            assert entity_string[0] == "<", error_message
-            assert "," not in self.data[0]["entities"][0], error_message
-        else:
+        if args.ascii_encoding:
             error_message = f"Expected format '-31, 17' not '<-31><17>', found '{entity_string}'"
             assert entity_string[0] != "<", error_message
             assert "," in self.data[0]["entities"][0], error_message
+        else:
+            error_message = f"Expected format '<-31><17>' not '-31, 17', found '{entity_string}'"
+            assert entity_string[0] == "<", error_message
+            assert "," not in self.data[0]["entities"][0], error_message
 
-        self.subset_range = subset_range or [0, 1]
-        assert self.subset_range[0] >= 0 and self.subset_range[1] <= 1
+        self.min_input_percent = args.min_input_percent
+        self.max_input_percent = args.max_input_percent
+        assert self.min_input_percent >= 0 and self.max_input_percent <= 1
 
     def __getitem__(self, index):
         """
@@ -45,7 +46,7 @@ class SketchGraphsDataset(Dataset):
         Sample a random size for mask and a random mask of size n
         """
         mask_size = random.randint(1, n - 1)
-        low, high = self.subset_range
+        low, high = self.max_input_percent, self.max_input_percent
         mask_size = min(max(mask_size, int(low * n)), int(high * n))
         mask = np.zeros(n, dtype=bool)
         mask[:mask_size] = 1
@@ -89,9 +90,8 @@ class SketchGraphsCollator:
         return batch
 
 
-def get_sketchgraphs_dataloader(tokenizer, dataset_dir, split, hps, shuffle, num_workers, ascii_encoding):
-    dataset = SketchGraphsDataset(dataset_dir=dataset_dir, split=split, subset_range=hps.get("subset_range"),
-                                  ascii_encoding=ascii_encoding)
-    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=hps.get("max_length"))
-    return DataLoader(dataset, batch_size=hps['batch_size'], collate_fn=collator, shuffle=shuffle,
-                      num_workers=num_workers)
+def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
+    dataset = SketchGraphsDataset(split=split, args=args)
+    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length)
+    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
+                      num_workers=args.num_workers)

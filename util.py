@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 import pytorch_lightning as pl
-from experiment_log import experiment_name_to_hps
 from pytorch_lightning.callbacks import ModelCheckpoint
 import aws_utils
 
@@ -45,17 +44,6 @@ def  get_checkpoint_callbacks(log_dir, all_checkpoint_dir, using_sagemaker):
         # Sync the checkpoints to s3 manually after each epoch
         callbacks.append(aws_utils.SyncCheckpoint())
     return callbacks
-
-
-def get_exp_hyperparams(exp_name, log_dir):
-    print(f"Loading hyperparameters for experiment '{exp_name}'")
-    hyperparams = experiment_name_to_hps[exp_name]
-    hyperparams_file = log_dir / "hyperparams.json"
-    # Save the hyperparameters
-    print(hyperparams)
-    with open(hyperparams_file, "w", encoding="utf8") as f:
-        json.dump(hyperparams, f, indent=4)
-    return hyperparams
 
 
 def get_quantized_range(quantize_n_bits):

@@ -11,7 +11,6 @@ import boto3
 from sagemaker.pytorch import PyTorch
 from args.launch_args import get_launch_args
 from args.main_args import get_main_args_for_launch
-from experiment_log import experiment_name_to_hps
 
 
 def launch_sagemaker():
@@ -48,7 +47,6 @@ def launch_sagemaker():
 
     entry_point = f"main.py"
     exp_name = main_args.exp_name
-    assert exp_name in experiment_name_to_hps, f"experiment {exp_name} not found in experiment_log"
 
     exp_run_name = exp_name.replace("_", "-") + '-' + datetime.now().strftime("%m-%d-%y-%H%M")
     job_name = f"katzm-{exp_run_name}"
