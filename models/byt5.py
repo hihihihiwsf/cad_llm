@@ -55,9 +55,9 @@ class ByT5Model(pl.LightningModule):
     
     def calc_metric(self, batch):
 
-        labels = batch["labels"].to("cuda")
-        all_samples = self.model.generate(input_ids=batch["input_ids"].to("cuda"),
-                                attention_mask=batch["attention_mask"].to("cuda"),
+        labels = batch["labels"]
+        all_samples = self.model.generate(input_ids=batch["input_ids"],
+                                attention_mask=batch["attention_mask"],
                                 do_sample=False,
                                 max_new_tokens=labels.shape[1])
 
