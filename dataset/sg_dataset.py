@@ -38,7 +38,7 @@ class SketchGraphsDataset(Dataset):
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
         sketch_dict['input_text'] = input_text
-        sketch_dict['output_text']= output_text
+        sketch_dict['output_text'] = output_text
         return sketch_dict
 
     def get_mask(self, n):
@@ -52,12 +52,6 @@ class SketchGraphsDataset(Dataset):
         mask[:mask_size] = 1
         np.random.shuffle(mask)
         return mask
-
-    def get_sketch(self, index):
-        """
-        Returns the element at index without resampling a mask
-        """
-        return self.data[index]
 
     def __len__(self):
         return len(self.data)
