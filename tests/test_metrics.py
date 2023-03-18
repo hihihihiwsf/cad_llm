@@ -1,7 +1,7 @@
 # import os
 # os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-from metrics import count_accurate
+from metrics import calculate_accuracy
 import torch
 import unittest
 
@@ -16,6 +16,6 @@ class TestMetrics(unittest.TestCase):
             [0, 48, 54, 52, 47, 48, 52, 52, 47, 54, 52, 47, 48, 52, 52, 62, 1, 0, 0, 0],
             [0, 48, 54, 52, 47, 48, 52, 47, 48, 54, 52, 47, 52, 62, 1, 0, 0, 0, 0, 0],
         ])
-        expected_accurate = 1
-        accurate = count_accurate(labels=labels, samples=samples)
-        self.assertEqual(accurate, expected_accurate)
+        expected_accuracy = 0.5
+        accuracy = calculate_accuracy(labels=labels, samples=samples)
+        self.assertEqual(accuracy, expected_accuracy)

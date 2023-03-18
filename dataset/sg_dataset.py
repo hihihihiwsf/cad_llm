@@ -46,7 +46,7 @@ class SketchGraphsDataset(Dataset):
         Sample a random size for mask and a random mask of size n
         """
         mask_size = random.randint(1, n - 1)
-        low, high = self.max_input_percent, self.max_input_percent
+        low, high = self.min_input_percent, self.max_input_percent
         mask_size = min(max(mask_size, int(low * n)), int(high * n))
         mask = np.zeros(n, dtype=bool)
         mask[:mask_size] = 1

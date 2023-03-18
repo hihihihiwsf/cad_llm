@@ -11,6 +11,7 @@ import torch
 import torch.optim as optim
 import pytorch_lightning as pl
 from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
+from transformers.modeling_utils import unwrap_model
 import sys  
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy
@@ -65,11 +66,13 @@ class ByT5Model(pl.LightningModule):
         self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
         if batch_idx % 10 == 0:
-            samples = self.model.generate(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                          do_sample=False, max_new_tokens=batch["labels"].shape[1])
+            # Recursively unwrap the model from potential distributed training containers
+            generate_func = unwrap_model(self.model).generate
+            samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                                    do_sample=False, max_new_tokens=batch["labels"].shape[1])
             top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
-            self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True,
-                     logger=True, sync_dist=True)
+            self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
         return loss
 
     def configure_optimizers(self):

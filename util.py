@@ -33,7 +33,7 @@ def get_loggers(args, log_dir):
     return loggers
 
 
-def  get_checkpoint_callbacks(log_dir, all_checkpoint_dir, using_sagemaker):
+def get_checkpoint_callbacks(log_dir, all_checkpoint_dir, using_sagemaker):
     checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min", dirpath=log_dir, filename=f"best",
                                           save_last=True)
     # Also save in a checkpoint directory that is backed up to s3 during training ??
