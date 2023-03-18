@@ -65,13 +65,13 @@ class ByT5Model(pl.LightningModule):
         loss = outputs.loss
         self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
-        if batch_idx % 10 == 0:
-            # Recursively unwrap the model from potential distributed training containers
-            generate_func = unwrap_model(self.model).generate
-            samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                    do_sample=False, max_new_tokens=batch["labels"].shape[1])
-            top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
-            self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        # Generate samples and calculate accuracy
+        # Recursively unwrap the model from potential distributed training containers
+        generate_func = unwrap_model(self.model).generate
+        samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                                do_sample=False, max_new_tokens=batch["labels"].shape[1])
+        top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
+        self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
         return loss
 
