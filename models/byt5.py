@@ -69,7 +69,7 @@ class ByT5Model(pl.LightningModule):
                                           do_sample=False, max_new_tokens=batch["labels"].shape[1])
             top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
             self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True,
-                     logger=True, sync_dist=True)
+                     logger=True, sync_dist=False, batch_size=self.args.batch_size)
         return loss
 
     def configure_optimizers(self):

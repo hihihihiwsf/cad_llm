@@ -35,8 +35,8 @@ def main():
     model = ByT5Model(args=args)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=False)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=True)
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
+    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -50,7 +50,6 @@ def main():
         logger=loggers,
         max_epochs=3,
         log_every_n_steps=log_every_n_steps,
-        val_check_interval=0.25,
         resume_from_checkpoint=None,
     )
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
