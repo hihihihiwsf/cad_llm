@@ -10,3 +10,7 @@ lightning_logs
 cometml.json
 checkpoints/
 .gitignore
+aws/
+aws_cli_login.sh
+awscliv2.zip
+vault
