@@ -7,7 +7,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="data/sg_strings_v2", help="Dataset path")
+    parser.add_argument("--dataset", type=str, default="data/sg_strings_v3", help="Dataset path")
     parser.add_argument("--num_workers", type=int, default=-1, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
@@ -25,6 +25,8 @@ def get_parser():
                         help="Maximal percentage of sketch entities to choose as input")
     parser.add_argument("--max_length", type=int, default=96,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
+    parser.add_argument("--order", type=str, default="sorted", choices=("sorted", "user"),
+                        help="Choose between sorted/user order for entities in the sketch")
 
     return parser
 

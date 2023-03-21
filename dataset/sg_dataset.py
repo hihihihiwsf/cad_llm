@@ -11,6 +11,10 @@ class SketchGraphsDataset(Dataset):
         with open(path, "r") as f:
             self.data = json.load(f)
 
+        self.order = args.order
+        assert self.order in ["sorted", "user"]
+        self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
+
         # Sanity check text format
         entity_string = self.data[0]["entities"][0]
         if args.ascii_encoding:
@@ -32,7 +36,7 @@ class SketchGraphsDataset(Dataset):
         Returns (input_text, output_text)
         """
         sketch_dict = self.data[index]
-        entities = sketch_dict["entities"]
+        entities = sketch_dict[self.entities_col]
         mask = self.get_mask(len(entities))
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
