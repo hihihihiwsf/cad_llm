@@ -46,9 +46,9 @@ class ByT5Model(pl.LightningModule):
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
         embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(len(new_tokens)):
+        for i in range(1, len(new_tokens)+1):
             # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[65 + i]
+            embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
