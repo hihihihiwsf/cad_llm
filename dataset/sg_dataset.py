@@ -12,7 +12,7 @@ class SketchGraphsDataset(Dataset):
             self.data = json.load(f)
 
         self.order = args.order
-        assert self.order in ["sorted", "user"]
+        assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
 
         # Sanity check text format
@@ -37,6 +37,8 @@ class SketchGraphsDataset(Dataset):
         """
         sketch_dict = self.data[index]
         entities = sketch_dict[self.entities_col]
+        if self.order == "random":
+            np.random.shuffle(entities)
         mask = self.get_mask(len(entities))
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
