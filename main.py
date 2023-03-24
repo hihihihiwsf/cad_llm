@@ -24,6 +24,11 @@ def main():
     if not results_dir.exists():
         results_dir.mkdir(parents=True)
 
+    samples_dir = results_dir / "samples"
+    args.samples_dir = str(samples_dir)
+    if not samples_dir.exists():
+        samples_dir.mkdir()
+
     checkpoint_dir = Path(args.checkpoint_dir) / "checkpoints" / args.exp_name
     args.checkpoint_dir = str(checkpoint_dir)
     if not checkpoint_dir.exists():
