@@ -16,15 +16,15 @@ class SketchGraphsDataset(Dataset):
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
 
         # Sanity check text format
-        entity_string = self.data[0]["entities"][0]
+        entity_string = self.data[0][self.entities_col][0]
         if args.ascii_encoding:
             error_message = f"Expected format '-31, 17' not '<-31><17>', found '{entity_string}'"
             assert entity_string[0] != "<", error_message
-            assert "," in self.data[0]["entities"][0], error_message
+            assert "," in self.data[0][self.entities_col][0], error_message
         else:
             error_message = f"Expected format '<-31><17>' not '-31, 17', found '{entity_string}'"
             assert entity_string[0] == "<", error_message
-            assert "," not in self.data[0]["entities"][0], error_message
+            assert "," not in self.data[0][self.entities_col][0], error_message
 
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
