@@ -11,7 +11,7 @@ class SketchGraphsDataset(Dataset):
         with open(path, "r") as f:
             self.data = json.load(f)
 
-        self.order = args.order
+        self.order = args.train_order if split == "train" else "sorted"
         assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
 

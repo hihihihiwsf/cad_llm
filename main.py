@@ -53,7 +53,7 @@ def main():
         devices=args.devices,
         strategy=args.strategy,
         logger=loggers,
-        max_epochs=10,
+        max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         resume_from_checkpoint=None,
         # limit_train_batches=0.001,

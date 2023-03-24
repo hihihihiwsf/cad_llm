@@ -19,13 +19,14 @@ def get_parser():
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
     parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")
+    parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs.")
     parser.add_argument("--min_input_percent", type=float, default=0.,
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=1.,
                         help="Maximal percentage of sketch entities to choose as input")
     parser.add_argument("--max_length", type=int, default=96,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
-    parser.add_argument("--order", type=str, default="sorted", choices=("sorted", "user", "random"),
+    parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")
 
     return parser
@@ -75,10 +76,11 @@ class MockArgs:
         self.untrained_model = False
         self.lr = 3e-4
         self.batch_size = 16
+        self.epochs = 5
         self.min_input_percent = 0
         self.max_input_percent = 1
         self.max_length = 128
-        self.order = "sorted"
+        self.train_order = "sorted"
 
 
 def get_mock_args():
