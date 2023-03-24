@@ -58,3 +58,28 @@ def get_training_args():
     args.checkpoint_dir = "/opt/ml" if args.using_sagemaker else args.results_dir
 
     return args
+
+
+class MockArgs:
+    def __init__(self):
+        self.exp_name = "test"
+        self.results_dir = "results"
+        self.dataset = "data/sg_strings_v3"
+        self.num_workers = 1
+        self.accelerator = "auto"
+        self.devices = "auto"
+        self.strategy = "ddp"
+        self.comet = False
+        self.ascii_encoding = False
+        self.model_name = "google/byt5-base"
+        self.untrained_model = False
+        self.lr = 3e-4
+        self.batch_size = 16
+        self.min_input_percent = 0
+        self.max_input_percent = 1
+        self.max_length = 128
+        self.order = "sorted"
+
+
+def get_mock_args():
+    return MockArgs()
