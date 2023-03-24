@@ -37,6 +37,7 @@ class ByT5Model(pl.LightningModule):
         self.args = args
 
         self.lr = self.args.lr
+        self.batch_size = self.args.batch_size  # to fix logging warning
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
@@ -62,7 +63,8 @@ class ByT5Model(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+                 batch_size=self.batch_size)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -70,7 +72,8 @@ class ByT5Model(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss
-        self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size)
 
         # Generate samples and calculate accuracy
         # Recursively unwrap the model from potential distributed training containers
@@ -78,18 +81,21 @@ class ByT5Model(pl.LightningModule):
         samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
                                 do_sample=False, max_new_tokens=batch["labels"].shape[1])
         top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
-        self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size)
 
         # Decode samples
         string_samples = self.tokenizer.batch_decode(samples, skip_special_tokens=True)
         string_labels = [sketch["output_text"] for sketch in batch["sketches"]]
         top1_ent = calculate_first_ent_accuracy(string_labels=string_labels, string_samples=string_samples)
-        self.log(f"top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f"top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size)
 
         # Convert string entities to curves and check validity
         sample_curves = [parse_string_to_curves(string_sample) for string_sample in string_samples]
         validity = calculate_validity(batch_sample_curves=sample_curves)
-        self.log(f"validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f"validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size)
 
         # # Plot sketches
         if batch_idx < 5:
