@@ -1,7 +1,11 @@
 """
 
 Convert the SketchGraphs Dataset sketches
-into a npy file containing obj-file like data
+into a json file containing lists of entities
+
+Versions:
+sg_strings_v2: deduped, single token strings
+sg_strings_v3: deduped, single token strings, user order option
 
 """
 # # hack for running locally
@@ -14,7 +18,6 @@ import time
 import argparse
 import importlib
 import json
-import numpy as np
 from tqdm import tqdm
 from sketchgraphs.data import flat_array, sketch_from_sequence
 import sketch_sg
