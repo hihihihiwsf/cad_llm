@@ -11,3 +11,4 @@ cometml.json
 checkpoints/
 .gitignore
 aws_cli_login.sh
+t5-base-vocab-100/

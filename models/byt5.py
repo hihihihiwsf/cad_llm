@@ -10,7 +10,7 @@ except ImportError:
 import torch
 import torch.optim as optim
 import pytorch_lightning as pl
-from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
+from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer, T5TokenizerFast
 from transformers.modeling_utils import unwrap_model
 import sys  
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
@@ -30,12 +30,15 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained("t5-base-vocab-100")
+
         self.args = args
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
+
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
@@ -46,16 +49,18 @@ class ByT5Model(pl.LightningModule):
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
         embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(1, len(new_tokens)+1):
+        for i, j in enumerate(new_tokens):
             # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[67 + i]
+            # embedding_params[-len(new_tokens)+i] = torch.mean(embedding_params[self.tokenizer.encode(j)[:-1]], 0)
+            embedding_params[-len(new_tokens)+i] = embedding_params[65+i]
+            # embedding_params[-i-1] = embedding_params[65+i]
 
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.args.batch_size)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -63,7 +68,7 @@ class ByT5Model(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss
-        self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.args.batch_size)
 
         # Generate samples and calculate accuracy
         # Recursively unwrap the model from potential distributed training containers
@@ -71,7 +76,7 @@ class ByT5Model(pl.LightningModule):
         samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
                                 do_sample=False, max_new_tokens=batch["labels"].shape[1])
         top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
-        self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.args.batch_size)
 
         return loss
 

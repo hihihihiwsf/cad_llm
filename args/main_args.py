@@ -17,8 +17,8 @@ def get_parser():
                         help="Use ascii ByT5 encoding instead of single token encoding")
     parser.add_argument("--model_name", type=str, default="google/byt5-base", help="Huggingface model name")
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
-    parser.add_argument("--lr", type=float, default=3e-5, help="Initial learning rate")
-    parser.add_argument("--batch_size", type=int, default=4, help="Number of sketches in a batch")
+    parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
+    parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")
     parser.add_argument("--min_input_percent", type=float, default=0.,
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=1.,

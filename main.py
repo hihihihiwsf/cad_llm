@@ -14,7 +14,7 @@ from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
 from pytorch_lightning import Trainer
-
+import copy
 
 def main():
     """Entry point for our training script"""
@@ -35,8 +35,15 @@ def main():
     model = ByT5Model(args=args)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False)
+
+    train_args = copy.deepcopy(args)
+    val_args = copy.deepcopy(args)
+
+    # train_args.min_input_percent, train_args.max_input_percent = 0.15, 0.17
+    # val_args.min_input_percent, val_args.max_input_percent = 0., 1.
+
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=train_args, split="train", shuffle=True)
+    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=val_args, split="val", shuffle=False)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -48,10 +55,11 @@ def main():
         devices=args.devices,
         strategy=args.strategy,
         logger=loggers,
-        max_epochs=10,
+        max_epochs=5,
         log_every_n_steps=log_every_n_steps,
         resume_from_checkpoint=None,
-        # limit_train_batches=0.001,
+        # limit_train_batches=0.01,
+        # limit_val_batches=0.1
     )
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
