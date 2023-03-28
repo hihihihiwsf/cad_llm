@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
-from pytorch_lightning import Trainer
+import pytorch_lightning as pl
 
 
 def main():
@@ -45,9 +45,12 @@ def main():
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
+
+    pl.utilities.seed.seed_everything(args.seed)
+
     print("Training the model...")
     log_every_n_steps = 100
-    trainer = Trainer(
+    trainer = pl.Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
