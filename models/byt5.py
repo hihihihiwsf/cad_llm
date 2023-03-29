@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy
 from util import get_quantized_range
-
+import math
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args):
@@ -30,8 +30,8 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        self.tokenizer = AutoTokenizer.from_pretrained("t5-base-vocab-100")
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        # self.tokenizer = AutoTokenizer.from_pretrained("t5-base-vocab-100")
 
         self.args = args
 
@@ -39,6 +39,24 @@ class ByT5Model(pl.LightningModule):
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
 
+
+    def positionalencoding1d(self, d_model, length):
+        """
+        :param d_model: dimension of the model
+        :param length: length of positions
+        :return: length*d_model position matrix
+        """
+        if d_model % 2 != 0:
+            raise ValueError("Cannot use sin/cos positional encoding with "
+                            "odd dim (got dim={:d})".format(d_model))
+        pe = torch.zeros(length, d_model)
+        position = torch.arange(0, length).unsqueeze(1)
+        div_term = torch.exp((torch.arange(0, d_model, 2, dtype=torch.float) *
+                            -(math.log(10000.0) / d_model)))
+        pe[:, 0::2] = torch.sin(position.float() * div_term)
+        pe[:, 1::2] = torch.cos(position.float() * div_term)
+
+        return pe
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
@@ -49,10 +67,11 @@ class ByT5Model(pl.LightningModule):
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
         embedding_params = self.model.get_input_embeddings().weight.data
+        pe = self.positionalencoding1d(embedding_params.shape[1], len(new_tokens))
         for i, j in enumerate(new_tokens):
             # start with the embedding for 'A', ensures no clash with embedding for ';'
             # embedding_params[-len(new_tokens)+i] = torch.mean(embedding_params[self.tokenizer.encode(j)[:-1]], 0)
-            embedding_params[-len(new_tokens)+i] = embedding_params[65+i]
+            embedding_params[-len(new_tokens)+i] = embedding_params[65] + pe[i, :]
             # embedding_params[-i-1] = embedding_params[65+i]
 
     def training_step(self, batch, batch_idx):
