@@ -28,7 +28,8 @@ def get_parser():
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")
-    parser.add_argument("--eval", action='store_true', help="if called, goes directly to the eval mode. loading best from the ckpt dir")
+    parser.add_argument("--eval", type=int, default=0, help="if true, goes directly to the eval mode. loading best from the ckpt dir")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed to use")
 
     return parser
 
@@ -46,8 +47,7 @@ def get_training_args():
     args = parser.parse_args()
 
     # Change flag int args (required by sagemaker) back to bool
-    args.ascii_encoding = bool(args.ascii_encoding)
-    args.comet = bool(args.comet)
+    args.comet, args.eval, args.ascii_encoding = bool(args.comet), bool(args.eval), bool(args.ascii_encoding)
     if args.num_workers == -1:
         args.num_workers = multiprocessing.cpu_count()
     args.strategy = None if args.strategy == "None" else args.strategy

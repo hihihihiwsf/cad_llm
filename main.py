@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
-from pytorch_lightning import Trainer
+import pytorch_lightning as pl
 import torch
 
 def main():
