@@ -38,11 +38,11 @@ def get_checkpoint_callbacks(log_dir, all_checkpoint_dir, using_sagemaker):
                                           save_last=True)
     # Also save in a checkpoint directory that is backed up to s3 during training ??
     checkpoint_callback.CHECKPOINT_NAME_LAST = "last"
-    all_checkpoint_callback = ModelCheckpoint(dirpath=all_checkpoint_dir, filename="{epoch}", every_n_epochs=1)
-    callbacks = [checkpoint_callback, all_checkpoint_callback]
-    if using_sagemaker:
+    # all_checkpoint_callback = ModelCheckpoint(dirpath=all_checkpoint_dir, filename="{epoch}", every_n_epochs=1)
+    callbacks = [checkpoint_callback]
+    # if using_sagemaker:
         # Sync the checkpoints to s3 manually after each epoch
-        callbacks.append(aws_utils.SyncCheckpoint())
+        # callbacks.append(aws_utils.SyncCheckpoint())
     return callbacks
 
 

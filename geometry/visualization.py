@@ -23,6 +23,7 @@ def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
         draw_curves(input_curves[i], ax=ax, box_lim=box_lim, color="black")
         draw_curves(sample_curves[i], ax=ax, box_lim=box_lim, color="red")
 
+    plt.close()
     return fig
 
 

@@ -23,7 +23,6 @@ def parse_entity_string_to_curve(entity_string):
         elif len(points) == 4:
             curve = Circle(points)
     except Exception as e:
-        print(e)
         pass
     return curve
 
