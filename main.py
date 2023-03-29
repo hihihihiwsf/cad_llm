@@ -14,7 +14,7 @@ from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
 from pytorch_lightning import Trainer
-
+import torch
 
 def main():
     """Entry point for our training script"""
@@ -29,8 +29,7 @@ def main():
     if not samples_dir.exists():
         samples_dir.mkdir()
 
-    checkpoint_dir = Path(args.checkpoint_dir) / "checkpoints" / args.exp_name
-    args.checkpoint_dir = str(checkpoint_dir)
+    checkpoint_dir = Path(args.checkpoint_dir)
     if not checkpoint_dir.exists():
         checkpoint_dir.mkdir(parents=True)
 
@@ -58,7 +57,12 @@ def main():
         resume_from_checkpoint=None,
         # limit_train_batches=0.001,
     )
-    trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    if not args.eval: 
+        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    else:
+        # loading the model from exp_name/best.ckpt
+        ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
+        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
 
 if __name__ == "__main__":
