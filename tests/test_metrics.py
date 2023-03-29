@@ -4,26 +4,38 @@
 from metrics import calculate_accuracy, calculate_first_ent_accuracy
 import torch
 import unittest
+from geometry.parse import get_point_entities
+
+
+labels = [
+    "<1><2><3><4>;<5><6><7><8>;",
+    "<1><2><3><4>;<5><6><7><8>;",
+    "<1><2><3><4>;<5><6><7><8>;",
+    "<1><2><3><4>;<5><6><7><8>;",
+    "<1><2><3><4>;<5><6><7><8>;",
+]
+samples = [
+    "<5><6><7><8>;",
+    "<7><8><5><6>;",
+    "<7><8><5><6><9>;",  # invalid
+    "<3><4><1><2>;<7><8><5><6>;",
+    "<3><1><4><2>;<7><8><5><6>;",  # bad
+]
 
 
 class TestMetrics(unittest.TestCase):
     def test_calculate_accuracy(self):
-        labels = torch.tensor([
-            [48, 54, 52, 47, 48, 52, 52, 47, 54, 52, 47, 48, 52, 52, 62, 1, -100, -100, -100, -100, -100, -100],
-            [48, 54, 52, 47, 52, 47, 54, 52, 47, 48, 52, 62, 1, -100, -100, -100, -100, -100, -100, -100, -100, -100]
-        ])
-        samples = torch.tensor([
-            [0, 48, 54, 52, 47, 48, 52, 52, 47, 54, 52, 47, 48, 52, 52, 62, 1, 0, 0, 0],
-            [0, 48, 54, 52, 47, 48, 52, 47, 48, 54, 52, 47, 52, 62, 1, 0, 0, 0, 0, 0],
-        ])
-        expected_accuracy = 0.5
-        accuracy = calculate_accuracy(labels=labels, samples=samples)
+        point_labels = [get_point_entities(label) for label in labels]
+        point_samples = [get_point_entities(sample) for sample in samples]
+
+        expected_accuracy = 1 / 5
+        accuracy = calculate_accuracy(labels=point_labels, samples=point_samples)
         self.assertEqual(accuracy, expected_accuracy)
 
     def test_calculate_first_ent_accuracy(self):
-        labels = ["<1><2><3><4>;<5><6><7><8>;"]
-        samples = ["<5><6><7><8>;"]
-        expected_accuracy = 1
+        point_labels = [get_point_entities(label) for label in labels]
+        point_samples = [get_point_entities(sample) for sample in samples]
 
-        accuracy = calculate_first_ent_accuracy(string_labels=labels, string_samples=samples)
+        expected_accuracy = 3 / 5
+        accuracy = calculate_first_ent_accuracy(labels=point_labels, samples=point_samples)
         self.assertEqual(accuracy, expected_accuracy)

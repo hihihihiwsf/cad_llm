@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
 from util import get_quantized_range
-from geometry.parse import parse_string_to_curves
+from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
 
@@ -75,40 +75,51 @@ class ByT5Model(pl.LightningModule):
         self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size)
 
-        # Generate samples and calculate accuracy
-        # Recursively unwrap the model from potential distributed training containers
-        generate_func = unwrap_model(self.model).generate
-        samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                do_sample=False, max_new_tokens=batch["labels"].shape[1])
-        top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
+        # Generate and process samples
+        self.generate_samples(batch)
+
+        # Calculate metrics
+        top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size)
 
-        # Decode samples
-        string_samples = self.tokenizer.batch_decode(samples, skip_special_tokens=True)
-        string_labels = [sketch["output_text"] for sketch in batch["sketches"]]
-        top1_ent = calculate_first_ent_accuracy(string_labels=string_labels, string_samples=string_samples)
+        top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size)
 
         # Convert string entities to curves and check validity
-        sample_curves = [parse_string_to_curves(string_sample) for string_sample in string_samples]
-        validity = calculate_validity(batch_sample_curves=sample_curves)
+        validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
         self.log(f"validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size)
 
         # # Plot sketches
         if batch_idx < 5:
-            self.log_samples(batch=batch, sample_curves=sample_curves, batch_idx=batch_idx)
+            self.log_samples(batch=batch, batch_idx=batch_idx)
 
         return loss
 
-    def log_samples(self, batch, sample_curves, batch_idx):
-        input_curves = [parse_string_to_curves(sketch["input_text"]) for sketch in batch["sketches"]]
-        label_curves = [parse_string_to_curves(sketch["output_text"]) for sketch in batch["sketches"]]
+    def generate_samples(self, batch):
+        # Recursively unwrap the model from potential distributed training containers
+        generate_func = unwrap_model(self.model).generate
+        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                                         do_sample=False, max_new_tokens=batch["labels"].shape[1])
 
-        fig = visualize_batch(input_curves=input_curves, label_curves=label_curves, sample_curves=sample_curves,
-                              box_lim=self.box_lim + 3)
+        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+        batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
+
+        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
+        batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
+
+        batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
+
+    def log_samples(self, batch, batch_idx):
+        label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]
+
+        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in batch["sketches"]]
+        input_curves = [get_curves(point_input) for point_input in point_inputs]
+
+        fig = visualize_batch(input_curves=input_curves, label_curves=label_curves,
+                              sample_curves=batch["sample_curves"], box_lim=self.box_lim + 3)
         fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
         fig.savefig(fig_path)
 

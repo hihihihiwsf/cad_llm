@@ -66,6 +66,9 @@ def get_entities_string(entities, new_tokens):
 
 
 def sort_points(points):
+    if not points:
+        return None
+
     if len(points) == 2:  # Line
         points = sorted(points)
     elif len(points) == 3:  # Arc

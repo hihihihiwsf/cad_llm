@@ -5,30 +5,25 @@ def calculate_accuracy(labels, samples):
     """
     Count number of exact matches without decoding
     """
-    batch_size, num_tokens = labels.shape
-    # Replace -100 masked tokens with 0 to match pad token in samples
-    labels[labels == -100] = 0
-    # Truncate/Pad samples, skip initial pad token
-    samples = samples[:, 1:num_tokens+1]
-    pad_amount = num_tokens - samples.shape[1]
-    assert pad_amount >= 0, f"Negative pad amount {pad_amount}"
-    padded_samples = torch.nn.functional.pad(samples, (0, pad_amount), mode='constant', value=0)
-    accuracy = (padded_samples == labels).all(dim=1).float()
-    return torch.mean(accuracy)
+    count_accurate = 0
+    for label_entities, sample_entities in zip(labels, samples):
+        label_entities = tuple(sorted([ent for ent in label_entities if ent]))
+        sample_entities = tuple(sorted([ent for ent in sample_entities if ent]))
+        if label_entities == sample_entities:
+            count_accurate += 1
+    return count_accurate / len(labels)
 
 
-def calculate_first_ent_accuracy(string_labels, string_samples):
+def calculate_first_ent_accuracy(labels, samples):
     """
     Calculate accuracy of first predicted entity
     """
     count_accurate = 0
-    for label_string, sample_string in zip(string_labels, string_samples):
-        first_entity = sample_string.split(";")[0].replace(" ", "")
-        label_entities = label_string.replace(" ", "").split(";")
-        label_entities = set(ent for ent in label_entities if ent)
+    for label_entities, sample_entities in zip(labels, samples):
+        first_entity = sample_entities[0]
         if first_entity and first_entity in label_entities:
             count_accurate += 1
-    return count_accurate / len(string_labels)
+    return count_accurate / len(labels)
 
 
 def calculate_validity(batch_sample_curves):
