@@ -67,19 +67,26 @@ class ByT5Model(pl.LightningModule):
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
         embedding_params = self.model.get_input_embeddings().weight.data
-        pe = self.positionalencoding1d(embedding_params.shape[1], len(new_tokens))
+        # pe = self.positionalencoding1d(embedding_params.shape[1], len(new_tokens))
+
+
+        pe = self.positionalencoding1d(embedding_params.shape[1], int(len(new_tokens)/2)+1)
+        b = -1 * torch.flip(pe[1:, :], [0])
+        pe = torch.concatenate((b, pe), 0)
+
         for i, j in enumerate(new_tokens):
             # start with the embedding for 'A', ensures no clash with embedding for ';'
             # embedding_params[-len(new_tokens)+i] = torch.mean(embedding_params[self.tokenizer.encode(j)[:-1]], 0)
-            embedding_params[-len(new_tokens)+i] = embedding_params[65] + pe[i, :]
+            embedding_params[-len(new_tokens)+i] = embedding_params[68] + pe[i, :]
             # embedding_params[-i-1] = embedding_params[65+i]
 
     def training_step(self, batch, batch_idx):
+        # pl.utilities.memory.garbage_collection_cuda()
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.args.batch_size)
+        self.log(f"train_loss", loss.detach().cpu(), on_step=False, on_epoch=True, prog_bar=False, logger=True, batch_size=self.args.batch_size)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -97,7 +104,7 @@ class ByT5Model(pl.LightningModule):
         top1_full_sketch = calculate_accuracy(samples=samples, labels=batch["labels"])
         self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True, batch_size=self.args.batch_size)
 
-        return loss
+        # return loss
 
     def configure_optimizers(self):
         lr = self.args.lr

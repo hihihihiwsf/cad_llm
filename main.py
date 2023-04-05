@@ -52,15 +52,16 @@ def main():
     trainer = Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,
-        devices=args.devices,
+        devices=1,
         strategy=args.strategy,
         logger=loggers,
-        max_epochs=5,
+        max_epochs=8,
         log_every_n_steps=log_every_n_steps,
         resume_from_checkpoint=None,
-        # limit_train_batches=0.01,
-        # limit_val_batches=0.1
+        limit_train_batches=0.001,
+        limit_val_batches=0.1
     )
+    # trainer = Trainer.from_argparse_args(args)
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
 

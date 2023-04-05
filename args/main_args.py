@@ -1,10 +1,11 @@
 import argparse
 import multiprocessing
 import os
-
+from pytorch_lightning import Trainer
 
 def get_parser():
     parser = argparse.ArgumentParser()
+    # parser = Trainer.add_argparse_args(parser)
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="results", help="Directory to save checkpoints and logs")
     parser.add_argument("--dataset", type=str, default="data/sg_strings_v3", help="Dataset path")
