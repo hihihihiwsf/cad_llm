@@ -8,14 +8,13 @@ try:
 except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
+from models.gpt_neo import GPT_Neo
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
 import pytorch_lightning as pl
 import torch
-
 def main():
     """Entry point for our training script"""
     args = get_training_args()
@@ -36,7 +35,8 @@ def main():
     loggers = get_loggers(args=args, log_dir=results_dir)
 
     print("Loading model...")
-    model = ByT5Model(args=args)
+    # model = ByT5Model(args=args)
+    model = GPT_Neo(args=args)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)

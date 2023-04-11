@@ -74,17 +74,29 @@ class SketchGraphsCollator:
     def __call__(self, sketch_dicts):
         input_strings = [sketch['input_text'] for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
+        all_strings = ["".join(sketch['entities']) for sketch in sketch_dicts]
+
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
+        tokenized_all = self.tokenize(all_strings)
+
+        labels_all = tokenized_all.input_ids.clone()
+        # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
+        labels_all[labels_all == self.tokenizer.pad_token_id] = -100
 
         labels = tokenized_output.input_ids
-        # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
+        
 
         batch = {
-            "input_ids": tokenized_input.input_ids,
-            "attention_mask": tokenized_input.attention_mask,
-            "labels": labels,
+            "input_ids": tokenized_all.input_ids,
+            "attention_mask": tokenized_all.attention_mask,
+            "labels": labels_all,
+
+            "labels_out": labels,
+            "input_ids_input": tokenized_input.input_ids,
+            "attention_mask_input": tokenized_input.attention_mask,
+
             "sketches": sketch_dicts
         }
         return batch
