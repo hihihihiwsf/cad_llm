@@ -28,6 +28,7 @@ def get_parser():
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")
+    parser.add_argument("--eval", type=int, default=0, help="Eval mode")
 
     return parser
 

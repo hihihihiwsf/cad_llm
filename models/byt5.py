@@ -67,12 +67,12 @@ class ByT5Model(pl.LightningModule):
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
         embedding_params = self.model.get_input_embeddings().weight.data
-        # pe = self.positionalencoding1d(embedding_params.shape[1], len(new_tokens))
+        pe = self.positionalencoding1d(embedding_params.shape[1], len(new_tokens))
 
 
-        pe = self.positionalencoding1d(embedding_params.shape[1], int(len(new_tokens)/2)+1)
-        b = -1 * torch.flip(pe[1:, :], [0])
-        pe = torch.concatenate((b, pe), 0)
+        # pe = self.positionalencoding1d(embedding_params.shape[1], int(len(new_tokens)/2)+1)
+        # b = -1 * torch.flip(pe[1:, :], [0])
+        # pe = torch.concatenate((b, pe), 0)
 
         for i, j in enumerate(new_tokens):
             # start with the embedding for 'A', ensures no clash with embedding for ';'

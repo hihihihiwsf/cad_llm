@@ -62,7 +62,13 @@ def main():
         limit_val_batches=0.1
     )
     # trainer = Trainer.from_argparse_args(args)
-    trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    if not args.eval: 
+        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    else:
+        # loading the model from exp_name/best.ckpt
+        # ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
+        ckpt_dir = "/home/amir/Projects/cad_llm/checkpoints/tokenizer_with_pe/best.ckpt"
+        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
 
 if __name__ == "__main__":
