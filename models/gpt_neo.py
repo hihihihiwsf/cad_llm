@@ -140,10 +140,28 @@ class GPT_Neo(pl.LightningModule):
         batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
                                          do_sample=False, max_new_tokens=batch["labels"].shape[1])
 
-        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+
+        first_special_token_occurance = []
+        for s in batch["samples"]:
+            flag = 0
+            for i, x in enumerate(s):
+                if x in self.tokenizer.all_special_ids:
+                    first_special_token_occurance.append(i)
+                    flag = 1
+                    break
+            if not flag:
+                first_special_token_occurance.append(i)
+        
+
+        # batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+        batch["string_samples"] = []
+        for i, s in enumerate(batch['samples']):
+            batch['string_samples'].append(self.tokenizer.decode(s[:first_special_token_occurance[i]], skip_special_tokens=True))
+
         batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
 
-        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
+        # Cutting the outputs from the first special token occurance
+        batch["point_samples"] = [get_point_entities(string_sample) for i, string_sample in enumerate(batch["string_samples"])]
         batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
 
         batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
