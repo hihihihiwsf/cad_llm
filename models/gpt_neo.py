@@ -57,10 +57,15 @@ class GPT_Neo(pl.LightningModule):
         self.model = model
         # self.model = EncoderDecoderModel.from_encoder_decoder_pretrained(args.model_name, args.model_name)
         # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, side_padding='left')
-        self.model.config.decoder_start_token_id = self.tokenizer.bos_token_id
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model.config.pad_token_id = self.tokenizer.pad_token_id
+        # self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
+
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
+        # self.model.config.decoder_start_token_id = self.tokenizer.bos_token_id
+        # self.tokenizer.pad_token = self.tokenizer.eos_token
+        # self.model.config.pad_token_id = self.tokenizer.pad_token_id
 
         self.args = args
 
@@ -76,8 +81,10 @@ class GPT_Neo(pl.LightningModule):
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
+        delimiter_token = "<delim>"
         new_tokens = [f"<{i}>" for i in self.quantized_range]
         self.tokenizer.add_tokens(new_tokens)
+        # self.tokenizer.sep_token = delimiter_token
 
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
@@ -150,13 +157,13 @@ class GPT_Neo(pl.LightningModule):
                     flag = 1
                     break
             if not flag:
-                first_special_token_occurance.append(i)
+                first_special_token_occurance.append(0)
         
 
         # batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_samples"] = []
         for i, s in enumerate(batch['samples']):
-            batch['string_samples'].append(self.tokenizer.decode(s[:first_special_token_occurance[i]], skip_special_tokens=True))
+            batch['string_samples'].append(self.tokenizer.decode(s[first_special_token_occurance[i]:], skip_special_tokens=True))
 
         batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
 

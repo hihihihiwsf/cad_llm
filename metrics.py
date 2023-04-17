@@ -20,7 +20,7 @@ def calculate_first_ent_accuracy(labels, samples):
     """
     count_accurate = 0
     for label_entities, sample_entities in zip(labels, samples):
-        first_entity = sample_entities[0]
+        first_entity = sample_entities[0] if sample_entities else None
         if first_entity and first_entity in label_entities:
             count_accurate += 1
     return count_accurate / len(labels)
