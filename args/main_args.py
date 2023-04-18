@@ -11,7 +11,7 @@ def get_parser():
     parser.add_argument("--num_workers", type=int, default=-1, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
-    parser.add_argument("--strategy", type=str, default="ddp", help="Lightning Trainer strategy parameter")
+    parser.add_argument("--strategy", type=str, default="deepspeed", help="Lightning Trainer strategy parameter")
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
     parser.add_argument("--ascii_encoding", type=int, default=0,
                         help="Use ascii ByT5 encoding instead of single token encoding")

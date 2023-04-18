@@ -9,7 +9,7 @@ except ImportError:
 import torch
 import torch.optim as optim
 import pytorch_lightning as pl
-from transformers import GPTNeoForCausalLM, GPT2Tokenizer, AutoTokenizer, EncoderDecoderModel
+from transformers import GPTNeoForCausalLM, GPT2Tokenizer, AutoTokenizer, EncoderDecoderModel, GPTNeoModel
 from transformers.modeling_utils import unwrap_model
 import sys
 
@@ -57,8 +57,8 @@ class GPT_Neo(pl.LightningModule):
         self.model = model
         # self.model = EncoderDecoderModel.from_encoder_decoder_pretrained(args.model_name, args.model_name)
         # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        # self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
+        self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, padding_side='left')
+        # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
 
         if self.tokenizer.pad_token is None:
             self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
@@ -83,14 +83,14 @@ class GPT_Neo(pl.LightningModule):
         # Add new tokens to the tokenizer
         delimiter_token = "<delim>"
         new_tokens = [f"<{i}>" for i in self.quantized_range]
+        # new_tokens.append(delimiter_token)
         self.tokenizer.add_tokens(new_tokens)
         # self.tokenizer.sep_token = delimiter_token
 
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
 
-        # self.model.encoder.resize_token_embeddings(len(self.tokenizer))
-        # self.model.decoder.resize_token_embeddings(len(self.tokenizer))
+
         embedding_params = self.model.get_input_embeddings().weight.data
         for i in range(1, len(new_tokens)+1):
             # start with the embedding for 'A', ensures no clash with embedding for ';'
@@ -145,7 +145,7 @@ class GPT_Neo(pl.LightningModule):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                         do_sample=False, max_new_tokens=batch["labels"].shape[1])
+                                         do_sample=False, max_new_tokens=batch["labels"].shape[1], pad_token_id=self.tokenizer.eos_token_id)
 
 
         first_special_token_occurance = []
