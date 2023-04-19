@@ -35,6 +35,8 @@ def main():
 
     loggers = get_loggers(args=args, log_dir=results_dir)
 
+    pl.utilities.seed.seed_everything(args.seed)
+
     print("Loading model...")
     model = ByT5Model(args=args)
 
@@ -44,8 +46,6 @@ def main():
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
-
-    pl.utilities.seed.seed_everything(args.seed)
 
     print("Training the model...")
     log_every_n_steps = 100
