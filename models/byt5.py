@@ -24,6 +24,7 @@ from pathlib import Path
 class ByT5Model(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
+        self.save_hyperparameters()
 
         if args.untrained_model:
             config = T5Config.from_pretrained(args.model_name)

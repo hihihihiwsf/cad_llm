@@ -3,7 +3,7 @@ import torch
 
 def calculate_accuracy(labels, samples):
     """
-    Count number of exact matches without decoding
+    Count number of exact matches of decoded and sorted entities
     """
     count_accurate = 0
     for label_entities, sample_entities in zip(labels, samples):
