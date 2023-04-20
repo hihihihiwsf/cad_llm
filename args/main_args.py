@@ -18,13 +18,13 @@ def get_parser():
     parser.add_argument("--model_name", type=str, default="google/byt5-base", help="Huggingface model name")
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
-    parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")
+    parser.add_argument("--batch_size", type=int, default=3, help="Number of sketches in a batch")
     parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs.")
     parser.add_argument("--min_input_percent", type=float, default=0.,
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=1.,
                         help="Maximal percentage of sketch entities to choose as input")
-    parser.add_argument("--max_length", type=int, default=512,
+    parser.add_argument("--max_length", type=int, default=96,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")

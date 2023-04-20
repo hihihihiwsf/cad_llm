@@ -13,8 +13,16 @@ from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
-import pytorch_lightning as pl
+# import pytorch_lightning as pl
+import lightning.pytorch as pl
+
 import torch
+import os
+from pytorch_lightning.strategies import DeepSpeedStrategy
+from finetuning_scheduler import FinetuningScheduler
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
+
+
 def main():
     """Entry point for our training script"""
     args = get_training_args()
@@ -45,9 +53,14 @@ def main():
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
 
-    pl.utilities.seed.seed_everything(args.seed)
+    call_backs = []
+    # call_backs.append(LearningRateMonitor(logging_interval='step'))
+    # call_backs = [LearningRateMonitor(logging_interval='step')]
+    call_backs.append(FinetuningScheduler())
+    # pl.utilities.seed.seed_everything(args.seed)
 
     print("Training the model...")
+
     log_every_n_steps = 100
     trainer = pl.Trainer(
         callbacks=call_backs,
@@ -57,8 +70,13 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        resume_from_checkpoint=None,
+        # strategy=DeepSpeedStrategy(config="./ds_config_gpt_neo_27.json"),
+        gradient_clip_val=2.,
+        # accumulate_grad_batches=16,
+        # precision=16,
+        # resume_from_checkpoint=None,
         # limit_train_batches=0.001,
+        # limit_val_batches=0.01
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
@@ -69,4 +87,6 @@ def main():
 
 
 if __name__ == "__main__":
+    # os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
+
     main()

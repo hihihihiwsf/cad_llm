@@ -35,6 +35,6 @@ def calculate_validity(batch_sample_curves):
         valid_sample_curves = [curve for curve in sample_curves if curve and curve.good]
         valid_count += len(valid_sample_curves)
 
-    percent_valid = valid_count / curve_count
+    percent_valid = valid_count / max(curve_count, 1)
 
     return percent_valid

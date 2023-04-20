@@ -8,10 +8,14 @@ except ImportError:
     pass
 import torch
 import torch.optim as optim
-import pytorch_lightning as pl
+
+# import pytorch_lightning as pl
+import lightning.pytorch as pl
+
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer, AutoTokenizer, EncoderDecoderModel, GPTNeoModel, GPT2LMHeadModel
 from transformers.modeling_utils import unwrap_model
 import sys
+import math
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
@@ -19,6 +23,8 @@ from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
+from deepspeed.ops.adam import FusedAdam, DeepSpeedCPUAdam
+
 
 
 
@@ -51,20 +57,24 @@ class GPT_Neo(pl.LightningModule):
             model = GPTNeoForCausalLM.from_pretrained(args.model_name)
             model._init_weights(model)  # maybe redundant
         else:
-            # model = GPTNeoForCausalLM.from_pretrained(args.model_name)
-            model = GPT2LMHeadModel.from_pretrained(args.model_name)
+            model = GPTNeoForCausalLM.from_pretrained(args.model_name)
+            # model = GPT2LMHeadModel.from_pretrained(args.model_name)
         
 
-        self.model = model
         # self.model = EncoderDecoderModel.from_encoder_decoder_pretrained(args.model_name, args.model_name)
         # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, padding_side='left')
+        # self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, padding_side='left')
         # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, sep_token='[SEP]', pad_token='<pad>', padding_side='left')
 
-        self.tokenizer.pad_token = self.tokenizer.bos_token
+        self.model = model
+        self.model.config.pad_token_id = self.tokenizer.pad_token_id
+
+        # self.tokenizer.pad_token = self.tokenizer.bos_token
         if self.tokenizer.sep_token is None:
             self.tokenizer.add_special_tokens({'sep_token': '[SEP]'})
-            self.model.resize_token_embeddings(len(self.tokenizer))
+        
+        self.model.resize_token_embeddings(len(self.tokenizer))
 
 
         # self.model.config.decoder_start_token_id = self.tokenizer.bos_token_id
@@ -80,8 +90,27 @@ class GPT_Neo(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
 
         # If using single token encoding - adjust tokenizer and model embeddings
-        # if not args.ascii_encoding:
-        #     self.adjust_to_use_new_tokens()
+        if not args.ascii_encoding:
+            self.adjust_to_use_new_tokens()
+
+    def positionalencoding1d(self, d_model, length):
+        """
+        :param d_model: dimension of the model
+        :param length: length of positions
+        :return: length*d_model position matrix
+        """
+        if d_model % 2 != 0:
+            raise ValueError("Cannot use sin/cos positional encoding with "
+                            "odd dim (got dim={:d})".format(d_model))
+        pe = torch.zeros(length, d_model)
+        position = torch.arange(0, length).unsqueeze(1)
+        div_term = torch.exp((torch.arange(0, d_model, 2, dtype=torch.float) *
+                            -(math.log(10000.0) / d_model)))
+        pe[:, 0::2] = torch.sin(position.float() * div_term)
+        pe[:, 1::2] = torch.cos(position.float() * div_term)
+
+        return pe
+
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
@@ -90,14 +119,23 @@ class GPT_Neo(pl.LightningModule):
         self.tokenizer.add_tokens(new_tokens)
         # self.tokenizer.sep_token = delimiter_token
 
+
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
+        embedding_params = self.model.get_input_embeddings().weight.data
+        pe = self.positionalencoding1d(embedding_params.shape[1], len(new_tokens))
+
+
+        # pe = self.positionalencoding1d(embedding_params.shape[1], int(len(new_tokens)/2)+1)
+        # b = -1 * torch.flip(pe[1:, :], [0])
+        # pe = torch.concatenate((b, pe), 0)
+
 
 
         # embedding_params = self.model.get_input_embeddings().weight.data
-        # for i in range(1, len(new_tokens)+1):
-        #     # start with the embedding for 'A', ensures no clash with embedding for ';'
-        #     embedding_params[-i] = embedding_params[31 + i] #"A" starts from 31 for gpt2 tokenizer
+        for i in range(1, len(new_tokens)+1):
+            # start with the embedding for 'A', ensures no clash with embedding for ';'
+            embedding_params[-i] = embedding_params[31] + pe[i-1, :] #"A" starts from 31 for gpt2 tokenizer
 
     def training_step(self, batch, batch_idx):
 
@@ -107,6 +145,9 @@ class GPT_Neo(pl.LightningModule):
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size)
+        self.log(f"loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
+                batch_size=self.batch_size)
+        # self.log(f"lr", self.lr, on_step=True, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -148,7 +189,7 @@ class GPT_Neo(pl.LightningModule):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                         do_sample=False, max_new_tokens=batch["labels"].shape[1], pad_token_id=self.tokenizer.eos_token_id)
+                                         do_sample=False, max_new_tokens=batch["labels"].shape[1], pad_token_id=self.tokenizer.pad_token_id)
 
 
         first_special_token_occurance = []
@@ -190,4 +231,6 @@ class GPT_Neo(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        # optimizer = DeepSpeedCPUAdam(self.model.parameters(), lr=self.lr)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=200)
         return optimizer
