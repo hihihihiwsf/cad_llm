@@ -58,6 +58,7 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         resume_from_checkpoint=None,
+        check_val_every_n_epoch=args.val_every_n_epoch,
         # limit_train_batches=0.001,
     )
     if not args.eval: 
