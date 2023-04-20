@@ -73,10 +73,11 @@ class SketchGraphsCollator:
 
     def __call__(self, sketch_dicts):
         
-        sep_token = "<delim>"
-        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
+        sep_token = '[SEP]'
+        input_strings = [sketch['input_text'] + sep_token for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
-        all_strings = [sketch['input_text'] + sketch['output_text'] for sketch in sketch_dicts]
+        all_strings = [sketch['input_text'] + sep_token + sketch['output_text'] for sketch in sketch_dicts]
+        # all_strings = ["".join(sketch['entities']) for sketch in sketch_dicts]
 
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
@@ -91,9 +92,9 @@ class SketchGraphsCollator:
         
 
         batch = {
-            "input_ids": tokenized_input.input_ids,
-            "attention_mask": tokenized_input.attention_mask,
-            "labels": tokenized_input.input_ids.clone(),
+            "input_ids": tokenized_all.input_ids,
+            "attention_mask": tokenized_all.attention_mask,
+            "labels": labels_all,
 
             "labels_out": labels,
             "input_ids_input": tokenized_input.input_ids,

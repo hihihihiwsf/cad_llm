@@ -36,7 +36,8 @@ def launch_sagemaker():
     gpu_counts = {
         "ml.p3.2xlarge": 1,
         "ml.p3.8xlarge": 4,
-        "ml.p3.16xlarge": 8
+        "ml.p3.16xlarge": 8,
+        "ml.p3dn.24xlarge": 8,
     }
     processes_per_host = gpu_counts[launch_args.instance_type]
 

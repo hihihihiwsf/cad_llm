@@ -9,7 +9,7 @@ except ImportError:
 import torch
 import torch.optim as optim
 import pytorch_lightning as pl
-from transformers import GPTNeoForCausalLM, GPT2Tokenizer, AutoTokenizer, EncoderDecoderModel, GPTNeoModel
+from transformers import GPTNeoForCausalLM, GPT2Tokenizer, AutoTokenizer, EncoderDecoderModel, GPTNeoModel, GPT2LMHeadModel
 from transformers.modeling_utils import unwrap_model
 import sys
 
@@ -51,7 +51,8 @@ class GPT_Neo(pl.LightningModule):
             model = GPTNeoForCausalLM.from_pretrained(args.model_name)
             model._init_weights(model)  # maybe redundant
         else:
-            model = GPTNeoForCausalLM.from_pretrained(args.model_name)
+            # model = GPTNeoForCausalLM.from_pretrained(args.model_name)
+            model = GPT2LMHeadModel.from_pretrained(args.model_name)
         
 
         self.model = model
@@ -60,8 +61,11 @@ class GPT_Neo(pl.LightningModule):
         self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, padding_side='left')
         # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
 
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        self.tokenizer.pad_token = self.tokenizer.bos_token
+        if self.tokenizer.sep_token is None:
+            self.tokenizer.add_special_tokens({'sep_token': '[SEP]'})
+            self.model.resize_token_embeddings(len(self.tokenizer))
+
 
         # self.model.config.decoder_start_token_id = self.tokenizer.bos_token_id
         # self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -76,12 +80,11 @@ class GPT_Neo(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
 
         # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
+        # if not args.ascii_encoding:
+        #     self.adjust_to_use_new_tokens()
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
-        delimiter_token = "<delim>"
         new_tokens = [f"<{i}>" for i in self.quantized_range]
         # new_tokens.append(delimiter_token)
         self.tokenizer.add_tokens(new_tokens)
@@ -91,10 +94,10 @@ class GPT_Neo(pl.LightningModule):
         self.model.resize_token_embeddings(len(self.tokenizer))
 
 
-        embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(1, len(new_tokens)+1):
-            # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[31 + i] #"A" starts from 31 for gpt2 tokenizer
+        # embedding_params = self.model.get_input_embeddings().weight.data
+        # for i in range(1, len(new_tokens)+1):
+        #     # start with the embedding for 'A', ensures no clash with embedding for ';'
+        #     embedding_params[-i] = embedding_params[31 + i] #"A" starts from 31 for gpt2 tokenizer
 
     def training_step(self, batch, batch_idx):
 
@@ -152,8 +155,9 @@ class GPT_Neo(pl.LightningModule):
         for s in batch["samples"]:
             flag = 0
             for i, x in enumerate(s):
-                if x in self.tokenizer.all_special_ids:
-                    first_special_token_occurance.append(i)
+                # if x in self.tokenizer.all_special_ids:
+                if x == self.tokenizer.sep_token_id:
+                    first_special_token_occurance.append(i+1)
                     flag = 1
                     break
             if not flag:
