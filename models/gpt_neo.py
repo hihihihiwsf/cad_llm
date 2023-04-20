@@ -12,6 +12,7 @@ import pytorch_lightning as pl
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer, AutoTokenizer, EncoderDecoderModel, GPTNeoModel, GPT2LMHeadModel
 from transformers.modeling_utils import unwrap_model
 import sys
+import math
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
@@ -83,6 +84,25 @@ class GPT_Neo(pl.LightningModule):
         # if not args.ascii_encoding:
         #     self.adjust_to_use_new_tokens()
 
+    def positionalencoding1d(self, d_model, length):
+        """
+        :param d_model: dimension of the model
+        :param length: length of positions
+        :return: length*d_model position matrix
+        """
+        if d_model % 2 != 0:
+            raise ValueError("Cannot use sin/cos positional encoding with "
+                            "odd dim (got dim={:d})".format(d_model))
+        pe = torch.zeros(length, d_model)
+        position = torch.arange(0, length).unsqueeze(1)
+        div_term = torch.exp((torch.arange(0, d_model, 2, dtype=torch.float) *
+                            -(math.log(10000.0) / d_model)))
+        pe[:, 0::2] = torch.sin(position.float() * div_term)
+        pe[:, 1::2] = torch.cos(position.float() * div_term)
+
+        return pe
+
+
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
         new_tokens = [f"<{i}>" for i in self.quantized_range]
@@ -90,6 +110,7 @@ class GPT_Neo(pl.LightningModule):
         self.tokenizer.add_tokens(new_tokens)
         # self.tokenizer.sep_token = delimiter_token
 
+        pe = self.positionalencoding1d(embedding_params.shape[1], len(new_tokens))
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
 
