@@ -53,7 +53,7 @@ def main():
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
 
-    call_backs = []
+    # call_backs = []
     # call_backs.append(LearningRateMonitor(logging_interval='step'))
     # call_backs = [LearningRateMonitor(logging_interval='step')]
     call_backs.append(FinetuningScheduler())
