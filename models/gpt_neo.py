@@ -16,6 +16,7 @@ from transformers import GPTNeoForCausalLM, GPT2Tokenizer, AutoTokenizer, Encode
 from transformers.modeling_utils import unwrap_model
 import sys
 import math
+import math
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
@@ -23,8 +24,6 @@ from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
-from deepspeed.ops.adam import FusedAdam, DeepSpeedCPUAdam
-
 
 
 
