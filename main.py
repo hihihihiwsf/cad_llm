@@ -35,7 +35,7 @@ def main():
 
     loggers = get_loggers(args=args, log_dir=results_dir)
 
-    pl.utilities.seed.seed_everything(args.seed)
+    pl.seed_everything(args.seed)
 
     print("Loading model...")
     model = ByT5Model(args=args)
@@ -57,7 +57,7 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        resume_from_checkpoint=None,
+        # resume_from_checkpoint=None,
         check_val_every_n_epoch=args.val_every_n_epoch,
         # limit_train_batches=0.001,
     )
