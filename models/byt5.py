@@ -19,6 +19,7 @@ from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
+from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 
 
 class ByT5Model(pl.LightningModule):
@@ -46,6 +47,29 @@ class ByT5Model(pl.LightningModule):
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
+
+        if args.lora:
+            self.add_lora()
+
+    def add_lora(self):
+        lora_config = LoraConfig(
+            r=16,
+            lora_alpha=64,
+            target_modules=["q", "v"],
+            lora_dropout=0.05,
+            bias="none",
+            task_type=TaskType.SEQ_2_SEQ_LM
+        )
+        # prepare int-8 model for training
+        self.model = prepare_model_for_int8_training(self.model)
+        # add LoRA adaptor
+        self.model = get_peft_model(self.model, lora_config)
+        # unfreeze embeddings
+        self.model.get_input_embeddings().weight.requires_grad = True
+        # unfreeze last layer
+        for name, param in self.model.named_parameters():
+            if "decoder.block.5.layer.2" in name or name in ["decoder.final_layer_norm.weight", "lm_head.weight"]:
+                param.requires_grad = True
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
