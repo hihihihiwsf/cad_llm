@@ -53,25 +53,26 @@ class GPT_Neo(pl.LightningModule):
         if args.untrained_model:
             # config = T5Config.from_pretrained(args.model_name)
             # model = T5ForConditionalGeneration(config)
-            model = GPTNeoForCausalLM.from_pretrained(args.model_name)
+            # model = GPTNeoForCausalLM.from_pretrained(args.model_name)
+            model = GPT2LMHeadModel.from_pretrained(args.model_name)
             model._init_weights(model)  # maybe redundant
         else:
-            model = GPTNeoForCausalLM.from_pretrained(args.model_name)
-            # model = GPT2LMHeadModel.from_pretrained(args.model_name)
+            # model = GPTNeoForCausalLM.from_pretrained(args.model_name)
+            model = GPT2LMHeadModel.from_pretrained(args.model_name)
         
 
         # self.model = EncoderDecoderModel.from_encoder_decoder_pretrained(args.model_name, args.model_name)
         # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         # self.tokenizer = GPT2Tokenizer.from_pretrained(args.model_name, padding_side='left')
         # self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, padding_side='left', sep_token="<delim>")
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, sep_token='[SEP]', pad_token='<pad>', padding_side='left')
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, sep_token='[SEP]', pad_token='<pad>', mask_token='<mask>', padding_side='left')
 
         self.model = model
         self.model.config.pad_token_id = self.tokenizer.pad_token_id
 
         # self.tokenizer.pad_token = self.tokenizer.bos_token
-        if self.tokenizer.sep_token is None:
-            self.tokenizer.add_special_tokens({'sep_token': '[SEP]'})
+        # if self.tokenizer.sep_token is None:
+            # self.tokenizer.add_special_tokens({'sep_token': '[SEP]'})
         
         self.model.resize_token_embeddings(len(self.tokenizer))
 
@@ -134,7 +135,7 @@ class GPT_Neo(pl.LightningModule):
         # embedding_params = self.model.get_input_embeddings().weight.data
         for i in range(1, len(new_tokens)+1):
             # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[31] + pe[i-1, :] #"A" starts from 31 for gpt2 tokenizer
+            embedding_params[-i] = embedding_params[31+i] #"A" starts from 31 for gpt2 tokenizer
 
     def training_step(self, batch, batch_idx):
 
@@ -146,7 +147,7 @@ class GPT_Neo(pl.LightningModule):
                  batch_size=self.batch_size)
         self.log(f"loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
                 batch_size=self.batch_size)
-        # self.log(f"lr", self.lr, on_step=True, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
+        self.log(f"lr", self.lr, on_step=True, on_epoch=True, prog_bar=True, logger=True, batch_size=self.batch_size)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -231,5 +232,16 @@ class GPT_Neo(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
         # optimizer = DeepSpeedCPUAdam(self.model.parameters(), lr=self.lr)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=200)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=200)
+        # scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.5, total_iters=1000)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+
+        out = {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1,
+            }
+        }
         return optimizer

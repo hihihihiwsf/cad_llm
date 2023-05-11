@@ -54,9 +54,9 @@ def main():
                                           using_sagemaker=args.using_sagemaker)
 
     # call_backs = []
-    # call_backs.append(LearningRateMonitor(logging_interval='step'))
+    call_backs.append(LearningRateMonitor(logging_interval='step'))
     # call_backs = [LearningRateMonitor(logging_interval='step')]
-    call_backs.append(FinetuningScheduler())
+    # call_backs.append(FinetuningScheduler())
     # pl.utilities.seed.seed_everything(args.seed)
 
     print("Training the model...")
