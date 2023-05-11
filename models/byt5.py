@@ -55,7 +55,7 @@ class ByT5Model(pl.LightningModule):
         lora_config = LoraConfig(
             r=16,
             lora_alpha=64,
-            target_modules=["q", "v"],
+            target_modules=["q", "v", "SelfAttention.k", "EncDecAttention.k", "SelfAttention.o", "EncDecAttention.o"],
             lora_dropout=0.05,
             bias="none",
             task_type=TaskType.SEQ_2_SEQ_LM
@@ -68,8 +68,10 @@ class ByT5Model(pl.LightningModule):
         self.model.get_input_embeddings().weight.requires_grad = True
         # unfreeze last layer
         for name, param in self.model.named_parameters():
-            if "decoder.block.5.layer.2" in name or name in ["decoder.final_layer_norm.weight", "lm_head.weight"]:
+            if "decoder.block.5" in name or name in ["decoder.final_layer_norm.weight", "lm_head.weight"]:
                 param.requires_grad = True
+
+        self.model.print_trainable_parameters()
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
