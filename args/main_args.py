@@ -7,7 +7,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="data/sg_strings_v3", help="Dataset path")
+    parser.add_argument("--dataset", type=str, default="data/sg_strings_v4", help="Dataset path")
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
@@ -67,29 +67,3 @@ def get_training_args():
     args.checkpoint_dir = "/opt/ml" if args.using_sagemaker else args.results_dir
 
     return args
-
-
-class MockArgs:
-    def __init__(self):
-        self.exp_name = "test"
-        self.results_dir = "results"
-        self.dataset = "data/sg_strings_v3"
-        self.num_workers = 1
-        self.accelerator = "auto"
-        self.devices = "auto"
-        self.strategy = "ddp"
-        self.comet = False
-        self.ascii_encoding = False
-        self.model_name = "google/byt5-base"
-        self.untrained_model = False
-        self.lr = 3e-4
-        self.batch_size = 16
-        self.epochs = 5
-        self.min_input_percent = 0
-        self.max_input_percent = 1
-        self.max_length = 128
-        self.train_order = "sorted"
-
-
-def get_mock_args():
-    return MockArgs()
