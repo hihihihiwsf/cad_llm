@@ -48,7 +48,7 @@ def main():
                                           using_sagemaker=args.using_sagemaker)
 
     print("Training the model...")
-    log_every_n_steps = 500
+    log_every_n_steps = 1000
     trainer = pl.Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,

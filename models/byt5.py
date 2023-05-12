@@ -90,8 +90,8 @@ class ByT5Model(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log(f"train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
-                 batch_size=self.batch_size)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -99,25 +99,25 @@ class ByT5Model(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss
-        self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
         self.generate_samples(batch)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log(f"top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size)
+        self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
 
         top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log(f"top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size)
+        self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
 
         # Convert string entities to curves and check validity
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        self.log(f"validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size)
+        self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
         if batch_idx < 5:
