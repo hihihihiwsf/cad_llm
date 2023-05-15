@@ -13,8 +13,12 @@ from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
+# import lightning.pytorch as pl
 import pytorch_lightning as pl
 import torch
+# from lightning.pytorch.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor
+
 
 def main():
     """Entry point for our training script"""
@@ -35,7 +39,8 @@ def main():
 
     loggers = get_loggers(args=args, log_dir=results_dir)
 
-    pl.utilities.seed.seed_everything(args.seed)
+    # pl.utilities.seed.seed_everything(args.seed)
+    pl.seed_everything(args.seed)
 
     print("Loading model...")
     model = ByT5Model(args=args)
@@ -47,6 +52,8 @@ def main():
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
 
+    call_backs.append(LearningRateMonitor(logging_interval='step'))
+
     print("Training the model...")
     log_every_n_steps = 100
     trainer = pl.Trainer(
@@ -57,9 +64,10 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        resume_from_checkpoint=None,
+        # resume_from_checkpoint=None,
         check_val_every_n_epoch=args.val_every_n_epoch,
         # limit_train_batches=0.001,
+        # limit_val_batches=0.01,
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
