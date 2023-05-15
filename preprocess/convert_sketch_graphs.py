@@ -6,6 +6,7 @@ into a json file containing lists of entities
 Versions:
 sg_strings_v2: deduped, single token strings
 sg_strings_v3: deduped, single token strings, user order option
+sg_strings_v4: filtered for SolidGen, deduped, single token strings, user order option
 
 """
 # # hack for running locally

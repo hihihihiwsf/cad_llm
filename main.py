@@ -55,7 +55,7 @@ def main():
     call_backs.append(LearningRateMonitor(logging_interval='step'))
 
     print("Training the model...")
-    log_every_n_steps = 100
+    log_every_n_steps = 1000
     trainer = pl.Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,
