@@ -13,10 +13,8 @@ from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
-# import lightning.pytorch as pl
 import pytorch_lightning as pl
 import torch
-# from lightning.pytorch.callbacks import LearningRateMonitor
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 
