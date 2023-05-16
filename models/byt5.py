@@ -153,19 +153,16 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        if not self.args.cosinedecay:
+            return optimizer
+            
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs, verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
-
-        out = {
+        return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": scheduler,
-                "interval": "epoch",
-                "frequency": 1,
-            }
-        }
-
-        if self.args.cosinedecay:
-            return out
-        else:
-            return optimizer
+            "scheduler": scheduler,
+            "interval": "epoch",
+            "frequency": 1,
+                            }
+                }
