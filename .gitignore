@@ -13,3 +13,4 @@ checkpoints/
 aws_cli_login.sh
 t5-base-vocab-100/
 draw_sample.py
+.vscode/settings.json

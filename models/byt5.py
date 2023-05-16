@@ -161,8 +161,8 @@ class ByT5Model(pl.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-            "scheduler": scheduler,
-            "interval": "epoch",
-            "frequency": 1,
-                            }
-                }
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "frequency": 1,
+            }
+        }
