@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
-# import lightning.pytorch as pl
 import pytorch_lightning as pl
-# from lightning.pytorch.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks import ModelCheckpoint
 import aws_utils
 
