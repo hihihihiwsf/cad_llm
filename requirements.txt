@@ -5,7 +5,7 @@
 # # which should use cuda 11.1
 # which should use cuda 11.7
 
-pytorch-lightning==1.9.4
+pytorch-lightning==2.0.0
 torchmetrics==0.11.3
 comet_ml
 datasets

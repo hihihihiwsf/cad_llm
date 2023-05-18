@@ -8,6 +8,7 @@ except ImportError:
     pass
 import torch
 import torch.optim as optim
+# import lightning.pytorch as pl
 import pytorch_lightning as pl
 from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
@@ -152,4 +153,16 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
-        return optimizer
+        if not self.args.cosinedecay:
+            return optimizer
+            
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs, verbose=True)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "frequency": 1,
+            }
+        }
