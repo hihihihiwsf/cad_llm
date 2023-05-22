@@ -18,10 +18,12 @@ sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch
+from geometry.visualization import visualize_batch, visualize_sample
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
-
+from PIL import Image
+import clip
+import numpy as np
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args):
@@ -36,7 +38,7 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, max_new_)
         self.args = args
 
         self.lr = self.args.lr
@@ -44,6 +46,7 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
+        self.clip_model, self.clip_preprocess = clip.load("ViT-B/32")
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -89,6 +92,20 @@ class ByT5Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+
+        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in batch["sketches"]]
+        input_curves = [get_curves(point_input) for point_input in point_inputs]
+
+        list_of_img = visualize_sample(input_curves=input_curves, box_lim=self.box_lim + 3)
+
+        #convert to PIL image for CLIP
+        # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+        images = []
+        for img in list_of_img:
+            images.append(self.clip_preprocess(img))
+        batch_images = torch.tensor(np.stack(images)).to(self.model.device)
+        image_features = self.clip_model.encode_image(batch_images)
+
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
