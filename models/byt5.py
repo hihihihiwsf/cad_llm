@@ -75,41 +75,38 @@ class ByT5Model(pl.LightningModule):
 
         self.model.print_trainable_parameters()
 
-    # def adjust_to_use_new_tokens(self):
-    #     # Add new tokens to the tokenizer
-    #     new_tokens = [f"<{i}>" for i in self.quantized_range]
-    #     self.tokenizer.add_tokens(new_tokens)
-
-    #     # Add new token embeddings and initialize using learned embeddings
-    #     self.model.resize_token_embeddings(len(self.tokenizer))
-    #     embedding_params = self.model.get_input_embeddings().weight.data
-    #     for i in range(1, len(new_tokens)+1):
-    #         # start with the embedding for 'A', ensures no clash with embedding for ';'
-    #         embedding_params[-i] = embedding_params[67 + i]
-
-
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
-
         new_tokens = [f"<{i}>" for i in self.quantized_range]
         self.tokenizer.add_tokens(new_tokens)
 
         # Add new token embeddings and initialize using learned embeddings
         self.model.resize_token_embeddings(len(self.tokenizer))
         embedding_params = self.model.get_input_embeddings().weight.data
+        for i in range(1, len(new_tokens)+1):
+            # start with the embedding for 'A', ensures no clash with embedding for ';'
+            embedding_params[-i] = embedding_params[67 + i]
 
-        neg, pos = [], []
-        total = 0
-        for i, j in enumerate(self.quantized_range):
-            if j != 0:
-                #assigning the negative of the absolute value of that token
-                l = len(self.quantized_range)
-                embedding_params[-l + i] = np.sign(j) * embedding_params[self.tokenizer.encode(str(abs(j)))[0]]
-            else:
-                embedding_params[-l + i] = torch.zeros_like(embedding_params[0])
-    
-        print('stop')
 
+    # def adjust_to_use_new_tokens(self):
+    #     # Add new tokens to the tokenizer
+
+    #     new_tokens = [f"<{i}>" for i in self.quantized_range]
+    #     self.tokenizer.add_tokens(new_tokens)
+
+    #     # Add new token embeddings and initialize using learned embeddings
+    #     self.model.resize_token_embeddings(len(self.tokenizer))
+    #     embedding_params = self.model.get_input_embeddings().weight.data
+
+    #     neg, pos = [], []
+    #     total = 0
+    #     for i, j in enumerate(self.quantized_range):
+    #         if j != 0:
+    #             #assigning the negative of the absolute value of that token
+    #             l = len(self.quantized_range)
+    #             embedding_params[-l + i] = np.sign(j) * embedding_params[self.tokenizer.encode(str(abs(j)))[0]]
+    #         else:
+    #             embedding_params[-l + i] = torch.zeros_like(embedding_params[0])
 
 
     def training_step(self, batch, batch_idx):
