@@ -9,12 +9,6 @@ sg_strings_v3: deduped, single token strings, user order option
 sg_strings_v4: filtered for SolidGen, deduped, single token strings, user order option
 
 """
-# # hack for running locally
-# import os
-#
-# os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-
-from pathlib import Path
 import time
 import argparse
 import importlib
@@ -23,53 +17,11 @@ from tqdm import tqdm
 from sketchgraphs.data import flat_array, sketch_from_sequence
 import sketch_sg
 from preprocessing import preprocess_sketch
+from preprocess_utils import get_files, get_output_dir, load_filter
 from deduplicate import deduplicate_splits
 
 importlib.reload(sketch_sg)
 from sketch_sg import SketchSG
-
-
-def get_files(args):
-    """Get the Sketch Graphs files to process"""
-    input_dir = Path(args.input)
-    if not input_dir.exists():
-        print("Input folder does not exist")
-        exit()
-    if not input_dir.is_dir():
-        print("Input folder is not a directory")
-        exit()
-    files = [f for f in input_dir.glob("*.npy")]
-    # files = [ input_dir / "sg_t16_validation.npy" ]
-    if len(files) == 0:
-        print("No SketchGraphs files found")
-        exit()
-    return files
-
-
-def get_output_dir(args):
-    """Get the output directory to save the data"""
-    current_dir = Path(__file__).resolve().parent
-    if args.output is not None:
-        output_dir = Path(args.output)
-    else:
-        output_dir = current_dir / "output"
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True)
-    return output_dir
-
-
-def load_filter(path):
-    """
-        Expected filter file format:
-        {
-            'train': ['train_07265623.obj', ...],
-            'val': ['val_00032698.obj', ...],
-            'test': ['test_00289446.obj', ...]
-        }
-    """
-    with open(path) as f:
-        split_to_filenames = json.load(f)
-    return split_to_filenames
 
 
 def get_index(filename):
@@ -163,8 +115,8 @@ if __name__ == "__main__":
                         help="Set to nonzero to use new token encoding")
     args = parser.parse_args()
 
-    output_dir = get_output_dir(args)
-    sg_files = get_files(args)
+    output_dir = get_output_dir(args.output)
+    sg_files = get_files(args.input, pattern="*.npy")
 
     main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter, limit=args.limit,
          quantize_bits=args.quantize_bits, new_tokens=args.new_tokens)
