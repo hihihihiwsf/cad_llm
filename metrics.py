@@ -40,3 +40,14 @@ def calculate_validity(batch_sample_curves):
     percent_valid = valid_count / curve_count
 
     return percent_valid
+
+
+def compute_token_loss(logits, labels):
+    #import pdb; pdb.set_trace()
+
+    bsz = logits.shape[0]
+    token_loss = labels
+    for item in range(bsz):
+        for token_id in range(logits.shape[1]):
+            token = torch.argmax(logits[item][token_id].argmax, dim = -1)
+            

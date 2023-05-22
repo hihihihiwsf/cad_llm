@@ -8,6 +8,10 @@ except ImportError:
     pass
 import torch
 import torch.optim as optim
+
+import numpy as np
+
+import torch.nn.functional as F
 import pytorch_lightning as pl
 from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
@@ -43,7 +47,9 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-
+        
+        self.avg_token_len = np.zeros((args.max_length))
+        self.avg_token_loss = np.zeros((args.max_length))
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
@@ -75,7 +81,12 @@ class ByT5Model(pl.LightningModule):
 
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
+
         new_tokens = [f"<{i}>" for i in self.quantized_range]
+        new_tokens.append('<Line>')
+        new_tokens.append('<Circle>')
+        new_tokens.append('<Curve>')
+        
         self.tokenizer.add_tokens(new_tokens)
 
         # Add new token embeddings and initialize using learned embeddings
@@ -101,6 +112,22 @@ class ByT5Model(pl.LightningModule):
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
+    
+        labels = model_batch['labels']
+        labels[labels==-100] = 0
+        if labels.shape[1]<96:
+            self.avg_token_len += np.pad(np.array(torch.count_nonzero(labels, dim=0).cpu()), (0, self.args.max_length-labels.shape[1]), 'constant')
+        else:
+            self.avg_token_len += np.array(torch.count_nonzero(labels, dim=0).cpu())
+        
+        # Average loss of each token of each bath, avg_token_loss.shape [31]
+
+        # for token_id in range(outputs.logits.shape[1]):
+        #     self.avg_token_loss[token_id] = F.cross_entropy(outputs.logits.transpose(2,1)[:,:,token_id], model_batch['labels'][:,token_id],ignore_index=-100)
+        #     self.log(f"avg_token_loss_token_{token_id}", self.avg_token_loss[token_id], on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #             batch_size=self.batch_size, sync_dist=True)
+        #     self.log(f"length_of_token_{token_id}", self.avg_token_len[token_id], on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #             batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
         self.generate_samples(batch)
@@ -124,6 +151,11 @@ class ByT5Model(pl.LightningModule):
             self.log_samples(batch=batch, batch_idx=batch_idx)
 
         return loss
+    
+    
+    # def on_validation_epoch_end(self):
+    #     np.save('avg_token_loss.npy', self.avg_token_loss)
+    #     np.save('avg_token_len.npy', self.avg_token_len)
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
@@ -152,4 +184,16 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
-        return optimizer
+        if not self.args.cosinedecay:
+            return optimizer
+            
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs, verbose=True)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "frequency": 1,
+            }
+        }

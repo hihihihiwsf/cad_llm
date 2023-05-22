@@ -24,7 +24,6 @@ expected_new_tokens_entity_strings = ['<-31><-17><-31><17>;', '<-31><-17><31><-1
 expected_user_ordered_entity_strings = ['<31><17><-31><17>;', '<31><-17><-31><-17>;',
                                         '<31><17><31><-17>;', '<-31><17><-31><-17>;']
 
-
 class TestSketchLLM(unittest.TestCase):
     def test_generate_random_input_output(self):
         sketch_str_dict = preprocess_sketch(sketch_obj_dict, quantize_bits=6)

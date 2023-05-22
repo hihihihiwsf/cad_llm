@@ -4,6 +4,9 @@ import random
 import json
 from pathlib import Path
 
+import torch
+import enum
+
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
@@ -68,6 +71,125 @@ class SketchGraphsDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+def add_token(sketch_string):
+    ent_list = sketch_string.split(";")[:-1]
+    new_ent_list = ''
+    for ent in ent_list:
+        if len(ent.split('>')[0:-1]) == 4:
+            ent = '<Line>' + ent + ';'
+        elif len(ent.split('>')[0:-1]) == 6:
+            ent = '<Curve>' + ent + ';'
+        elif len(ent.split('>')[0:-1]) == 8:
+            ent = '<Circle>' + ent + ';'
+        new_ent_list = new_ent_list + ent
+    return new_ent_list
+
+def classify_type(ent):
+    if len(ent.split('>')[0:-1]) == 4:
+        return 'Line'
+    elif len(ent.split('>')[0:-1]) == 6:
+        return 'Curve'
+    elif len(ent.split('>')[0:-1]) == 8:
+        return 'Circle'
+
+def extract(ent):
+    v_list = ent.split('<')[1:]
+    v_list = [int(v.split('>')[0])+31 for v in v_list] #convert from [-31,32] to[0,63] 
+    return v_list
+
+class Token(enum.IntEnum):
+    """Enumeration indicating the non-parameter value tokens of PrimitiveModel.
+    """
+    Pad = -100
+    Start = 1
+    Stop = 2
+    Line = 3
+    Curve = 4
+    Circle = 5
+
+NUM_PARAMS = {
+    'Line': 4,
+    'Curve': 6,
+    'Circle': 8,
+}
+
+NON_COORD_TOKEN = 1 # 0 for padding???
+COORD_TOKEN_MAP = {}
+tok = NON_COORD_TOKEN + 1
+for ent_type in ['Line', 'Curve', 'Circle']:
+    COORD_TOKEN_MAP[ent_type] = list(range(tok, tok+NUM_PARAMS[ent_type]))
+    tok += NUM_PARAMS[ent_type]
+
+from typing import Callable, Dict, List, Union, Sequence, Tuple, Optional
+
+def _pad_or_truncate_to_length(arr: np.ndarray, target_length: Optional[int]=None):
+    if target_length is None:
+        return arr
+    if len(arr) > target_length:
+        return arr[:target_length]
+    if isinstance(arr, np.ndarray):
+        return np.pad(arr, (0, target_length - len(arr)), constant_values=Token.Pad)
+    elif isinstance(arr, torch.Tensor):
+        return torch.nn.functional.pad(arr, (0, target_length - len(arr)), value=Token.Pad)
+    else:
+        raise ValueError('arr must be either numpy array or torch Tensor')
+
+def vitru_tokenize(strings, max_length, padding=True, truncation=True,return_tensors="pt"):
+    s_val = []
+    s_coord = []
+    s_pos = []
+    s_mask = []
+    max_len = 0
+    for sketch in strings:
+        val, coord, pos, attention_mask = sketch_tokenize(sketch, truncation=True, max_length=max_length,padding=True, return_tensors="pt")
+
+        s_val.append(val)
+        s_coord.append(coord)
+        s_pos.append(pos)
+        s_mask.append(attention_mask)
+    
+    sample = {
+        'val': s_val,
+        'coord': s_coord,
+        'pos':s_pos,
+        "attention_mask":s_mask
+    }
+    return sample
+
+
+def sketch_tokenize(sketch, max_length, padding=True, truncation=True,return_tensors="pt",include_stop=False):
+    val_tokens = [Token.Start]
+    coord_tokens = [1] # 0 for padding
+    pos_idx = 1  # 0 is reserved for padding
+    pos_tokens = [pos_idx]
+    
+    ent_list = sketch.split(";")[:-1]
+    for ent in ent_list:
+        val_tokens.append(Token[classify_type(ent)])
+        coord_tokens.append(NON_COORD_TOKEN)
+
+        pos_idx += 1
+        pos_tokens.append(pos_idx)
+        val_tokens.extend(extract(ent))
+        coord_tokens.extend(COORD_TOKEN_MAP[classify_type(ent)])
+        pos_tokens.extend([pos_idx] * len(extract(ent)))
+
+    if include_stop:
+        val_tokens.append(Token.Stop)
+        coord_tokens.append(NON_COORD_TOKEN)
+        pos_tokens.append(pos_idx+1)
+    
+    attention_mask =np.ones(np.array(val_tokens).size)
+    val = _pad_or_truncate_to_length(np.array(val_tokens, dtype=np.int64), max_length)
+    coord= _pad_or_truncate_to_length(np.array(coord_tokens, dtype=np.int64), max_length)
+    pos= _pad_or_truncate_to_length(np.array(pos_tokens, dtype=np.int64), max_length)
+    attention_mask = _pad_or_truncate_to_length(np.array(attention_mask, dtype=np.int64), max_length)
+    # val = np.array(val_tokens, dtype=np.int64)
+    # coord = np.array(coord_tokens, dtype=np.int64)
+    # pos = np.array(pos_tokens, dtype=np.int64)
+    
+
+    return val, coord, pos, attention_mask
 
 class SketchGraphsCollator:
     def __init__(self, tokenizer, max_length=None):
@@ -75,29 +197,55 @@ class SketchGraphsCollator:
         self.max_length = max_length
 
     def tokenize(self, strings):
-        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+
+        model_tokenize = self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+
+        return model_tokenize 
 
     def __call__(self, sketch_dicts):
-        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
-        output_strings = [sketch['output_text'] for sketch in sketch_dicts]
-        tokenized_input = self.tokenize(input_strings)
-        tokenized_output = self.tokenize(output_strings)
+
+        input_strings_2 = [add_token(sketch['input_text']) for sketch in sketch_dicts]
+        output_strings_2 = [add_token(sketch['output_text']) for sketch in sketch_dicts]
+        
+        tokenized_input = self.tokenize(input_strings_2) #keys: 'input_ids', 'attention_mask'
+        tokenized_output = self.tokenize(output_strings_2)
 
         labels = tokenized_output.input_ids
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
 
-        batch = {
+        batch_1 = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
             "labels": labels,
             "sketches": sketch_dicts
         }
-        return batch
+
+        # input_strings = [sketch['input_text'] for sketch in sketch_dicts]
+        # output_strings = [sketch['output_text'] for sketch in sketch_dicts]
+
+        # vitru_tokenized_input = vitru_tokenize(input_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        # vitru_tokenized_output = vitru_tokenize(output_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        # labels = torch.tensor(vitru_tokenized_output['val'])
+
+        # batch = {
+        #     "input_ids": torch.tensor(vitru_tokenized_input['val']),
+        #     "pos_id": torch.tensor(vitru_tokenized_input['pos']),
+        #     "coord_id": torch.tensor(vitru_tokenized_input['coord']),
+        #     "attention_mask": torch.tensor(vitru_tokenized_input['attention_mask']),
+        #     "labels": labels,
+        #     "sketches": sketch_dicts
+        # }
+
+        return batch_1
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
+
+    # from IPython import embed; embed()
+    
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length)
+
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
