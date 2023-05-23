@@ -3,7 +3,10 @@ import numpy as np
 import random
 import json
 from pathlib import Path
-
+from geometry.parse import get_curves, get_point_entities
+from geometry.visualization import visualize_batch, visualize_sample
+import clip
+import torch 
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
@@ -70,9 +73,11 @@ class SketchGraphsDataset(Dataset):
 
 
 class SketchGraphsCollator:
-    def __init__(self, tokenizer, max_length=None):
+    def __init__(self, tokenizer, max_length=None, args=None):
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.args = args
+        _, self.clip_preprocess = clip.load("ViT-B/32")
 
     def tokenize(self, strings):
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
@@ -87,17 +92,26 @@ class SketchGraphsCollator:
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
 
+        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        input_curves = [get_curves(point_input) for point_input in point_inputs]
+        list_of_img = visualize_sample(input_curves=input_curves, box_lim=31 + 3)
+        images = []
+        for img in list_of_img:
+            images.append(self.clip_preprocess(img))
+            batch_images = torch.tensor(np.stack(images))
+
         batch = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
             "labels": labels,
-            "sketches": sketch_dicts
+            "sketches": sketch_dicts,
+            "images": batch_images,
         }
         return batch
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
-    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length)
+    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)

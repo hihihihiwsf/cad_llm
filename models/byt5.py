@@ -38,7 +38,7 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, max_new_)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
 
         self.lr = self.args.lr
@@ -47,6 +47,9 @@ class ByT5Model(pl.LightningModule):
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
         self.clip_model, self.clip_preprocess = clip.load("ViT-B/32")
+        self.clip_model.requires_grad_(False)
+        self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
+
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -90,22 +93,23 @@ class ByT5Model(pl.LightningModule):
             embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
+        cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
-        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in batch["sketches"]]
-        input_curves = [get_curves(point_input) for point_input in point_inputs]
 
-        list_of_img = visualize_sample(input_curves=input_curves, box_lim=self.box_lim + 3)
 
         #convert to PIL image for CLIP
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-        images = []
-        for img in list_of_img:
-            images.append(self.clip_preprocess(img))
-        batch_images = torch.tensor(np.stack(images)).to(self.model.device)
-        image_features = self.clip_model.encode_image(batch_images)
+        with torch.no_grad():
+            image_features = self.clip_model.encode_image(batch['images'])
 
+        image_for_llm = self.mapper(image_features.float())
+
+        txt_embedder = self.model.get_input_embeddings()
+        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
+        model_batch['inputs_embeds'] = input_embed
+        del model_batch['attention_mask']
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -169,12 +173,13 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        params = list(self.model.parameters()) + list(self.mapper.parameters())
+        optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs, verbose=True)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

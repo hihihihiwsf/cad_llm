@@ -54,11 +54,15 @@ def main():
 
     print("Training the model...")
     log_every_n_steps = 1000
+
+
+    from pytorch_lightning.strategies import DDPStrategy
+
     trainer = pl.Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
-        strategy=args.strategy,
+        strategy=DDPStrategy(find_unused_parameters=True),
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
