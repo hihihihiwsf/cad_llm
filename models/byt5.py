@@ -77,6 +77,9 @@ class ByT5Model(pl.LightningModule):
     def adjust_to_use_new_tokens(self):
         # Add new tokens to the tokenizer
         new_tokens = [f"<{i}>" for i in self.quantized_range]
+        new_tokens.append('<Line>')
+        new_tokens.append('<Circle>')
+        new_tokens.append('<Curve>')
         self.tokenizer.add_tokens(new_tokens)
 
         # Add new token embeddings and initialize using learned embeddings

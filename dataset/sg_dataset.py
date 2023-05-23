@@ -69,6 +69,19 @@ class SketchGraphsDataset(Dataset):
         return len(self.data)
 
 
+def add_token(sketch_string):
+    ent_list = sketch_string.split(";")[:-1]
+    new_ent_list = ''
+    for ent in ent_list:
+        if len(ent.split('>')[0:-1]) == 4:
+            ent = '<Line>' + ent + ';'
+        elif len(ent.split('>')[0:-1]) == 6:
+            ent = '<Curve>' + ent + ';'
+        elif len(ent.split('>')[0:-1]) == 8:
+            ent = '<Circle>' + ent + ';'
+        new_ent_list = new_ent_list + ent
+    return new_ent_list
+
 class SketchGraphsCollator:
     def __init__(self, tokenizer, max_length=None):
         self.tokenizer = tokenizer
@@ -78,8 +91,8 @@ class SketchGraphsCollator:
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
-        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
-        output_strings = [sketch['output_text'] for sketch in sketch_dicts]
+        input_strings = [add_token(sketch['input_text']) for sketch in sketch_dicts]
+        output_strings = [add_token(sketch['output_text']) for sketch in sketch_dicts]
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
 
