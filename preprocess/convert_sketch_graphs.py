@@ -17,7 +17,7 @@ from tqdm import tqdm
 from sketchgraphs.data import flat_array, sketch_from_sequence
 import sketch_sg
 from preprocessing import preprocess_sketch
-from preprocess_utils import get_files, get_output_dir, load_filter
+from preprocess_utils import get_files, get_output_dir, load_filter, save_splits
 from deduplicate import deduplicate_splits
 
 importlib.reload(sketch_sg)
@@ -73,13 +73,6 @@ def convert_split(file, split_name, filter_filenames, limit, quantize_bits, new_
     return sketch_str_dicts
 
 
-def save_splits(output_dir, split_to_sketches):
-    for split_name, sketches in split_to_sketches.items():
-        filename = output_dir / f"sg_str_{split_name}.json"
-        with open(filename, "w") as f:
-            json.dump(sketches, f)
-
-
 def main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tokens):
     split_to_filenames = load_filter(filter_path)
     assert split_to_filenames.keys() == {"train", "val", "test"}, "All splits required for deduplication"
@@ -96,7 +89,7 @@ def main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tokens):
 
     split_to_sketches = deduplicate_splits(split_to_sketches)
 
-    save_splits(output_dir, split_to_sketches)
+    save_splits(output_dir, split_to_sketches, filename_prefix="sg_str")
 
     print(f"Processing Time: {time.time() - start_time} secs")
 

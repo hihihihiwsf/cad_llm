@@ -30,7 +30,8 @@ def deduplicate_splits(split_to_sketches):
         split_to_keys[split] = keys
 
         after_count = len(deduped_sketches)
-        print(f"Deduplicate {split} - removed {before_count - after_count} sketches ({before_count} to {after_count})")
+        percent_removed = 100 * (before_count - after_count) / before_count
+        print(f"Deduplicate {split} - removed {percent_removed:.2f}% of sketches ({before_count} to {after_count})")
 
     # Remove train sketches from val
     before_count = len(split_to_sketches["val"])
@@ -42,7 +43,8 @@ def deduplicate_splits(split_to_sketches):
     split_to_sketches["val"] = deduped_val_sketches
 
     after_count = len(split_to_sketches["val"])
-    print(f"Deduplicate val from train - removed {before_count - after_count} sketches ({before_count} to {after_count})")
+    percent_removed = 100 * (before_count - after_count) / before_count
+    print(f"Deduplicate val from train - removed {percent_removed:.2f}% of sketches ({before_count} to {after_count})")
 
     # Remove train and val sketches from test
     before_count = len(split_to_sketches["test"])
@@ -54,7 +56,8 @@ def deduplicate_splits(split_to_sketches):
     split_to_sketches["test"] = deduped_test_sketches
 
     after_count = len(split_to_sketches["test"])
-    print(f"Deduplicate test from val and train - removed {before_count - after_count} sketches ({before_count} to {after_count})")
+    percent_removed = 100 * (before_count - after_count) / before_count
+    print(f"Deduplicate test from val and train - removed {percent_removed:.2f}% of sketches ({before_count} to {after_count})")
 
     split_to_count = {split: len(sketches) for split, sketches in split_to_sketches.items()}
     print("After deduplication: ", split_to_count)

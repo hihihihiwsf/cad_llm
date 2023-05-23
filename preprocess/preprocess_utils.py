@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 
 def get_files(input_path, pattern):
@@ -42,3 +43,10 @@ def load_filter(path):
     with open(path) as f:
         split_to_filenames = json.load(f)
     return split_to_filenames
+
+
+def save_splits(output_dir, split_to_sketches, filename_prefix):
+    for split_name, sketches in split_to_sketches.items():
+        filename = output_dir / f"{filename_prefix}_{split_name}.json"
+        with open(filename, "w") as f:
+            json.dump(sketches, f, indent=4)
