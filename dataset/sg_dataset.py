@@ -94,13 +94,13 @@ def classify_type(ent):
 
 def extract(ent):
     v_list = ent.split('<')[1:]
-    v_list = [int(v.split('>')[0])+31 for v in v_list] #convert from [-31,32] to[0,63] 
+    v_list = [int(v.split('>')[0])+37 for v in v_list] #convert from [-31,32] to[0,63] 
     return v_list
 
 class Token(enum.IntEnum):
     """Enumeration indicating the non-parameter value tokens of PrimitiveModel.
     """
-    Pad = -100
+    Pad = 0
     Start = 1
     Stop = 2
     Line = 3
@@ -198,7 +198,7 @@ class SketchGraphsCollator:
 
     def tokenize(self, strings):
 
-        model_tokenize = self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        model_tokenize = self.tokenizer(strings, padding='longest', truncation=True, max_length=self.max_length, return_tensors="pt")
 
         return model_tokenize 
 
@@ -221,23 +221,24 @@ class SketchGraphsCollator:
             "sketches": sketch_dicts
         }
 
-        # input_strings = [sketch['input_text'] for sketch in sketch_dicts]
-        # output_strings = [sketch['output_text'] for sketch in sketch_dicts]
+        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
+        output_strings = [sketch['output_text'] for sketch in sketch_dicts]
 
-        # vitru_tokenized_input = vitru_tokenize(input_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
-        # vitru_tokenized_output = vitru_tokenize(output_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
-        # labels = torch.tensor(vitru_tokenized_output['val'])
+        vitru_tokenized_input = vitru_tokenize(input_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        vitru_tokenized_output = vitru_tokenize(output_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        labels = torch.tensor(vitru_tokenized_output['val'])
+        labels[labels == Token.Pad] = -100
 
-        # batch = {
-        #     "input_ids": torch.tensor(vitru_tokenized_input['val']),
-        #     "pos_id": torch.tensor(vitru_tokenized_input['pos']),
-        #     "coord_id": torch.tensor(vitru_tokenized_input['coord']),
-        #     "attention_mask": torch.tensor(vitru_tokenized_input['attention_mask']),
-        #     "labels": labels,
-        #     "sketches": sketch_dicts
-        # }
+        batch = {
+            "input_ids": torch.tensor(vitru_tokenized_input['val']),
+            "pos_id": torch.tensor(vitru_tokenized_input['pos']),
+            "coord_id": torch.tensor(vitru_tokenized_input['coord']),
+            "attention_mask": torch.tensor(vitru_tokenized_input['attention_mask']),
+            "labels": labels,
+            "sketches": sketch_dicts
+        }
 
-        return batch_1
+        return batch
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):

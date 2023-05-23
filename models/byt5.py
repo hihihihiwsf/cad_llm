@@ -6,16 +6,23 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
+from typing import Any
+from pytorch_lightning.utilities.types import STEP_OUTPUT
 import torch
 import torch.optim as optim
 
 import numpy as np
 
+import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
 import sys
+
+import sys 
+sys.path.append("..") 
+import dataset.sg_dataset as dataset
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
@@ -24,6 +31,47 @@ from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
+
+
+class Add_Embed(nn.Module):
+    def __init__(self):
+        super(Add_Embed, self).__init__()
+
+        self.num_val_embeddings = 64 + 6
+        self.embed_dim = 512*3
+        # Value embeddings
+        self.num_bins = 64
+        self.max_entities = 16
+
+        num_val_embeddings = len(dataset.Token) + self.num_bins
+
+        self.val_embed = nn.Embedding(num_val_embeddings, self.embed_dim,
+            padding_idx=dataset.Token.Pad)
+        
+        # Coordinate embeddings
+        num_coord_embeddings = 2 + sum(
+            [len(coord_map) for coord_map in dataset.COORD_TOKEN_MAP.values()])
+        self.coord_embed = nn.Embedding(num_coord_embeddings, self.embed_dim,
+            padding_idx=dataset.Token.Pad)
+        
+        # Position embeddings
+        num_pos_embeddings = 3 + self.max_entities
+        self.pos_embed = nn.Embedding(num_pos_embeddings, self.embed_dim,
+            padding_idx=dataset.Token.Pad)
+        # Also create output layer
+        self.out = nn.Linear(self.embed_dim, num_val_embeddings) #512, 70
+    
+    def forward(self, model_batch):
+        # cols = ["input_ids", "pos_ids", "coord_ids", "attention_mask", "labels"]
+        # model_batch = {col: val for col, val in batch.items() if col in cols}
+        val_embeddings = self.val_embed(model_batch['input_ids'])
+        coord_embeddings = self.coord_embed(model_batch['coord_ids'])
+        pos_embeddings = self.pos_embed(model_batch['pos_ids'])
+        embeddings = val_embeddings+ coord_embeddings + pos_embeddings
+        
+        return embeddings
+
+
 
 
 class ByT5Model(pl.LightningModule):
@@ -39,7 +87,17 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
+        self.embed = Add_Embed()
+
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        if args.linear_decode:
+            # self.num_val_embeddings = 64 + 6
+            # self.embed_dim = 512
+            # (self.val_embed, self.coord_embed, self.pos_embed), self.out = self.create_embedding()
+            
+            self.model.shared = self.embed
+            self.model.lm_head = self.embed.out
+
         self.args = args
 
         self.lr = self.args.lr
@@ -51,11 +109,12 @@ class ByT5Model(pl.LightningModule):
         self.avg_token_len = np.zeros((args.max_length))
         self.avg_token_loss = np.zeros((args.max_length))
         # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
+        # if not args.ascii_encoding:
+        #     self.adjust_to_use_new_tokens()
 
         if args.lora:
             self.add_lora()
+
 
     def add_lora(self):
         lora_config = LoraConfig(
@@ -83,9 +142,6 @@ class ByT5Model(pl.LightningModule):
         # Add new tokens to the tokenizer
 
         new_tokens = [f"<{i}>" for i in self.quantized_range]
-        new_tokens.append('<Line>')
-        new_tokens.append('<Circle>')
-        new_tokens.append('<Curve>')
         
         self.tokenizer.add_tokens(new_tokens)
 
@@ -97,16 +153,23 @@ class ByT5Model(pl.LightningModule):
             embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
+        # cols = ["input_ids", "attention_mask", "labels"]
+        # model_batch = {col: val for col, val in batch.items() if col in cols}
+        # outputs = self.model(**model_batch)
+
+        cols = ["input_ids", "pos_ids", "coord_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
+        outputs = self.model(**model_batch, output_hidden_states=True)
+        decoder_output = outputs.decoder_hidden_states[-1]
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
+        #cols = ["input_ids", "attention_mask", "labels"]
+
+        cols = ["input_ids", "pos_ids", "coord_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss
@@ -131,6 +194,9 @@ class ByT5Model(pl.LightningModule):
 
         # Generate and process samples
         self.generate_samples(batch)
+        logits = outputs.logits
+        loss = outputs.loss
+        # outputs = self.linear_decode(logits)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
