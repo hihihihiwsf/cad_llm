@@ -46,7 +46,7 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-        self.clip_model, self.clip_preprocess = clip.load("ViT-B/32")
+        self.clip_model, self.clip_preprocess = clip.load(args.clipmodel)
         self.clip_model.requires_grad_(False)
         self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
 
@@ -102,14 +102,15 @@ class ByT5Model(pl.LightningModule):
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         with torch.no_grad():
             image_features = self.clip_model.encode_image(batch['images'])
-
         image_for_llm = self.mapper(image_features.float())
-
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
         del model_batch['attention_mask']
+
+
+
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -117,8 +118,19 @@ class ByT5Model(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
+        cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+
+
+        image_features = self.clip_model.encode_image(batch['images'])
+        image_for_llm = self.mapper(image_features.float())
+        txt_embedder = self.model.get_input_embeddings()
+        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
+        model_batch['inputs_embeds'] = input_embed
+        del model_batch['attention_mask']
+
+
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
