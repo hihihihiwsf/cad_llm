@@ -34,7 +34,7 @@ def get_parser():
     parser.add_argument("--val_every_n_epoch", type=int, default=1, help="Check validation after n training epochs")
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")
     parser.add_argument("--cosinedecay", type=int, default=0, help="Apply Cosine Learning rate decay if true")
-    parser.add_argument("--linear_decode", type=int, default=0, help="If apply self defined vitru tokenizer")
+    parser.add_argument("--linear_decode", type=int, default=1, help="If apply self defined vitru tokenizer")
 
     return parser
 
