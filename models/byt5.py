@@ -107,7 +107,8 @@ class ByT5Model(pl.LightningModule):
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
-        del model_batch['attention_mask']
+        # adding ones to attention_mask
+        model_batch['attention_mask'] = torch.cat((torch.ones(self.args.batch_size, 1).to(self.device), model_batch['attention_mask']), dim=1)
 
 
 
@@ -128,7 +129,8 @@ class ByT5Model(pl.LightningModule):
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
-        del model_batch['attention_mask']
+        # adding ones to attention_mask
+        model_batch['attention_mask'] = torch.cat((torch.ones(self.args.batch_size, 1).to(self.device), model_batch['attention_mask']), dim=1)
 
 
         outputs = self.model(**model_batch)
