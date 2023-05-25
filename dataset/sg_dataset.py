@@ -135,18 +135,25 @@ def _pad_or_truncate_to_length(arr: np.ndarray, target_length: Optional[int]=Non
         raise ValueError('arr must be either numpy array or torch Tensor')
 
 def vitru_tokenize(strings, max_length, padding=True, truncation=True,return_tensors="pt"):
-    s_val = []
-    s_coord = []
-    s_pos = []
-    s_mask = []
+    s_val = np.array([],dtype=int)
+    s_coord = np.array([],dtype=int)
+    s_pos = np.array([],dtype=int)
+    s_mask = np.array([],dtype=int)
     max_len = 0
-    for sketch in strings:
-        val, coord, pos, attention_mask = sketch_tokenize(sketch, truncation=True, max_length=max_length,padding=True, return_tensors="pt")
+    for i, sketch in enumerate(strings):
 
-        s_val.append(val)
-        s_coord.append(coord)
-        s_pos.append(pos)
-        s_mask.append(attention_mask)
+        val, coord, pos, attention_mask = sketch_tokenize(sketch, truncation=True, max_length=max_length,padding=True, return_tensors="pt")
+        if max_len==0:
+            s_val = val
+            s_coord = coord
+            s_pos = pos 
+            s_mask = attention_mask
+        else:
+            s_val = np.vstack([s_val, val])
+            s_coord = np.vstack([s_coord, coord])
+            s_pos = np.vstack([s_pos, pos])
+            s_mask = np.vstack([s_mask, attention_mask])
+        max_len += 1
     
     sample = {
         'val': s_val,
@@ -158,7 +165,8 @@ def vitru_tokenize(strings, max_length, padding=True, truncation=True,return_ten
 
 
 def sketch_tokenize(sketch, max_length, padding=True, truncation=True,return_tensors="pt",include_stop=False):
-    val_tokens = [Token.Start]
+    #val_tokens = [Token.Start]
+    val_tokens = []
     coord_tokens = [1] # 0 for padding
     pos_idx = 1  # 0 is reserved for padding
     pos_tokens = [pos_idx]
@@ -184,10 +192,6 @@ def sketch_tokenize(sketch, max_length, padding=True, truncation=True,return_ten
     coord= _pad_or_truncate_to_length(np.array(coord_tokens, dtype=np.int64), max_length)
     pos= _pad_or_truncate_to_length(np.array(pos_tokens, dtype=np.int64), max_length)
     attention_mask = _pad_or_truncate_to_length(np.array(attention_mask, dtype=np.int64), max_length)
-    # val = np.array(val_tokens, dtype=np.int64)
-    # coord = np.array(coord_tokens, dtype=np.int64)
-    # pos = np.array(pos_tokens, dtype=np.int64)
-    
 
     return val, coord, pos, attention_mask
 
@@ -225,14 +229,19 @@ class SketchGraphsCollator:
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
 
         vitru_tokenized_input = vitru_tokenize(input_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+
         vitru_tokenized_output = vitru_tokenize(output_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
         labels = torch.tensor(vitru_tokenized_output['val'])
         labels[labels == Token.Pad] = -100
 
+        batch_input_id = {
+            "val_ids": torch.tensor(vitru_tokenized_input['val']),
+            "pos_ids": torch.tensor(vitru_tokenized_input['pos']),
+            "coord_ids": torch.tensor(vitru_tokenized_input['coord']),
+        }
+
         batch = {
-            "input_ids": torch.tensor(vitru_tokenized_input['val']),
-            "pos_id": torch.tensor(vitru_tokenized_input['pos']),
-            "coord_id": torch.tensor(vitru_tokenized_input['coord']),
+            "input_ids": batch_input_id,
             "attention_mask": torch.tensor(vitru_tokenized_input['attention_mask']),
             "labels": labels,
             "sketches": sketch_dicts

@@ -16,61 +16,21 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
+from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer, AutoModelForSeq2SeqLM
 from transformers.modeling_utils import unwrap_model
 import sys
 
 import sys 
 sys.path.append("..") 
-import dataset.sg_dataset as dataset
+from dataset import sg_dataset
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
 from util import get_quantized_range
-from geometry.parse import get_curves, get_point_entities
+from geometry.parse import get_curves, get_point_entities, new_get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
-
-
-class Add_Embed(nn.Module):
-    def __init__(self):
-        super(Add_Embed, self).__init__()
-
-        self.num_val_embeddings = 64 + 6
-        self.embed_dim = 512*3
-        # Value embeddings
-        self.num_bins = 64
-        self.max_entities = 16
-
-        num_val_embeddings = len(dataset.Token) + self.num_bins
-
-        self.val_embed = nn.Embedding(num_val_embeddings, self.embed_dim,
-            padding_idx=dataset.Token.Pad)
-        
-        # Coordinate embeddings
-        num_coord_embeddings = 2 + sum(
-            [len(coord_map) for coord_map in dataset.COORD_TOKEN_MAP.values()])
-        self.coord_embed = nn.Embedding(num_coord_embeddings, self.embed_dim,
-            padding_idx=dataset.Token.Pad)
-        
-        # Position embeddings
-        num_pos_embeddings = 3 + self.max_entities
-        self.pos_embed = nn.Embedding(num_pos_embeddings, self.embed_dim,
-            padding_idx=dataset.Token.Pad)
-        # Also create output layer
-        self.out = nn.Linear(self.embed_dim, num_val_embeddings) #512, 70
-    
-    def forward(self, model_batch):
-        # cols = ["input_ids", "pos_ids", "coord_ids", "attention_mask", "labels"]
-        # model_batch = {col: val for col, val in batch.items() if col in cols}
-        val_embeddings = self.val_embed(model_batch['input_ids'])
-        coord_embeddings = self.coord_embed(model_batch['coord_ids'])
-        pos_embeddings = self.pos_embed(model_batch['pos_ids'])
-        embeddings = val_embeddings+ coord_embeddings + pos_embeddings
-        
-        return embeddings
-
 
 
 
@@ -87,16 +47,41 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.embed = Add_Embed()
 
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        
+        '''
+        add_ three tokenize
+        '''
+        self.num_val_embeddings = 64 + 6
+        self.embed_dim = 512*3
+
+        # Value embeddings
+        self.num_bins = 64
+        self.max_entities = 16
+
+        num_val_embeddings = len(sg_dataset.Token) + self.num_bins
+
+        self.val_embed = nn.Embedding(num_val_embeddings, self.embed_dim,
+            padding_idx=sg_dataset.Token.Pad)
+        
+        # Coordinate embeddings
+        num_coord_embeddings = 2 + sum(
+            [len(coord_map) for coord_map in sg_dataset.COORD_TOKEN_MAP.values()])
+        self.coord_embed = nn.Embedding(num_coord_embeddings, self.embed_dim,
+            padding_idx=sg_dataset.Token.Pad)
+        
+        # Position embeddings
+        num_pos_embeddings = 3 + self.max_entities
+        self.pos_embed = nn.Embedding(num_pos_embeddings, self.embed_dim,
+            padding_idx=sg_dataset.Token.Pad)
+        # Also create output layer
+        self.out = nn.Linear(self.embed_dim, num_val_embeddings) #512, 70
+
+        
         if args.linear_decode:
-            # self.num_val_embeddings = 64 + 6
-            # self.embed_dim = 512
-            # (self.val_embed, self.coord_embed, self.pos_embed), self.out = self.create_embedding()
-            
-            self.model.shared = self.embed
-            self.model.lm_head = self.embed.out
+            #self.model.shared = self.embed
+            self.model.lm_head = self.out
 
         self.args = args
 
@@ -156,11 +141,16 @@ class ByT5Model(pl.LightningModule):
         # cols = ["input_ids", "attention_mask", "labels"]
         # model_batch = {col: val for col, val in batch.items() if col in cols}
         # outputs = self.model(**model_batch)
+        input_embeds = self.add_embed(batch["input_ids"])
 
-        cols = ["input_ids", "pos_ids", "coord_ids", "attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
+        cols = ["input_embeds", "attention_mask", "labels"]
+        model_batch = {
+            "inputs_embeds": input_embeds,
+            "attention_mask": batch['attention_mask'],
+            "labels": batch['labels']
+        }
+
         outputs = self.model(**model_batch, output_hidden_states=True)
-        decoder_output = outputs.decoder_hidden_states[-1]
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -168,9 +158,14 @@ class ByT5Model(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         #cols = ["input_ids", "attention_mask", "labels"]
-
-        cols = ["input_ids", "pos_ids", "coord_ids", "attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
+        # print('valid batch idx', batch_idx)
+        input_embeds = self.add_embed(batch["input_ids"])
+        cols = ["input_embeds", "attention_mask", "labels"]
+        model_batch = {
+            "inputs_embeds": input_embeds,
+            "attention_mask": batch['attention_mask'],
+            "labels": batch['labels']
+        }
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
@@ -193,28 +188,25 @@ class ByT5Model(pl.LightningModule):
         #             batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
-        self.generate_samples(batch)
-        logits = outputs.logits
-        loss = outputs.loss
-        # outputs = self.linear_decode(logits)
+        top1_full_sketch, top1_ent = self.new_generate_samples(batch)
 
-        # Calculate metrics
-        top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        # # Calculate metrics
+        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+                  batch_size=self.batch_size, sync_dist=True)
 
-        top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+                  batch_size=self.batch_size, sync_dist=True)
 
-        # Convert string entities to curves and check validity
-        validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+        # # Convert string entities to curves and check validity
+        # validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
+        # self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
-        if batch_idx < 5:
-            self.log_samples(batch=batch, batch_idx=batch_idx)
+        # if batch_idx < 5:
+        #     self.log_samples(batch=batch, batch_idx=batch_idx)
 
         return loss
     
@@ -222,6 +214,42 @@ class ByT5Model(pl.LightningModule):
     # def on_validation_epoch_end(self):
     #     np.save('avg_token_loss.npy', self.avg_token_loss)
     #     np.save('avg_token_len.npy', self.avg_token_len)
+
+    def add_embed(self, model_batch):
+
+        val_embeddings = self.val_embed(model_batch['val_ids'])
+        coord_embeddings = self.coord_embed(model_batch['coord_ids'])
+        pos_embeddings = self.pos_embed(model_batch['pos_ids'])
+        embeddings = val_embeddings+ coord_embeddings + pos_embeddings
+        return embeddings
+
+    def new_generate_samples(self, batch):
+        generate_func = unwrap_model(self.model).generate
+        inputs_embeds = self.add_embed(batch["input_ids"])
+        batch["string_samples"] = generate_func(inputs_embeds=inputs_embeds, attention_mask=batch["attention_mask"],
+                                         do_sample=False)
+        batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
+
+        full = 0
+        top1_ent = 0
+        for string, label in zip(batch["string_samples"], batch["labels"]):
+            label = label.detach().cpu().numpy()
+            label = set(np.trim_zeros(label))
+            string = string.detach().cpu().numpy()
+            if label.issuperset(string):
+                full += 1
+            
+            else:
+                if label.issuperset(string[0:5]) or label.issuperset(string[0:7]) or label.issuperset(string[0:9]):
+                    top1_ent += 1
+            continue
+
+        top1_full = full / len(batch["labels"])
+        top1_ent = top1_ent / len(batch["labels"])
+        return top1_full, top1_ent 
+        
+        
+
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
@@ -236,6 +264,7 @@ class ByT5Model(pl.LightningModule):
         batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
 
         batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
+        
 
     def log_samples(self, batch, batch_idx):
         label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]

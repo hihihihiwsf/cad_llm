@@ -5,6 +5,36 @@ from geometry.circle import Circle
 from geometry.line import Line
 from preprocess.preprocessing import sort_points
 
+import sys 
+sys.path.append("..") 
+from dataset import sg_dataset
+
+def new_get_point_entities(entities_string, sort=True):
+    idx = 0
+    token = [e.value for e in sg_dataset.Token]
+    point_entity = []
+    if len(entities_string)==0:
+        return point_entity
+    
+    while(idx < len(entities_string)-1):
+        val = entities_string[idx]
+        if val in token:
+            if val == sg_dataset.Token.Line and idx+4<len(entities_string)-1:
+                point_entity.append(entities_string[idx+1:idx+4].numpy().tolist())
+                idx = idx + 4
+            elif val == sg_dataset.Token.Curve and idx+6<len(entities_string)-1:
+                point_entity.append((entities_string[idx+1:idx+6]).numpy().tolist())
+                idx = idx + 6
+            elif val == sg_dataset.Token.Circle and idx+8<len(entities_string)-1:
+                point_entity.append((entities_string[idx+1:idx+8]).numpy().tolist())
+                idx = idx + 8
+            else:
+                idx += 1
+        else:
+            idx += 1
+            
+    return torch.tensor(point_entity)
+
 
 def get_point_entities(entities_string, sort=True):
     """
@@ -13,6 +43,8 @@ def get_point_entities(entities_string, sort=True):
     If sort is True, sort the points in each entity
     """
     entity_strings = [s.replace(" ", "") + ';' for s in entities_string.split(';') if s]
+    #entity_strings = entities_string
+
     point_entities = [get_point_entity(entity_string) for entity_string in entity_strings]
     if sort:
         point_entities = [sort_points(points) for points in point_entities]
