@@ -305,7 +305,7 @@ class ByT5Model(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
         params = list(self.val_embed.parameters()) + list(self.coord_embed.parameters())+list(self.pos_embed.parameters())+list(self.out.parameters())
-        emb_optimizer = optim.AdamW(params, lr=self.lr)
+        emb_optimizer = optim.AdamW(params, lr=self.lr*30)
         if not self.args.cosinedecay:
             return optimizer, emb_optimizer
             
