@@ -49,4 +49,4 @@ def save_splits(output_dir, split_to_sketches, filename_prefix):
     for split_name, sketches in split_to_sketches.items():
         filename = output_dir / f"{filename_prefix}_{split_name}.json"
         with open(filename, "w") as f:
-            json.dump(sketches, f, indent=4)
+            json.dump(sketches, f)

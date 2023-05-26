@@ -61,7 +61,7 @@ def main(args):
 
     split_to_indices = {split: get_index_list(sketches) for split, sketches in split_to_sketches.items()}
     with open(output_dir / "split_to_index.json", "w") as f:
-        json.dump(split_to_indices, f, indent=4)
+        json.dump(split_to_indices, f)
 
 
 if __name__ == "__main__":
