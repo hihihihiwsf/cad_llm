@@ -34,7 +34,7 @@ def get_parser():
     parser.add_argument("--val_every_n_epoch", type=int, default=1, help="Check validation after n training epochs")
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")
     parser.add_argument("--cosinedecay", type=int, default=0, help="Apply Cosine Learning rate decay if true")
-    parser.add_argument("--clipmodel", type=str, default="ViT-B/32", choices=['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'ViT-L/14@336px'], help="Which clip model to use")
+    parser.add_argument("--clipmodel", type=str, default="ViT-B/32", choices=['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'ViT-L/14@336px', 'openai/clip-vit-base-patch32', 'openai/clip-vit-large-patch14'], help="Which clip model to use")
 
 
     return parser

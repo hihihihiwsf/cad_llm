@@ -62,7 +62,7 @@ def main():
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        strategy=DDPStrategy(find_unused_parameters=False),
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,

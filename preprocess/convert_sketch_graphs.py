@@ -151,10 +151,10 @@ def main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tokens):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, required=True,
+    parser.add_argument("--input", type=str, default="./preprocess/sketchgraphs/data",
                         help="Input folder containing the SketchGraphs filter sequence .npy files")
     parser.add_argument("--output", type=str, help="Output folder to save the data [default: output]")
-    parser.add_argument("--filter", type=str, required=True,
+    parser.add_argument("--filter", type=str, default="./preprocess/split_to_filenames_v4.json",
                         help="File containing indices of deduped sketches ('train_test.json')")
     parser.add_argument("--limit", type=int, help="Only process this number of designs")
     parser.add_argument("--quantize_bits", type=int, default=6,

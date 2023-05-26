@@ -58,8 +58,16 @@ def get_entities_string(entities, new_tokens):
     # flatten [[x1, y1], [x2, y2], ...] -> [x1, y1, x2, y2, ...]
     flat_entities = [sum(points, tuple()) for points in entities]
     # convert each entity to a string
+    str_entities = []
     if not new_tokens:
-        str_entities = [",".join([str(x) for x in ent]) + ";" for ent in flat_entities]
+        for ent in entities:
+            all_points = []
+            for p in ent:
+                all_points.append(" ".join(str(x) for x in p))
+            str_entities.append(",".join(p for p in all_points) + ";")
+
+            
+        # str_entities = [",".join([str(x) for x in ent]) + ";" for ent in flat_entities]
     else:
         str_entities = ["".join([f"<{x}>" for x in ent]) + ";" for ent in flat_entities]
     return str_entities

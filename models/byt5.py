@@ -24,6 +24,8 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from PIL import Image
 import clip
 import numpy as np
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel
+
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args):
@@ -46,9 +48,17 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-        self.clip_model, self.clip_preprocess = clip.load(args.clipmodel)
+        
+        
+        # self.clip_model, _ = clip.load(args.clipmodel)
+        self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
         self.clip_model.requires_grad_(False)
-        self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
+
+
+        # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
+        self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
+        # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
+
 
 
         # If using single token encoding - adjust tokenizer and model embeddings
@@ -101,14 +111,23 @@ class ByT5Model(pl.LightningModule):
         #convert to PIL image for CLIP
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         with torch.no_grad():
-            image_features = self.clip_model.encode_image(batch['images'])
+            # image_features = self.clip_model.encode_image(batch['images'])
+            oi = self.clip_model(**batch['images'])
+            image_features = oi.image_embeds
+            # image_features = oi['pooler_output']
+
+
+
         image_for_llm = self.mapper(image_features.float())
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
         # adding ones to attention_mask
-        model_batch['attention_mask'] = torch.cat((torch.ones(self.args.batch_size, 1).to(self.device), model_batch['attention_mask']), dim=1)
+
+
+        att = model_batch['attention_mask']
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
 
 
 
@@ -119,19 +138,42 @@ class ByT5Model(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
+        
+        # image_features = self.clip_model.encode_image(batch['images'])
+        oi = self.clip_model(**batch['images'])
+        image_features = oi.image_embeds
+        # image_features = oi['pooler_output']
 
-        image_features = self.clip_model.encode_image(batch['images'])
+
+
         image_for_llm = self.mapper(image_features.float())
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        # input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
+        
+        # code = torch.tensor(self.tokenizer.encode('code')).to(self.device)
+        # code = txt_embedder(code).unsqueeze(0)
+        # code = torch.repeat_interleave(code, image_features.shape[0], dim=0)
+
+        # imm = torch.tensor(self.tokenizer.encode('image')).to(self.device)
+        # imm = txt_embedder(imm).unsqueeze(0)
+        # imm = torch.repeat_interleave(imm, image_features.shape[0], dim=0)
+        
         input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
-        # adding ones to attention_mask
-        model_batch['attention_mask'] = torch.cat((torch.ones(self.args.batch_size, 1).to(self.device), model_batch['attention_mask']), dim=1)
 
+
+        # adding ones to attention_mask
+        att = model_batch['attention_mask']
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
+
+        batch['attention_mask'] = model_batch['attention_mask']
+        batch['inputs_embeds'] = model_batch['inputs_embeds']
 
         outputs = self.model(**model_batch)
         loss = outputs.loss
@@ -164,7 +206,7 @@ class ByT5Model(pl.LightningModule):
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+        batch["samples"] = generate_func(inputs_embeds=batch["inputs_embeds"], attention_mask=batch["attention_mask"],
                                          do_sample=False, max_length=self.args.max_length+10)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
