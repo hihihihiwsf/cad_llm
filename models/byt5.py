@@ -47,9 +47,12 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-
+        
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         
+        ''' multiple optimizers to manual_backward'''
+        self.automatic_optimization = False
+
         '''
         add_ three tokenize
         '''
@@ -84,6 +87,8 @@ class ByT5Model(pl.LightningModule):
             self.model.lm_head = self.out
 
         self.args = args
+
+
 
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
@@ -141,7 +146,13 @@ class ByT5Model(pl.LightningModule):
         # cols = ["input_ids", "attention_mask", "labels"]
         # model_batch = {col: val for col, val in batch.items() if col in cols}
         # outputs = self.model(**model_batch)
+        
+        t5_opt, emb_opt = self.optimizers()
+        
+
         input_embeds = self.add_embed(batch["input_ids"])
+        
+        print("training batch_input_id.shape = ", input_embeds.shape)
 
         cols = ["input_embeds", "attention_mask", "labels"]
         model_batch = {
@@ -150,8 +161,19 @@ class ByT5Model(pl.LightningModule):
             "labels": batch['labels']
         }
 
+       
+        
         outputs = self.model(**model_batch, output_hidden_states=True)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        # outputs = self.out(input_embeds)
+        # loss = outputs.mean()
+
+        t5_opt.zero_grad()
+        emb_opt.zero_grad()
+        self.manual_backward(loss)
+        t5_opt.step()
+        emb_opt.step()
+
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
@@ -160,13 +182,16 @@ class ByT5Model(pl.LightningModule):
         #cols = ["input_ids", "attention_mask", "labels"]
         # print('valid batch idx', batch_idx)
         input_embeds = self.add_embed(batch["input_ids"])
-        cols = ["input_embeds", "attention_mask", "labels"]
+        
         model_batch = {
             "inputs_embeds": input_embeds,
             "attention_mask": batch['attention_mask'],
             "labels": batch['labels']
         }
+        print("validation batch_input_id.shape = ", input_embeds.shape)
         outputs = self.model(**model_batch)
+        # outputs = self.out(input_embeds)
+        
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -279,13 +304,18 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        params = list(self.val_embed.parameters()) + list(self.coord_embed.parameters())+list(self.pos_embed.parameters())+list(self.out.parameters())
+        emb_optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
-            return optimizer
+            return optimizer, emb_optimizer
             
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs, verbose=True)
+        emb_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(emb_optimizer, T_max=self.args.epochs, verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+
+        #optim.AdamW(self.model.parameters(), lr=self.lr)
         return {
-            "optimizer": optimizer,
+            "optimizer": optimizer, 
             "lr_scheduler": {
                 "scheduler": scheduler,
                 "interval": "epoch",

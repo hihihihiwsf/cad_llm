@@ -250,12 +250,12 @@ class SketchGraphsCollator:
         return batch
 
 
-def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
+def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle, drop_last):
     dataset = SketchGraphsDataset(split=split, args=args)
 
     # from IPython import embed; embed()
     
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length)
 
-    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
+    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle, drop_last=drop_last,
                       num_workers=args.num_workers)

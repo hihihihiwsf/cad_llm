@@ -41,8 +41,8 @@ def main():
     model = ByT5Model(args=args)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False) #len(val_dataloader) = 3681, len(val_dataset) = 22086
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True, drop_last=True)
+    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False,drop_last=True) #len(val_dataloader) = 3681, len(val_dataset) = 22086
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
