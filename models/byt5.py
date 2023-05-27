@@ -47,8 +47,8 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
 
         # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
+        # if not args.ascii_encoding:
+            # self.adjust_to_use_new_tokens()
 
         if args.lora:
             self.add_lora()
