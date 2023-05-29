@@ -47,8 +47,8 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
 
         # If using single token encoding - adjust tokenizer and model embeddings
-        # if not args.ascii_encoding:
-            # self.adjust_to_use_new_tokens()
+        if not args.ascii_encoding:
+            self.adjust_to_use_new_tokens()
 
         if args.lora:
             self.add_lora()
@@ -130,14 +130,27 @@ class ByT5Model(pl.LightningModule):
         self.generate_samples(batch)
 
         # Calculate metrics
-        top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        mx = 0
+        for i,j in zip(batch['string_samples'], batch['string_labels']):
+            if i == j:
+                mx += 1
+        top1_full_sketch = mx/len(batch['string_labels'])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
-        top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
+
+        mx = 0
+        for i,j in zip(batch['string_samples'], batch['string_labels']):
+            label_all_ent = j.split(";")
+            first_ent = i.split(";")[0]
+            if first_ent in label_all_ent:
+                mx += 1
+        top1_ent = mx/len(batch['string_labels'])
+        self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
         # Convert string entities to curves and check validity
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
         self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
