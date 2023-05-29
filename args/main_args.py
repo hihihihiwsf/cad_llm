@@ -7,7 +7,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="data/sg_strings_v4", help="Dataset path")
+    parser.add_argument("--dataset", type=str, default="/home/ec2-user/data/sifan_test_ascii/", help="Dataset path")
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
@@ -15,7 +15,7 @@ def get_parser():
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
     parser.add_argument("--ascii_encoding", type=int, default=0,
                         help="Use ascii ByT5 encoding instead of single token encoding")
-    parser.add_argument("--model_name", type=str, default="google/byt5-base", help="Huggingface model name")
+    parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-770m", help="Huggingface model name")
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
     parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")
