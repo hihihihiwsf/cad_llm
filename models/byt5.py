@@ -156,23 +156,23 @@ class ByT5Model(pl.LightningModule):
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
-        code = torch.tensor(self.tokenizer.encode('code')).to(self.device)
-        code = txt_embedder(code).unsqueeze(0)
-        code = torch.repeat_interleave(code, image_features.shape[0], dim=0)
+        # code = torch.tensor(self.tokenizer.encode('code')).to(self.device)
+        # code = txt_embedder(code).unsqueeze(0)
+        # code = torch.repeat_interleave(code, image_features.shape[0], dim=0)
 
-        imm = torch.tensor(self.tokenizer.encode('image')).to(self.device)
-        imm = txt_embedder(imm).unsqueeze(0)
-        imm = torch.repeat_interleave(imm, image_features.shape[0], dim=0)
+        # imm = torch.tensor(self.tokenizer.encode('image')).to(self.device)
+        # imm = txt_embedder(imm).unsqueeze(0)
+        # imm = torch.repeat_interleave(imm, image_features.shape[0], dim=0)
         
-        # input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
-        input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
+        # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
 
 
         # adding ones to attention_mask
         att = model_batch['attention_mask']
-        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
 
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']
