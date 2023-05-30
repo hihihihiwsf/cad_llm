@@ -15,3 +15,5 @@ t5-base-vocab-100/
 draw_sample.py
 .vscode/settings.json
 preprocess/split_to_filenames_v4.json
+wrong_vs_all.png
+wrong_vs_ture.png

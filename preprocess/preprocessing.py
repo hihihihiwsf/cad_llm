@@ -107,4 +107,4 @@ def normalize_and_quantize_vertices(vertices, n_bits=6):
     vertices = center_and_scale(vertices)
     quantize_range = 2 ** n_bits - 1
     vertices = (vertices * quantize_range).astype("int32")
-    return vertices
+    return vertices + 33

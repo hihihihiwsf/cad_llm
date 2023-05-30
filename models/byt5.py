@@ -45,7 +45,7 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-
+        self.all_labels_length, self.wrong_labels_length, self.true_labels_length = [], [], [] 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
@@ -135,8 +135,13 @@ class ByT5Model(pl.LightningModule):
         for i,j in zip(batch['string_samples'], batch['string_labels']):
             out, l = i.split(";"), j.split(";")
             # label_all_ent = j.split(";")
+            self.all_labels_length.append(len(l))
             if set(out) == set(l):
                 mx += 1
+            else:
+                self.wrong_labels_length.append(len(out))
+                self.true_labels_length.append(len(l))
+
         top1_full_sketch = mx/len(batch['string_labels'])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -163,6 +168,22 @@ class ByT5Model(pl.LightningModule):
             self.log_samples(batch=batch, batch_idx=batch_idx)
 
         return loss
+
+
+    def on_validation_epoch_end(self):
+        print('stop')
+        import matplotlib.pyplot as plt
+        plt.hist(self.all_labels_length, color='blue')
+        # plt.savefig('all_length.png')
+        # plt.close()
+        plt.hist(self.wrong_labels_length, alpha=.4, color='r')
+        plt.savefig('wrong_vs_all.png')
+        
+        plt.close()
+        plt.hist(self.true_labels_length, color='blue')
+        plt.hist(self.wrong_labels_length, alpha=.4, color='r')
+        plt.savefig('wrong_vs_ture.png')
+        return self.all_labels_length, self.wrong_labels_length
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
