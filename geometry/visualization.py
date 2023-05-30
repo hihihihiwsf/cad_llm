@@ -58,9 +58,9 @@ def draw_curves(curves, ax, box_lim, color, draw_points=False):
     ax.set_xticks([])
     ax.set_yticks([])
 
-    colors = {2: 'red', 3:'green', 4:'blue'}
+    # colors = {2: 'red', 3:'green', 4:'blue'}
 
     for curve in curves:
         if curve and curve.good:
-            curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
+            curve.draw(ax=ax,  color='black', draw_points=draw_points)
             

@@ -16,7 +16,8 @@ from pathlib import Path
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
-
+import os
+from pytorch_lightning.strategies import DDPStrategy
 
 def main():
     """Entry point for our training script"""
@@ -56,7 +57,8 @@ def main():
     log_every_n_steps = 1000
 
 
-    from pytorch_lightning.strategies import DDPStrategy
+    
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
         callbacks=call_backs,
