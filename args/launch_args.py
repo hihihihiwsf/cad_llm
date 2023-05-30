@@ -10,9 +10,10 @@ import argparse
 def get_launch_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--aws_profile",
+        "--aws_name",
         type=str,
-        help="AWS profile name to use for credentials"
+        required=True,
+        help="Username to prepend to aws job name"
     )
     parser.add_argument(
         "--aws_account",
@@ -35,7 +36,7 @@ def get_launch_args():
     parser.add_argument(
         "--instance_type",
         type=str,
-        choices=("ml.p3.2xlarge", "ml.p3.8xlarge", "ml.p3.16xlarge", "ml.p3dn.24xlarge"),
+        choices=("ml.p3.2xlarge", "ml.p3.8xlarge", "ml.p3.16xlarge", "ml.p3dn.24xlarge", "ml.p4d.24xlarge"),
         default="ml.p3.2xlarge",
         help="Sagemaker instance type",
     )
