@@ -133,7 +133,9 @@ class ByT5Model(pl.LightningModule):
         # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         mx = 0
         for i,j in zip(batch['string_samples'], batch['string_labels']):
-            if i == j:
+            out, l = i.split(";"), j.split(";")
+            # label_all_ent = j.split(";")
+            if set(out) == set(l):
                 mx += 1
         top1_full_sketch = mx/len(batch['string_labels'])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
