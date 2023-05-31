@@ -21,7 +21,7 @@ from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
-from transformers import T5Tokenizer
+from transformers import T5Tokenizer, AutoModelForSeq2SeqLM
 import numpy as np
 
 class ByT5Model(pl.LightningModule):
@@ -34,7 +34,10 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration(config)
             model._init_weights(model)  # maybe redundant
         else:
-            model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            # model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
+                                              torch_dtype=torch.float16,
+                                              trust_remote_code=True)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
@@ -46,7 +49,9 @@ class ByT5Model(pl.LightningModule):
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
         self.all_labels_length, self.wrong_labels_length, self.true_labels_length = [], [], [] 
+        self.all_labels_token, self.wrong_labels_token, self.true_labels_token, self.diff_token = [], [], [], []
         # If using single token encoding - adjust tokenizer and model embeddings
+        
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
 
@@ -135,12 +140,17 @@ class ByT5Model(pl.LightningModule):
         for i,j in zip(batch['string_samples'], batch['string_labels']):
             out, l = i.split(";"), j.split(";")
             # label_all_ent = j.split(";")
-            self.all_labels_length.append(len(l))
+            self.all_labels_length.append(len(l)-1)
+            self.all_labels_token.append(len(self.tokenizer.tokenize(j)))
             if set(out) == set(l):
                 mx += 1
             else:
-                self.wrong_labels_length.append(len(out))
-                self.true_labels_length.append(len(l))
+                self.wrong_labels_length.append(len(out)-1)
+                self.true_labels_length.append(len(l)-1)
+                
+                self.wrong_labels_token.append(len(self.tokenizer.tokenize(i)))
+                self.true_labels_token.append(len(self.tokenizer.tokenize(j)))
+                self.diff_token.append(len(self.tokenizer.tokenize(i)) - len(self.tokenizer.tokenize(j)))
 
         top1_full_sketch = mx/len(batch['string_labels'])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
@@ -171,25 +181,37 @@ class ByT5Model(pl.LightningModule):
 
 
     def on_validation_epoch_end(self):
-        print('stop')
         import matplotlib.pyplot as plt
         plt.hist(self.all_labels_length, color='blue')
-        # plt.savefig('all_length.png')
-        # plt.close()
         plt.hist(self.wrong_labels_length, alpha=.4, color='r')
         plt.savefig('wrong_vs_all.png')
         
         plt.close()
         plt.hist(self.true_labels_length, color='blue')
         plt.hist(self.wrong_labels_length, alpha=.4, color='r')
-        plt.savefig('wrong_vs_ture.png')
+        plt.savefig('wrong_vs_true.png')
+        
+        plt.close()
+        plt.hist(self.all_labels_token, color='blue')
+        plt.hist(self.wrong_labels_token, alpha=.4, color='r')
+        plt.savefig('wrong_vs_all_token.png')
+        
+        plt.close()
+        plt.hist(self.true_labels_token, color='blue')
+        plt.hist(self.wrong_labels_token, alpha=.4, color='r')
+        plt.savefig('wrong_vs_true_token.png')
+        
+        plt.close()
+        plt.hist(self.diff_token, color='blue')
+        plt.savefig('diff_token.png')
+        
         return self.all_labels_length, self.wrong_labels_length
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                         do_sample=False, max_length=self.args.max_length+10)
+                                         do_sample=False, max_new_tokens=self.args.max_length+10)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
@@ -215,7 +237,7 @@ class ByT5Model(pl.LightningModule):
         if not self.args.cosinedecay:
             return optimizer
             
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs, verbose=True)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.1), verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
         return {
             "optimizer": optimizer,

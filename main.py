@@ -64,6 +64,7 @@ def main():
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
         check_val_every_n_epoch=args.val_every_n_epoch,
+        precision='16-mixed',
         # limit_train_batches=0.01,
         # limit_val_batches=0.01,
     )

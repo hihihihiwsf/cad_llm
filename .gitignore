@@ -17,3 +17,8 @@ draw_sample.py
 preprocess/split_to_filenames_v4.json
 wrong_vs_all.png
 wrong_vs_ture.png
+diff_token.png
+.gitignore
+wrong_vs_true_token.png
+wrong_vs_all_token.png
+wrong_vs_true.png
