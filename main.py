@@ -47,13 +47,15 @@ def main():
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
     val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False)
 
+    model.set_total_train_steps(num_train_batches=len(train_dataloader))
+
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
 
     call_backs.append(LearningRateMonitor(logging_interval='step'))
 
     print("Training the model...")
-    log_every_n_steps = 1000
+    log_every_n_steps = 10000
     trainer = pl.Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,
@@ -63,7 +65,8 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
-        check_val_every_n_epoch=args.val_every_n_epoch,
+        # check_val_every_n_epoch=args.val_every_n_epoch,
+        val_check_interval=args.val_check_interval,
         # limit_train_batches=0.001,
         # limit_val_batches=0.01,
     )
