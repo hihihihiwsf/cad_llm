@@ -7,7 +7,7 @@ from pathlib import Path
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
-        path = Path(args.dataset) / f"sg_str_{split}.json"
+        path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
 
@@ -50,6 +50,10 @@ class SketchGraphsDataset(Dataset):
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
         sketch_dict['input_text'] = input_text
         sketch_dict['output_text'] = output_text
+        
+        sketch_dict['input_ent_num'] = len([ent for i, ent in enumerate(entities) if mask[i]])
+        sketch_dict['output_ent_num'] = len([ent for i, ent in enumerate(entities) if not mask[i]])
+        
         return sketch_dict
 
     def get_mask(self, n):

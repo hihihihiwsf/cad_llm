@@ -34,10 +34,10 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration(config)
             model._init_weights(model)  # maybe redundant
         else:
-            # model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-            model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
-                                              torch_dtype=torch.float16,
-                                              trust_remote_code=True)
+            model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            # model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
+            #                                   torch_dtype=torch.float16,
+            #                                   trust_remote_code=True)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
@@ -51,6 +51,8 @@ class ByT5Model(pl.LightningModule):
         self.all_labels_length, self.wrong_labels_length, self.true_labels_length = [], [], [] 
         self.all_labels_token, self.wrong_labels_token, self.true_labels_token, self.diff_token = [], [], [], []
         # If using single token encoding - adjust tokenizer and model embeddings
+        self.in_all, self.out_all, self.in_token, self.out_token = [], [], [], []
+        
         
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
@@ -114,18 +116,60 @@ class ByT5Model(pl.LightningModule):
     #             embedding_params[-l + i] = torch.zeros_like(embedding_params[0])
 
 
-    def training_step(self, batch, batch_idx):
+    def trainig_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+        # model_batch['decoder_input_ids'] = model_batch['input_ids'].clone()
+        
+        for s in batch['sketches']:
+            self.in_token.append(len(self.tokenizer.tokenize(s['input_text'])))
+            self.out_token.append(len(self.tokenizer.tokenize(s['output_text'])))
+            self.in_all.append(s['input_ent_num'])
+            self.out_all.append(s['output_ent_num'])
+        
+        
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
+    
+    def on_train_epoch_end_reserve(self):
+        import matplotlib.pyplot as plt
+        
+        fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+
+        axs[0, 0].hist(self.in_all, color='blue', bins=35)
+        axs[0, 0].set_title('Input Entity')
+
+        axs[0, 1].hist(self.out_all, color='red', bins=35)
+        axs[0, 1].set_title('Output Entity')
+
+
+        axs[1, 0].hist(self.in_token, color='blue', bins=350)
+        axs[1, 0].set_title('Input Token')
+
+        axs[1, 1].hist(self.out_token, color='red', bins=350)
+        axs[1, 1].set_title('Output Token')
+        
+        if self.in_all == self.out_all:
+            print('all ridim')
+        if self.in_token == self.out_token:
+            print('token ridim')
+        plt.tight_layout()
+        plt.savefig('all.png')
+
+        return
+        
+    
     def validation_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+        
+        # model_batch['decoder_input_ids'] = model_batch['input_ids'].clone()
+        # batch['decoder_input_ids'] = batch['input_ids'].clone()
+        
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
@@ -174,13 +218,12 @@ class ByT5Model(pl.LightningModule):
                  batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
-        if batch_idx < 5:
-            self.log_samples(batch=batch, batch_idx=batch_idx)
+        # if batch_idx < 5:
+        #     self.log_samples(batch=batch, batch_idx=batch_idx)
 
         return loss
-
-
-    def on_validation_epoch_end(self):
+    
+    def on_validation_epoch_end_reserve(self):
         import matplotlib.pyplot as plt
         plt.hist(self.all_labels_length, color='blue')
         plt.hist(self.wrong_labels_length, alpha=.4, color='r')
@@ -233,7 +276,7 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             

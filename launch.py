@@ -78,11 +78,12 @@ def launch_sagemaker():
         instance_count=launch_args.instance_count,
         instance_type=launch_args.instance_type,
         volume_size=500,  # Joint data size alone is 22 GB
-        framework_version='1.13',
+        framework_version='2.0',
         py_version='py39',
         hyperparameters=hyperparameters,
         max_run=max_run,
         # checkpoint_s3_uri=checkpoint_s3_uri,
+        image_uri='763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.0.0-gpu-py310-cu118-ubuntu20.04-sagemaker',
         use_spot_instances=launch_args.use_spot_instances,
         max_wait=max_wait,
         debugger_hook_config=False  # Disable debugger

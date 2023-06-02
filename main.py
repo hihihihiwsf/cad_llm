@@ -16,9 +16,11 @@ from pathlib import Path
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
-
+import os
 
 def main():
+    
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     """Entry point for our training script"""
     args = get_training_args()
 
@@ -64,8 +66,8 @@ def main():
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
         check_val_every_n_epoch=args.val_every_n_epoch,
-        precision='16-mixed',
-        # limit_train_batches=0.01,
+        # precision='16-mixed',
+        # limit_train_batches=0.001,
         # limit_val_batches=0.01,
     )
     if not args.eval: 
