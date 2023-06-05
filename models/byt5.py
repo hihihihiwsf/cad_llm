@@ -116,7 +116,7 @@ class ByT5Model(pl.LightningModule):
     #             embedding_params[-l + i] = torch.zeros_like(embedding_params[0])
 
 
-    def trainig_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         # model_batch['decoder_input_ids'] = model_batch['input_ids'].clone()

@@ -12,3 +12,4 @@ datasets
 transformers==4.26.1
 tensorboardX
 peft
+sentencepiece
