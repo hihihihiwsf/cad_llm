@@ -22,7 +22,7 @@ from geometry.visualization import visualize_batch, visualize_sample
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
-import clip
+# import clip
 import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel
 
@@ -225,7 +225,7 @@ class ByT5Model(pl.LightningModule):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         batch["samples"] = generate_func(inputs_embeds=batch["inputs_embeds"], attention_mask=batch["attention_mask"],
-                                         do_sample=False, max_length=self.args.max_length+10)
+                                         do_sample=False, max_new_tokens=self.args.max_length+10)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
@@ -252,7 +252,7 @@ class ByT5Model(pl.LightningModule):
         if not self.args.cosinedecay:
             return optimizer
             
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs, verbose=True)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
         return {
             "optimizer": optimizer,

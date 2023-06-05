@@ -82,6 +82,7 @@ def launch_sagemaker():
         py_version='py39',
         hyperparameters=hyperparameters,
         max_run=max_run,
+        # image_uri="763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.0.0-gpu-py310-cu118-ubuntu20.04-sagemaker",
         # checkpoint_s3_uri=checkpoint_s3_uri,
         use_spot_instances=launch_args.use_spot_instances,
         max_wait=max_wait,

@@ -55,10 +55,7 @@ def main():
 
     print("Training the model...")
     log_every_n_steps = 1000
-
-
-    
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
         callbacks=call_backs,

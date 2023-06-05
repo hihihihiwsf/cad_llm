@@ -53,14 +53,14 @@ def visualize_sample(input_curves, box_lim):
 
 
 def draw_curves(curves, ax, box_lim, color, draw_points=False):
-    ax.set_xlim(left=-box_lim, right=box_lim)
-    ax.set_ylim(bottom=-box_lim, top=box_lim)
+    ax.set_xlim(left=0, right=box_lim)
+    ax.set_ylim(bottom=0, top=box_lim)
     ax.set_xticks([])
     ax.set_yticks([])
 
-    # colors = {2: 'red', 3:'green', 4:'blue'}
+    colors = {2: 'red', 3:'green', 4:'blue'}
 
     for curve in curves:
         if curve and curve.good:
-            curve.draw(ax=ax,  color='black', draw_points=draw_points)
+            curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
             
