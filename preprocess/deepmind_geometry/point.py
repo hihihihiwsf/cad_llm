@@ -13,26 +13,6 @@ class DeepmindPoint(DeepmindBase):
                 self.point = (dm_ent.get("x", 0), dm_ent.get("y", 0))
         except Exception as e:
             self.exception = e
-        # Hash key used to merge points
-        precision = 17
-        self.key = f"{self.point[0]:.{precision}f}_{self.point[1]:.{precision}f}"
 
     def draw(self, ax):
         ax.plot([self.point[0]], [self.point[1]], color="red", zorder=100, marker="o")
-
-    def to_fg_dict(self):
-        """
-        Make a Fusion 360 Gallery format dict like this
-        {
-            "type": "Point3D",
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        }
-        """
-        return {
-            "type": "Point3D",
-            "x": self.point[0],
-            "y": self.point[1],
-            "z": 0.0
-        }

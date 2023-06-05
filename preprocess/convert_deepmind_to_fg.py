@@ -6,6 +6,7 @@ into the Fusion 360 Gallery dataset format
 """
 
 from deepmind_geometry import DeepmindLine, DeepmindArc, DeepmindCircle, DeepmindPoint
+from fusiongallery_geometry import FusionGalleryPoint
 import numpy as np
 import json
 from pathlib import Path
@@ -39,16 +40,42 @@ def convert_sketch(dm_sketch):
     # return fusion_gallery_sketch
 
 
+def create_sketch_curves(dm_entities):
+    """Create the sketch curves data structure"""
+    curve_data = {}
+    for dm_ent in dm_entities:
+        assert len(dm_ent) == 1, "Expected on entry in the dict"
+        entity_name = get_dm_ent_name(dm_ent)
+        entity_data = dm_ent[entity_name]
+
+        if entity_name == "pointEntity":
+            continue
+        elif entity_name == "lineEntity":
+            dm_obj = DeepmindLine(entity_data)
+        elif entity_name == "circleArcEntity":
+            if "arcParams" in entity_data:
+                dm_obj = DeepmindArc(entity_data)
+            elif "circleParams" in entity_data:
+                dm_obj = DeepmindCircle(entity_data)
+        else:
+            print("Warning - unexpected entity name", entity_name)
+            print(dm_ent)
+            continue
+
+    curve_data[dm_obj.uuid] = dm_obj.to_fg_dict()
+    return curve_data
+        
+
 def create_sketch_points(dm_entities):
     """Create the sketch points data structure"""
     # Dict of unique points
     # key: string of the form point.x_point.y
-    # value: DeepmindPoint object
+    # value: FusionGalleryPoint object
     point_map = get_point_map(dm_entities)
     # Sketch points data structure in the FG format
     point_data = {}
-    for key, dm_point in point_map.items():
-        point_data[dm_point.uuid] = dm_point.to_fg_dict()
+    for key, fg_point in point_map.items():
+        point_data[fg_point.uuid] = fg_point.to_dict()
     return point_data, point_map
 
 
@@ -60,9 +87,11 @@ def get_point_map(dm_entities):
         points = find_all_geom_points(dm_ent)
         for point in points:
             point_count += 1
-            point = DeepmindPoint(point)
-            if not point.key in point_dict:
-                point_dict[point.key] = point
+            # First make a deepmind point then pass that to our fusion gallery point
+            dm_point = DeepmindPoint(point)
+            fg_point = FusionGalleryPoint(dm_point)
+            if not fg_point.key in point_dict:
+                point_dict[fg_point.key] = fg_point
     print(f"Created vertex dictionary with {len(point_dict)} of {point_count} total vertices")
     return point_dict
 
@@ -75,10 +104,8 @@ def find_all_geom_points(dm_ent):
 
     if entity_name == "pointEntity":
         return [entity_data["point"]]
-
     if entity_name == "lineEntity":
         return [entity_data["start"], entity_data["end"]]
-
     if entity_name == "circleArcEntity":
         if "arcParams" in entity_data:
             return [
