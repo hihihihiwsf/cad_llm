@@ -39,6 +39,7 @@ def main():
 
     print("Loading model...")
     model = ByT5Model(args=args)
+    model = torch.compile(model)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True, drop_last=True)

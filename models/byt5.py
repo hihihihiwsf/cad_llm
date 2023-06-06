@@ -70,16 +70,17 @@ class ByT5Model(pl.LightningModule):
         self.val_embed = nn.Embedding(num_val_embeddings, self.embed_dim,
             padding_idx=sg_dataset.Token.Pad)
         
-        # Coordinate embeddings
-        num_coord_embeddings = 2 + sum(
-            [len(coord_map) for coord_map in sg_dataset.COORD_TOKEN_MAP.values()])
-        self.coord_embed = nn.Embedding(num_coord_embeddings, self.embed_dim,
-            padding_idx=sg_dataset.Token.Pad)
+        # # Coordinate embeddings
+        # num_coord_embeddings = 2 + sum(
+        #     [len(coord_map) for coord_map in sg_dataset.COORD_TOKEN_MAP.values()])
+        # self.coord_embed = nn.Embedding(num_coord_embeddings, self.embed_dim,
+        #     padding_idx=sg_dataset.Token.Pad)
         
-        # Position embeddings
-        num_pos_embeddings = 3 + self.max_entities
-        self.pos_embed = nn.Embedding(num_pos_embeddings, self.embed_dim,
-            padding_idx=sg_dataset.Token.Pad)
+        # # Position embeddings
+        # num_pos_embeddings = 3 + self.max_entities
+        # self.pos_embed = nn.Embedding(num_pos_embeddings, self.embed_dim,
+        #     padding_idx=sg_dataset.Token.Pad)
+        
         # Also create output layer
         self.out = nn.Linear(self.embed_dim, num_val_embeddings) #512, 70
 
@@ -190,11 +191,12 @@ class ByT5Model(pl.LightningModule):
             "attention_mask": batch['attention_mask'],
             "labels": batch['labels']
         }
-        print("validation batch_input_id.shape = ", input_embeds.shape)
+        # print("validation batch_input_id.shape = ", input_embeds.shape)
         outputs = self.model(**model_batch)
         # outputs = self.out(input_embeds)
         
         loss = outputs.loss
+        
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
     
@@ -255,11 +257,11 @@ class ByT5Model(pl.LightningModule):
     def add_embed(self, model_batch):
 
         val_embeddings = self.val_embed(model_batch['val_ids'])
-        coord_embeddings = self.coord_embed(model_batch['coord_ids'])
-        pos_embeddings = self.pos_embed(model_batch['pos_ids'])
-        embeddings = val_embeddings+ coord_embeddings + pos_embeddings
+        # coord_embeddings = self.coord_embed(model_batch['coord_ids'])
+        # pos_embeddings = self.pos_embed(model_batch['pos_ids'])
+        # embeddings = val_embeddings+ coord_embeddings + pos_embeddings
 
-        return embeddings
+        return val_embeddings
 
     def new_generate_samples(self, batch):
         generate_func = unwrap_model(self.model).generate
@@ -318,7 +320,7 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
-        params = list(self.val_embed.parameters()) + list(self.coord_embed.parameters())+list(self.pos_embed.parameters())+list(self.out.parameters())
+        params = list(self.val_embed.parameters()) +list(self.out.parameters()) #+ list(self.coord_embed.parameters())+list(self.pos_embed.parameters())
         emb_optimizer = optim.AdamW(params, lr=self.lr*30)
         
         if not self.args.cosinedecay:
