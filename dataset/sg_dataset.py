@@ -10,7 +10,7 @@ import enum
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
-        path = Path(args.dataset) / f"sg_str_{split}.json"
+        path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
 
@@ -139,14 +139,16 @@ def vitru_tokenize(strings, max_length, padding=True, truncation=True,return_ten
     s_coord = np.array([],dtype=int)
     s_pos = np.array([],dtype=int)
     s_mask = np.array([],dtype=int)
+    s_labels = np.array([],dtype=int)
     max_len = 0
     for i, sketch in enumerate(strings):
 
-        val, coord, pos, attention_mask = sketch_tokenize(sketch, truncation=True, max_length=max_length,padding=True, return_tensors="pt")
+        val, coord, pos, labels,attention_mask = sketch_tokenize(sketch, truncation=True, max_length=max_length,padding=True, return_tensors="pt")
         if max_len==0:
             s_val = val
             s_coord = coord
             s_pos = pos 
+            s_labels = labels
             s_mask = attention_mask
         else:
             s_val = np.vstack([s_val, val])
@@ -191,9 +193,10 @@ def sketch_tokenize(sketch, max_length, padding=True, truncation=True,return_ten
     val = _pad_or_truncate_to_length(np.array(val_tokens, dtype=np.int64), max_length)
     coord= _pad_or_truncate_to_length(np.array(coord_tokens, dtype=np.int64), max_length)
     pos= _pad_or_truncate_to_length(np.array(pos_tokens, dtype=np.int64), max_length)
+    labels = np.array(val_tokens, dtype=np.int64)
     attention_mask = _pad_or_truncate_to_length(np.array(attention_mask, dtype=np.int64), max_length)
 
-    return val, coord, pos, attention_mask
+    return val, coord, pos,labels, attention_mask
 
 class SketchGraphsCollator:
     def __init__(self, tokenizer, max_length=None):
@@ -232,7 +235,7 @@ class SketchGraphsCollator:
 
         vitru_tokenized_output = vitru_tokenize(output_strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
         labels = torch.tensor(vitru_tokenized_output['val'])
-        labels[labels == Token.Pad] = -100
+        #labels[labels == Token.Pad] = -100
 
         batch_input_id = {
             "val_ids": torch.tensor(vitru_tokenized_input['val']),
@@ -244,6 +247,7 @@ class SketchGraphsCollator:
             "input_ids": batch_input_id,
             "attention_mask": torch.tensor(vitru_tokenized_input['attention_mask']),
             "labels": labels,
+            "vitru_tokenized_output": vitru_tokenized_output,
             "sketches": sketch_dicts
         }
 

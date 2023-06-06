@@ -57,7 +57,7 @@ class ByT5Model(pl.LightningModule):
         add_ three tokenize
         '''
         self.num_val_embeddings = 64 + 6
-        self.embed_dim = 512*3
+        self.embed_dim = 1472
 
         # Value embeddings
         self.num_bins = 64
@@ -216,7 +216,17 @@ class ByT5Model(pl.LightningModule):
         top1_full_sketch, top1_ent = self.new_generate_samples(batch)
 
         # # Calculate metrics
-        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        #top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        
+        
+        # mx = 0
+        # for i,j in zip(batch['string_samples'], batch['string_labels']):
+        #     out, l = i.split(";"), j.split(";")
+        #     # label_all_ent = j.split(";")
+        #     if set(out) == set(l):
+        #         mx += 1
+        # top1_full_sketch = mx/len(batch['string_labels'])
+
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                   batch_size=self.batch_size, sync_dist=True)
 
@@ -257,15 +267,16 @@ class ByT5Model(pl.LightningModule):
 
         full = 0
         top1_ent = 0
-        for string, label in zip(batch["string_samples"], batch["labels"]):
+        for string, label in zip(batch["string_samples"], batch['vitru_tokenized_output']['val']):
             label = label.detach().cpu().numpy()
-            label = set(np.trim_zeros(label))
+            # label = set(np.trim_zeros(label))
+            label = np.trim_zeros(label)
             string = string.detach().cpu().numpy()
-            if label.issuperset(string):
+            if label == string:
                 full += 1
             
             else:
-                if label.issuperset(string[0:5]) or label.issuperset(string[0:7]) or label.issuperset(string[0:9]):
+                if set(string[0:5])<=set(label) or set(string[0:7])<=set(label) or set(string[0:9])<=set(label):
                     top1_ent += 1
             continue
 
