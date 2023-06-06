@@ -57,7 +57,7 @@ class ByT5Model(pl.LightningModule):
         add_ three tokenize
         '''
         self.num_val_embeddings = 64 + 6
-        self.embed_dim = 1472
+        self.embed_dim = 1536
 
         # Value embeddings
         self.num_bins = 64
@@ -152,7 +152,7 @@ class ByT5Model(pl.LightningModule):
 
         input_embeds = self.add_embed(batch["input_ids"])
         
-        print("training batch_input_id.shape = ", input_embeds.shape)
+        # print("training batch_input_id.shape = ", input_embeds.shape)
 
         cols = ["input_embeds", "attention_mask", "labels"]
         model_batch = {
@@ -268,11 +268,11 @@ class ByT5Model(pl.LightningModule):
         full = 0
         top1_ent = 0
         for string, label in zip(batch["string_samples"], batch['vitru_tokenized_output']['val']):
-            label = label.detach().cpu().numpy()
+            #label = label.detach().cpu().numpy()
             # label = set(np.trim_zeros(label))
             label = np.trim_zeros(label)
             string = string.detach().cpu().numpy()
-            if label == string:
+            if np.array_equiv(label, string):
                 full += 1
             
             else:

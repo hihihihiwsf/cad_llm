@@ -7,7 +7,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="/home/ec2-user/results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="/home/ec2-user/data/sg_strings_v4", help="Dataset path")
+    parser.add_argument("--dataset", type=str, default="/home/ec2-user/data/sg_strings_v4", help="Dataset path") #5_ascii_max64
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
