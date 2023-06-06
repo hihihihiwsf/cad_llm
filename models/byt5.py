@@ -47,6 +47,8 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
+        #self.model.requires_grad_(False)
+        
         
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         
@@ -57,7 +59,7 @@ class ByT5Model(pl.LightningModule):
         add_ three tokenize
         '''
         self.num_val_embeddings = 64 + 6
-        self.embed_dim = 1536
+        self.embed_dim = 1536 # 1472 # 1536
 
         # Value embeddings
         self.num_bins = 64
@@ -256,6 +258,7 @@ class ByT5Model(pl.LightningModule):
         coord_embeddings = self.coord_embed(model_batch['coord_ids'])
         pos_embeddings = self.pos_embed(model_batch['pos_ids'])
         embeddings = val_embeddings+ coord_embeddings + pos_embeddings
+
         return embeddings
 
     def new_generate_samples(self, batch):
@@ -317,6 +320,7 @@ class ByT5Model(pl.LightningModule):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
         params = list(self.val_embed.parameters()) + list(self.coord_embed.parameters())+list(self.pos_embed.parameters())+list(self.out.parameters())
         emb_optimizer = optim.AdamW(params, lr=self.lr*30)
+        
         if not self.args.cosinedecay:
             return optimizer, emb_optimizer
             
