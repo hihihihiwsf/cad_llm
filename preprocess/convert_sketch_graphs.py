@@ -89,7 +89,7 @@ def main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tokens):
 
     split_to_sketches = deduplicate_splits(split_to_sketches)
 
-    save_splits(output_dir, split_to_sketches, filename_prefix="sg_str")
+    save_splits(output_dir, split_to_sketches)
 
     print(f"Processing Time: {time.time() - start_time} secs")
 
