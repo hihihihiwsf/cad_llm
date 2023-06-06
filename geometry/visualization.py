@@ -53,8 +53,8 @@ def visualize_sample(input_curves, box_lim):
 
 
 def draw_curves(curves, ax, box_lim, color, draw_points=False):
-    ax.set_xlim(left=0, right=box_lim)
-    ax.set_ylim(bottom=0, top=box_lim)
+    ax.set_xlim(left=-3, right=box_lim)
+    ax.set_ylim(bottom=-3, top=box_lim)
     ax.set_xticks([])
     ax.set_yticks([])
 
