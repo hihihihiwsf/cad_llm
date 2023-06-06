@@ -30,7 +30,7 @@ def get_launch_args():
     parser.add_argument(
         "--s3_dataset",
         type=str,
-        default="deepmind_strings_v0",
+        default="deepmind_strings_v1",
         help="Name of the dataset folder to use in s3"
     )
     parser.add_argument(
