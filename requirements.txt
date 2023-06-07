@@ -12,5 +12,7 @@ datasets
 transformers
 tensorboardX
 peft
+requests
+urllib3<2
 
 
