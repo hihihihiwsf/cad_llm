@@ -1,9 +1,9 @@
-from deepmind_geometry import DeepmindLine, DeepmindArc, DeepmindCircle
-from preprocessing import center_and_scale
-import numpy as np
 import json
-from preprocess_utils import get_files, get_output_dir
 import argparse
+import numpy as np
+from preprocess.deepmind_geometry import DeepmindLine, DeepmindArc, DeepmindCircle
+from preprocess.preprocessing import center_and_scale
+from preprocess.preprocess_utils import get_files, get_output_dir
 
 
 def convert_data(dm_data):

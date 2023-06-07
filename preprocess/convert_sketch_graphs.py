@@ -14,14 +14,14 @@ import argparse
 import importlib
 import json
 from tqdm import tqdm
-from sketchgraphs.data import flat_array, sketch_from_sequence
-import sketch_sg
-from preprocessing import preprocess_sketch
-from preprocess_utils import get_files, get_output_dir, load_filter, save_splits
-from deduplicate import deduplicate_splits
+from preprocess.sketchgraphs.data import flat_array, sketch_from_sequence
+from preprocess import sketch_sg
+from preprocess.preprocessing import preprocess_sketch
+from preprocess.preprocess_utils import get_files, get_output_dir, load_filter, save_splits
+from preprocess.deduplicate import deduplicate_splits
 
 importlib.reload(sketch_sg)
-from sketch_sg import SketchSG
+from preprocess.sketch_sg import SketchSG
 
 
 def get_index(filename):

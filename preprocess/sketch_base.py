@@ -8,7 +8,7 @@ from collections import OrderedDict
 import uuid
 import networkx as nx
 
-from sketch_point import SketchPoint
+from preprocess.sketch_point import SketchPoint
 
 class SketchBase:
     """
