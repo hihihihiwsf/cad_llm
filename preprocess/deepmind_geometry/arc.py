@@ -1,4 +1,4 @@
-from .base import DeepmindBase
+from preprocess.deepmind_geometry.base import DeepmindBase
 import math
 from matplotlib.patches import Arc
 

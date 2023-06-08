@@ -1,4 +1,4 @@
-from .base import DeepmindBase
+from preprocess.deepmind_geometry.base import DeepmindBase
 
 
 class DeepmindLine(DeepmindBase):
