@@ -45,8 +45,8 @@ def load_filter(path):
     return split_to_filenames
 
 
-def save_splits(output_dir, split_to_sketches, filename_prefix):
+def save_splits(output_dir, split_to_sketches):
     for split_name, sketches in split_to_sketches.items():
-        filename = output_dir / f"{filename_prefix}_{split_name}.json"
+        filename = output_dir / f"{split_name}.json"
         with open(filename, "w") as f:
             json.dump(sketches, f)

@@ -73,7 +73,7 @@ def convert_point_entities_to_obj(point_entities, bits):
             if point not in vertices:
                 vertices.append(point)
             i = vertices.index(point)
-            curve.append(i)
+            curve.append(i + 1)
 
         curves.append(curve)
 

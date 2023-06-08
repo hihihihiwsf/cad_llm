@@ -78,8 +78,8 @@ def launch_sagemaker():
         instance_count=launch_args.instance_count,
         instance_type=launch_args.instance_type,
         volume_size=500,  # Joint data size alone is 22 GB
-        framework_version='1.13',
-        py_version='py39',
+        framework_version='2.0',
+        py_version='py310',
         hyperparameters=hyperparameters,
         max_run=max_run,
         # checkpoint_s3_uri=checkpoint_s3_uri,

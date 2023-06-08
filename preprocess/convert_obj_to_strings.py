@@ -57,7 +57,7 @@ def main(args):
     print("Deduplicating data")
     split_to_sketches = deduplicate_splits(split_to_sketches)
 
-    save_splits(output_dir, split_to_sketches, filename_prefix="sketch_strs")
+    save_splits(output_dir, split_to_sketches)
 
     split_to_indices = {split: get_index_list(sketches) for split, sketches in split_to_sketches.items()}
     with open(output_dir / "split_to_index.json", "w") as f:

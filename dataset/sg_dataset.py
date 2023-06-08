@@ -7,7 +7,7 @@ from pathlib import Path
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
-        path = Path(args.dataset) / f"sg_str_{split}.json"
+        path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
 

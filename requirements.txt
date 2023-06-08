@@ -1,9 +1,7 @@
 # We assume that there is already a bunch of stuff installed in the sagemaker container already:
-# # https://github.com/aws/deep-learning-containers/blob/master/pytorch/training/docker/1.9/py3/cu111/Dockerfile.gpu
-# https://github.com/aws/deep-learning-containers/tree/master/pytorch/training/docker/1.13/py3/cu117/Dockerfile.gpu
-# We target a framework_version='1.9'
-# # which should use cuda 11.1
-# which should use cuda 11.7
+# https://github.com/aws/deep-learning-containers/blob/master/pytorch/training/docker/2.0/py3/cu118/Dockerfile.gpu
+# We target a framework_version='2.0'
+# which should use cuda 11.8
 
 pytorch-lightning==2.0.0
 torchmetrics==0.11.3
