@@ -10,10 +10,10 @@ conda activate cad_llm
 ```
 
 ## Data Prep
-The `preprocess` directory contains scripts to convert and prepare the data ready for training. Run the scripts as modules, for example:
+The `preprocess` directory contains scripts to convert and prepare the data for training. Run the scripts as modules, for example:
 
 ```
-python -m preprocess.convert_obj_to_strings --input path/to/input/data
+python -m preprocess.convert_obj_to_strings --input path/to/input/data --output path/to/output/data
 ```
 
 ## Training
