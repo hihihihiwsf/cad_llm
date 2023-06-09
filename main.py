@@ -22,7 +22,10 @@ from pytorch_lightning.strategies import DDPStrategy
 def main():
     """Entry point for our training script"""
     args = get_training_args()
-
+    
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    # torch.set_float32_matmul_precision('high')
+    
     results_dir = Path(args.results_dir) / args.exp_name
     if not results_dir.exists():
         results_dir.mkdir(parents=True)
