@@ -78,8 +78,8 @@ def launch_sagemaker():
         instance_count=launch_args.instance_count,
         instance_type=launch_args.instance_type,
         volume_size=500,  # Joint data size alone is 22 GB
-        framework_version='1.13',
-        py_version='py39',
+        framework_version='2.0',
+        py_version='py310',
         hyperparameters=hyperparameters,
         max_run=max_run,
         # image_uri="763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.0.0-gpu-py310-cu118-ubuntu20.04-sagemaker",
