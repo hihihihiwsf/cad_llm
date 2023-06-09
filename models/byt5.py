@@ -23,6 +23,8 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from transformers import T5Tokenizer, AutoModelForSeq2SeqLM
 import numpy as np
+import bitsandbytes as bnb
+from accelerate import dispatch_model, infer_auto_device_map
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args):
@@ -35,12 +37,29 @@ class ByT5Model(pl.LightningModule):
             model._init_weights(model)  # maybe redundant
         else:
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            # model = T5ForConditionalGeneration.from_pretrained("t5-3b")
+        #     device_map = {
+        #         0: [0, 1, 2],
+        #         1: [3, 4, 5, 6, 7, 8, 9],
+        #         2: [10, 11, 12, 13, 14, 15, 16],
+        #         3: [17, 18, 19, 20, 21, 22, 23],
+        #                 }
+            
+        #     device_map = infer_auto_device_map(
+        #     model,
+        #     dtype='float16'
+        # )
+
+        #     model = dispatch_model(model, device_map=device_map)
+            # model.parallelize(device_map)
             # model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
-            #                                   torch_dtype=torch.float16,
-            #                                   trust_remote_code=True)
+            #                                                 trust_remote_code=True)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        # model.config.decoder_start_token_id = self.tokenizer.bos_token_id
+        # model.config.pad_token_id = self.tokenizer.pad_token_id
+        
         self.args = args
 
         self.lr = self.args.lr
@@ -53,7 +72,45 @@ class ByT5Model(pl.LightningModule):
         # If using single token encoding - adjust tokenizer and model embeddings
         self.in_all, self.out_all, self.in_token, self.out_token = [], [], [], []
         
+        unfrozen_list_decoder = [
+                            "decoder.transformer.h.31.ln_1.weight",
+                            "decoder.transformer.h.31.ln_1.bias",
+                            "decoder.transformer.h.31.attn.qkv_proj.weight",
+                            "decoder.transformer.h.31.attn.out_proj.weight",
+                            "decoder.transformer.h.31.mlp.fc_in.weight",
+                            "decoder.transformer.h.31.mlp.fc_in.bias",
+                            "decoder.transformer.h.31.mlp.fc_out.weight",
+                            "decoder.transformer.h.31.mlp.fc_out.bias",
+                            "decoder.transformer.h.31.crossattention.qkv_proj.weight",
+                            "decoder.transformer.h.31.crossattention.q_attn.weight",
+                            "decoder.transformer.h.31.crossattention.out_proj.weight",
+                            "decoder.transformer.ln_f.weight",
+                            "decoder.transformer.ln_f.bias",
+                            "decoder.lm_head.weight",
+                            "decoder.lm_head.bias",
+                            "enc_to_dec_proj.weight",
+                            "enc_to_dec_proj.bias"
+                        ]
         
+        unfrozen_list_encoder = [
+                                    "encoder.h.19.ln_1.bias",
+                                    "encoder.h.19.attn.qkv_proj.weight",
+                                    "encoder.h.19.attn.out_proj.weight",
+                                    "encoder.h.19.mlp.fc_in.weight",
+                                    "encoder.h.19.mlp.fc_in.bias",
+                                    "encoder.h.19.mlp.fc_out.weight",
+                                    "encoder.h.19.mlp.fc_out.bias",
+                                    "encoder.ln_f.weight",
+                                    "encoder.ln_f.bias"
+                                ]
+
+
+        # for n, p in self.model.named_parameters():
+        #     if n in unfrozen_list_decoder:
+        #         p.requires_grad = True
+        #     else:
+        #         p.requires_grad = False
+            
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
 
@@ -126,7 +183,6 @@ class ByT5Model(pl.LightningModule):
             self.out_token.append(len(self.tokenizer.tokenize(s['output_text'])))
             self.in_all.append(s['input_ent_num'])
             self.out_all.append(s['output_ent_num'])
-        
         
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
@@ -276,6 +332,11 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
+        
+        
+        # return bnb.optim.Adam8bit(self.parameters(), lr=self.lr, betas=(0.9, 0.995))
+        
+        
         optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer

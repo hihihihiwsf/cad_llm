@@ -101,10 +101,10 @@ def center_and_scale(vertices):
 
 def normalize_and_quantize_vertices(vertices, n_bits=6):
     """
-    Convert vertices to discrete values in [-(n_bits-1)**2, (n_bits-1)**2 - 1].
+    Convert vertices to discrete values in [-2**(n_bits-1), 2**(n_bits-1) - 1].
     e.g. n_bits=6: [-32, 31]
     """
-    vertices = center_and_scale(vertices)
+    vertices = center_and_scale(vertices) + 0.5
     quantize_range = 2 ** n_bits - 1
-    vertices = (vertices * quantize_range).astype("int32")
+    vertices = (vertices * quantize_range).astype("int32") - 2**(n_bits-1)
     return vertices

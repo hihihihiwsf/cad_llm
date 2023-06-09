@@ -18,9 +18,12 @@ import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
 import os
 
+
 def main():
     
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    # torch.set_float32_matmul_precision('high')
+    
     """Entry point for our training script"""
     args = get_training_args()
 
@@ -47,6 +50,7 @@ def main():
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
+    
     val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
@@ -60,14 +64,14 @@ def main():
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
-        strategy=args.strategy,
+        strategy=args.strategy,   
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
         check_val_every_n_epoch=args.val_every_n_epoch,
-        # precision='16-mixed',
-        # limit_train_batches=0.001,
+        # precision='16',
+        # limit_train_batches=0.01,
         # limit_val_batches=0.01,
     )
     if not args.eval: 
