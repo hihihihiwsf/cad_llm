@@ -9,6 +9,9 @@ except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
+from models.codet5 import CodeT5Model
+from models.multimodel import VLModel
+
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
@@ -41,7 +44,7 @@ def main():
     pl.seed_everything(args.seed)
 
     print("Loading model...")
-    model = ByT5Model(args=args)
+    model = CodeT5Model(args=args)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
@@ -58,6 +61,7 @@ def main():
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
+        #precision=16,
         strategy=args.strategy,
         logger=loggers,
         max_epochs=args.epochs,

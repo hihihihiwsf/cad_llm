@@ -38,6 +38,7 @@ def launch_sagemaker():
         "ml.p3.8xlarge": 4,
         "ml.p3.16xlarge": 8,
         "ml.p3dn.24xlarge": 8,
+        "ml.p4d.24xlarge": 8,
     }
     processes_per_host = gpu_counts[launch_args.instance_type]
 
@@ -50,7 +51,7 @@ def launch_sagemaker():
     exp_name = main_args.exp_name
 
     exp_run_name = exp_name.replace("_", "-") + '-' + datetime.now().strftime("%m-%d-%y-%H%M")
-    job_name = f"Sifan-{exp_run_name}"
+    job_name = f"sifan-{exp_run_name}"
     output_path = f"s3://{launch_args.s3_bucket}/jobs"
     print("Job name:", job_name)
     print("Entry point:", entry_point)
@@ -77,10 +78,11 @@ def launch_sagemaker():
         instance_count=launch_args.instance_count,
         instance_type=launch_args.instance_type,
         volume_size=500,  # Joint data size alone is 22 GB
-        framework_version='1.13',
-        py_version='py39',
+        framework_version='2.0.0',
+        py_version='py310',
         hyperparameters=hyperparameters,
         max_run=max_run,
+        # image_uri="763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.0.0-gpu-py310-cu118-ubuntu20.04-sagemaker",
         # checkpoint_s3_uri=checkpoint_s3_uri,
         use_spot_instances=launch_args.use_spot_instances,
         max_wait=max_wait,

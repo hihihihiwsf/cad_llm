@@ -4,13 +4,29 @@ import random
 import json
 from pathlib import Path
 
+from transformers import CLIPImageProcessor
+from geometry.parse import get_curves, get_point_entities
+from geometry.visualization import visualize_batch, visualize_sample
+
+def add_token(sketch_string):
+    ent_list = sketch_string.split(";")[:-1]
+    new_ent_list = ''
+    for ent in ent_list:
+        if len(ent.split(',')) == 4:
+            ent = 'L' + ent + ';'
+        elif len(ent.split(',')) == 6:
+            ent = 'A' + ent + ';'
+        elif len(ent.split(',')) == 8:
+            ent = 'C' + ent + ';'
+        new_ent_list = new_ent_list + ent
+    return new_ent_list
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
-        path = Path(args.dataset) / f"{split}.json"
+        path = Path(args.dataset) / f"sg_str_{split}.json" #sg_str_
         with open(path, "r") as f:
             self.data = json.load(f)
-
+        self.args = args
         if split == "train":
             n = int(args.limit_data * len(self.data))
             random.shuffle(self.data)
@@ -48,8 +64,11 @@ class SketchGraphsDataset(Dataset):
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
-        sketch_dict['input_text'] = input_text
-        sketch_dict['output_text'] = output_text
+        if self.args.type_token:
+            input_text = add_token(input_text)
+            output_text = add_token(output_text)
+        sketch_dict['input_text'] = input_text #+'#'
+        sketch_dict['output_text'] = output_text #+"#" #suitable for codet5 data features
         return sketch_dict
 
     def get_mask(self, n):
@@ -70,12 +89,15 @@ class SketchGraphsDataset(Dataset):
 
 
 class SketchGraphsCollator:
-    def __init__(self, tokenizer, max_length=None):
+    def __init__(self, tokenizer, args, max_length=None):
         self.tokenizer = tokenizer
         self.max_length = max_length
 
+        self.args = args
+        self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
+        
     def tokenize(self, strings):
-        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        return self.tokenizer(strings, padding='max_length', truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
         input_strings = [sketch['input_text'] for sketch in sketch_dicts]
@@ -85,19 +107,26 @@ class SketchGraphsCollator:
 
         labels = tokenized_output.input_ids
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
-        labels[labels == self.tokenizer.pad_token_id] = -100
+        # labels[labels == self.tokenizer.pad_token_id] = -100
+
+        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        input_curves = [get_curves(point_input) for point_input in point_inputs]
+        list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+
+        batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
 
         batch = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
             "labels": labels,
-            "sketches": sketch_dicts
+            "sketches": sketch_dicts,
+            "images": batch_images
         }
         return batch
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
-    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length)
+    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)

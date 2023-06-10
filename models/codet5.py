@@ -14,7 +14,7 @@ import torch
 import torch.optim as optim
 # import lightning.pytorch as pl
 import pytorch_lightning as pl
-from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
+from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer, AutoModelForSeq2SeqLM
 from transformers.modeling_utils import unwrap_model
 import sys
 
@@ -27,12 +27,9 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
 
-import clip
-import numpy as np
+from transformers import CLIPVisionModelWithProjection
 
-from transformers import CLIPProcessor, CLIPModel
-
-class ByT5Model(pl.LightningModule):
+class CodeT5Model(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters()
@@ -43,8 +40,15 @@ class ByT5Model(pl.LightningModule):
             model._init_weights(model)  # maybe redundant
         else:
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            # model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
+            #                                   torch_dtype=torch.float16,
+            #                                   trust_remote_code=True)
+
 
         self.model = model
+        # self.model.requires_grad_(False)
+        # self.model.get_input_embeddings().weight.requires_grad = True
+
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
 
@@ -55,17 +59,12 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
 
         # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
+        # if not args.ascii_encoding:
+        #     self.adjust_to_use_new_tokens()
 
         if args.lora:
             self.add_lora()
-
-    # def add_clip(self):
-    #     self.cip_model = CLIPModel.from_pretrained(self.args.clipmodel)
-    #     self.processor = CLIPProcessor.from_pretrained(self.args.clipmodel)
-
-    #     self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
+        
 
     def add_lora(self):
         lora_config = LoraConfig(
@@ -89,21 +88,11 @@ class ByT5Model(pl.LightningModule):
 
         self.model.print_trainable_parameters()
 
-    def adjust_to_use_new_tokens(self):
-        # Add new tokens to the tokenizer
-        new_tokens = [f"<{i}>" for i in self.quantized_range]
-        self.tokenizer.add_tokens(new_tokens)
-
-        # Add new token embeddings and initialize using learned embeddings
-        self.model.resize_token_embeddings(len(self.tokenizer))
-        embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(1, len(new_tokens)+1):
-            # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[67 + i]
-
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+        
+        # model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -113,6 +102,8 @@ class ByT5Model(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+        
+        # model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
@@ -125,6 +116,8 @@ class ByT5Model(pl.LightningModule):
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         mx = 0
         for i,j in zip(batch['string_samples'], batch['string_labels']):
+            i = i.strip('#')
+            j = j.strip('#')
             if i == j:
                 mx += 1
         top1_full_sketch = mx/len(batch['string_labels'])
@@ -136,6 +129,8 @@ class ByT5Model(pl.LightningModule):
 
         mx = 0
         for i,j in zip(batch['string_samples'], batch['string_labels']):
+            i = i.strip('#')
+            j = j.strip('#')
             label_all_ent = j.split(";")
             first_ent = i.split(";")[0]
             if first_ent in label_all_ent:
@@ -153,13 +148,12 @@ class ByT5Model(pl.LightningModule):
         # # Plot sketches
         if batch_idx < 5:
             self.log_samples(batch=batch, batch_idx=batch_idx)
-
         return loss
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"], max_length=self.args.max_length,
+        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"], max_length=self.args.max_length, # decoder_input_ids=batch["input_ids"],
                                          do_sample=False)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
