@@ -15,7 +15,7 @@ def get_parser():
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
     parser.add_argument("--ascii_encoding", type=int, default=1,
                         help="Use ascii ByT5 encoding instead of single token encoding")
-    parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-2b", help="Huggingface model name") #Salesforce/codet5p-220m  #Google/byt5-small
+    parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-770m", help="Huggingface model name") #Salesforce/codet5p-220m  #Google/byt5-small
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
     parser.add_argument("--batch_size", type=int, default=2, help="Number of sketches in a batch")
@@ -30,7 +30,7 @@ def get_parser():
                         help="Choose between sorted/user order for entities in the sketch")
     parser.add_argument("--eval", type=int, default=0, help="if true, goes directly to the eval mode. loading best from the ckpt dir")
     parser.add_argument("--seed", type=int, default=0, help="Random seed to use")
-    parser.add_argument("--type_token", type=int, default=1, help="Random seed to use")
+    parser.add_argument("--type_token", type=int, default=0, help="Random seed to use")
     parser.add_argument("--limit_data", type=float, default=1.0, help="Percentage of data to train on")
     parser.add_argument("--val_every_n_epoch", type=int, default=1, help="Check validation after n training epochs")
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")

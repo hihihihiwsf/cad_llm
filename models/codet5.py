@@ -39,10 +39,10 @@ class CodeT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration(config)
             model._init_weights(model)  # maybe redundant
         else:
-            #model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-            model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
-                                              torch_dtype=torch.float16,
-                                              trust_remote_code=True)
+            model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            # model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
+            #                                   torch_dtype=torch.float16,
+            #                                   trust_remote_code=True)
 
 
         self.model = model
@@ -92,7 +92,7 @@ class CodeT5Model(pl.LightningModule):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
-        model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
+        #model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -103,7 +103,7 @@ class CodeT5Model(pl.LightningModule):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
-        model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
+        #model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,

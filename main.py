@@ -12,18 +12,12 @@ from models.byt5 import ByT5Model
 from models.codet5 import CodeT5Model
 from models.multimodel import VLModel
 
-from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
-
-from accelerate import Accelerator
-
-from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
-from pytorch_lightning.strategies import DDPFullyShardedNativeStrategy
 
 
 def main():
