@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
 import numpy as np
 import random
 import json
@@ -23,7 +24,7 @@ def add_token(sketch_string):
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
-        path = Path(args.dataset) / f"sg_str_{split}.json" #sg_str_
+        path = Path(args.dataset) / f"{split}.json" #sg_str_
         with open(path, "r") as f:
             self.data = json.load(f)
         self.args = args
@@ -130,3 +131,27 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+
+
+
+def get_fsdp_dataloader(rank, world_size, tokenizer, args):
+    train_dataset = SketchGraphsDataset(split='train', args=args)
+    val_dataset = SketchGraphsDataset(split='val', args=args)
+    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
+
+    train_sampler = DistributedSampler(train_dataset, rank=rank, num_replicas=world_size, shuffle=True)
+    val_sampler = DistributedSampler(val_dataset, rank=rank, num_replicas=world_size)
+
+
+    train_kwargs = {'batch_size': args.batch_size, 'sampler': train_sampler, 'collate_fn':collator}
+    test_kwargs = {'batch_size': args.batch_size, 'sampler': val_sampler}
+
+    cuda_kwargs = {'num_workers': 2,
+                    'pin_memory': True,
+                    'shuffle': False}
+    train_kwargs.update(cuda_kwargs)
+    test_kwargs.update(cuda_kwargs)
+
+    train_loader = DataLoader(train_dataset,**train_kwargs)
+    val_loader = DataLoader(val_dataset, **test_kwargs)
+    return train_loader, val_loader

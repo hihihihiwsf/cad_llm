@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from typing import Optional, Tuple, Union
 from torch.nn import CrossEntropyLoss
 
+import torch.distributed as dist
+
 """
 ByT5 pytorch lightning model
 """
@@ -138,7 +140,81 @@ class BLIPModel(nn.Module):
             # encoder_attentions=encoder_outputs.attentions,
         )
 
+def train_VL(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=None):
+    model.train()
+    ddp_loss = torch.zeros(2).to(rank)
+    if sampler:
+        sampler.set_epoch(epoch)
+    for batch_idx, batch in enumerate(train_loader):
+        cols = ["input_ids", "attention_mask", "labels", "images"]
+        model_batch = {col: val.to(rank) for col, val in batch.items() if col in cols}
 
+        optimizer.zero_grad()
+        output = model(**model_batch)
+        loss = output.loss
+        loss.backward()
+        optimizer.step()
+
+        ddp_loss[0] += loss.item()
+        ddp_loss[1] += len(batch)
+
+    dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+    if rank == 0:
+        print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
+
+
+def test_VL(model, tokenizer, args, rank, world_size, test_loader):
+    model.eval()
+    correct = 0
+    ddp_loss = torch.zeros(3).to(rank)
+    with torch.no_grad():
+        for batch in test_loader:
+            cols = ["input_ids", "attention_mask", "labels", "images"]
+            model_batch = {col: val.to(rank) for col, val in batch.items() if col in cols}
+
+            output = model(model_batch)
+            ddp_loss[0] += output.loss.item()  # sum up batch loss
+            #pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+            # Generate and process samples
+            batch = generate_samples(model, tokenizer, args, batch)
+
+            # Calculate metrics
+            top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+            mx = 0
+            for i,j in zip(batch['string_samples'], batch['string_labels']):
+                i = i.strip('#')
+                j = j.strip('#')
+                if i == j:
+                    mx += 1
+            top1_full_sketch = mx/len(batch['string_labels'])
+
+            ddp_loss[1] += top1_full_sketch #pred.eq(target.view_as(pred)).sum().item()
+            ddp_loss[2] += len(batch)
+
+    dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+
+    if rank == 0:
+        test_loss = ddp_loss[0] / ddp_loss[2]
+        print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
+            test_loss, int(ddp_loss[1]), int(ddp_loss[2]),
+            100. * ddp_loss[1] / ddp_loss[2]))
+
+
+def generate_samples(model, tokenizer, args, batch):
+        # Recursively unwrap the model from potential distributed training containers
+        generate_func = unwrap_model(model).generate
+        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"], max_length=args.max_length, decoder_input_ids=batch["input_ids"],
+                                         do_sample=False)
+
+        batch["string_samples"] = tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+        batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
+
+        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
+        batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
+
+        batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
+
+        return batch
 
 class VLModel(pl.LightningModule):
     def __init__(self, args):
