@@ -52,9 +52,11 @@ class BLIPModel(nn.Module):
         self.visual_encoder.requires_grad_(False)
 
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        pretrained_codet5 = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
-                                              torch_dtype=torch.float16,
-                                              trust_remote_code=True)
+        pretrained_codet5 = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        # pretrained_codet5 = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
+        #                                       torch_dtype=torch.float16,
+        #                                       trust_remote_code=True)
+        
         self.text_encoder = pretrained_codet5.encoder
         
         self.embed_dim = pretrained_codet5.config.d_model  # config.n_embd for 2b model
