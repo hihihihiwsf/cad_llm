@@ -15,10 +15,10 @@ def get_parser():
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
     parser.add_argument("--ascii_encoding", type=int, default=1,
                         help="Use ascii ByT5 encoding instead of single token encoding")
-    parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-220m", help="Huggingface model name") #Salesforce/codet5p-220m  #Google/byt5-small
+    parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-2b", help="Huggingface model name") #Salesforce/codet5p-220m  #Google/byt5-small
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
-    parser.add_argument("--batch_size", type=int, default=4, help="Number of sketches in a batch")
+    parser.add_argument("--batch_size", type=int, default=2, help="Number of sketches in a batch")
     parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs.")
     parser.add_argument("--min_input_percent", type=float, default=0.2,
                         help="Minimal percentage of sketch entities to choose as input")

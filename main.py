@@ -22,6 +22,9 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 
 from accelerate import Accelerator
 
+from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
+from pytorch_lightning.strategies import DDPFullyShardedNativeStrategy
+
 
 def main():
     """Entry point for our training script"""
@@ -46,10 +49,11 @@ def main():
     pl.seed_everything(args.seed)
 
     ## fsdp accelarator:
-   # accelerator = Accelerator()
+    #accelerator = Accelerator()
 
     print("Loading model...")
     model = CodeT5Model(args=args)
+    #model = accelerator.prepare(model)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
@@ -63,19 +67,28 @@ def main():
     # from peft.utils.other import fsdp_auto_wrap_policy
     # if getattr(accelerator.state, "fsdp_plugin", None) is not None:
     #     accelerator.state.fsdp_plugin.auto_wrap_policy = fsdp_auto_wrap_policy(model)
+    
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    # lr_scheduler = {
+    #             "scheduler": torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, verbose=True), 
+    #             "interval": "epoch",
+    #             "frequency": 1,
+    #         }
 
-    # model, train_dataloader, val_dataloader, optimizer, lr_scheduler = accelerator.prepare(
-    #     model, train_dataloader, val_dataloader, optimizer, lr_scheduler
+    # optimizer, train_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
+    #     optimizer, train_dataloader, val_dataloader, lr_scheduler
     # )
-
+ 
+    
+    WORLD_SIZE = torch.cuda.device_count()
     print("Training the model...")
     log_every_n_steps = 1000
     trainer = pl.Trainer(
         callbacks=call_backs,
-        accelerator=args.accelerator,
-        devices=args.devices,
-        #precision=16,
-        strategy=args.strategy,
+        accelerator="gpu",  #accelerator,
+        devices=WORLD_SIZE,
+        precision=16,
+        strategy= "fsdp_native", #args.strategy,
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
