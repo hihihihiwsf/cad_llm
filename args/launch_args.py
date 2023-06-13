@@ -35,7 +35,7 @@ def get_launch_args():
     parser.add_argument(
         "--instance_type",
         type=str,
-        choices=("ml.p3.2xlarge", "ml.p3.8xlarge", "ml.p3.16xlarge", "ml.p3dn.24xlarge"),
+        choices=("ml.p3.2xlarge", "ml.p3.8xlarge", "ml.p3.16xlarge", "ml.p3dn.24xlarge", "ml.p4d.24xlarge"),
         default="ml.p3.2xlarge",
         help="Sagemaker instance type",
     )

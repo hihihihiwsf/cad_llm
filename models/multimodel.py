@@ -26,7 +26,6 @@ from transformers.modeling_utils import unwrap_model
 import sys
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-sys.path.insert(0, '../..')
 
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
 from util import get_quantized_range
@@ -51,23 +50,30 @@ class BLIPModel(nn.Module):
 
         clipmodel = "facebook/dino-vitb16"
         self.visual_encoder = CLIPVisionModelWithProjection.from_pretrained(clipmodel)
-        #self.visual_encoder.requires_grad_(False)
+        self.visual_encoder.requires_grad_(False)
 
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        pretrained_codet5 = T5ForConditionalGeneration.from_pretrained(args.model_name)
-        # pretrained_codet5 = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
-        #                                       torch_dtype=torch.float16,
-        #                                       trust_remote_code=True)
-        
+        # pretrained_codet5 = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        pretrained_codet5 = AutoModelForSeq2SeqLM.from_pretrained(args.model_name,
+                                              torch_dtype=torch.float16,
+                                              trust_remote_code=True)
+        self.pretrained_codet5 = pretrained_codet5
         self.text_encoder = pretrained_codet5.encoder
         
-        self.embed_dim = pretrained_codet5.config.d_model  # config.n_embd for 2b model
+        self.embed_dim = pretrained_codet5.config.encoder.n_embd  # config.n_embd for 2b model
         self.image_proj = torch.nn.Linear(self.visual_encoder.config.projection_dim, self.embed_dim)
-        self.text_proj = torch.nn.Linear(self.text_encoder.config.d_model, self.embed_dim)
+        
+        self.text_proj = torch.nn.Linear(self.text_encoder.config.n_embd, self.embed_dim)
         
         #self.decoder_proj = torch.nn.Linear(2*self.embed_dim, self.embed_dim)
         
         self.multimodal_decoder = pretrained_codet5.decoder
+        self.multimodal_decoder.requires_grad_(False)
+
+        if self.multimodal_decoder.config.hidden_size != self.text_encoder.config.hidden_size:
+            self.enc_to_dec_proj = nn.Linear(self.text_encoder.config.hidden_size, self.multimodal_decoder.config.hidden_size)
+
+        #self.lm_head = pretrained_codet5.lm_head  #donnot need for 2b models
 
     def forward(self,            
                 input_ids: Optional[torch.LongTensor] = None,
@@ -91,14 +97,13 @@ class BLIPModel(nn.Module):
         # with torch.no_grad():   
         clip_output = self.visual_encoder(**images)  
         image_embeds = clip_output.image_embeds # shape:(bsz,clip_model_dim)
-        image_embeds = self.image_proj(image_embeds)   
+        image_embeds = self.image_proj(image_embeds)   #shape: (bsz, model_dim)
 
         image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long)        
 
         #text features
-        
         text_output = self.text_encoder(input_ids = input_ids, attention_mask = attention_mask)
-        text_embeds = text_output.last_hidden_state[:,0,:] #shape: (bsz, max_length, model_dim)
+        text_embeds = text_output[0] #.last_hidden_state # [:,0,:] #shape: (bsz, seq_len, model_dim)
         
 
         # # return multimodel features
@@ -114,37 +119,93 @@ class BLIPModel(nn.Module):
         #                             )              
         #   return output.last_hidden_state
 
-        concate_output = torch.concatenate(image_embeds, text_embeds)
-        decoder_input = self.decoder_proj(concate_output)
+        '''
+        decoder project method:
+        1. broadcast to sample shape and then add
+        2. cross attention
+        '''
+        # concate_output = torch.cat((image_embeds, text_embeds), -1)
+        # decoder_input = self.decoder_proj(concate_output)
 
+        image_embeds = torch.unsqueeze(image_embeds,1)
+        image_embeds = torch.broadcast_to(image_embeds, text_embeds.shape)
         decoder_input = image_embeds+text_embeds
 
-        decoder_outputs = self.multimodal_decoder(input_embeds = decoder_input, attention_mask = attention_mask, labels=labels)
+        if self.multimodal_decoder.config.hidden_size != self.text_encoder.config.hidden_size:
+            text_embeds = self.enc_to_dec_proj(text_embeds)
+        decoder_outputs = self.multimodal_decoder(inputs_embeds = text_embeds, attention_mask = attention_mask, return_dict=True)
+        
 
         # Compute loss independent from decoder (as some shift the logits inside them)
         loss = None
         if labels is not None:
             # warnings.warn(DEPRECATION_WARNING, FutureWarning)
-            logits = decoder_outputs.logits if return_dict else decoder_outputs[0]
+            logits = self.lm_head(decoder_outputs.last_hidden_state) # if return_dict else decoder_outputs[0]
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(logits.reshape(-1, self.decoder.config.vocab_size), labels.view(-1))
+            loss = loss_fct(logits.reshape(-1, logits.size(-1)), labels.view(-1))
 
 
-        if not return_dict:
-            return (loss,) + decoder_outputs + encoder_outputs
+        # if not return_dict:
+        #     return loss #(loss,) + decoder_outputs + encoder_outputs
         
-        return Seq2SeqLMOutput(
-            loss=loss,
-            logits=decoder_outputs.logits,
-            past_key_values=decoder_outputs.past_key_values,
-            decoder_hidden_states=decoder_outputs.hidden_states,
-            decoder_attentions=decoder_outputs.attentions,
-            cross_attentions=decoder_outputs.cross_attentions,
-            # encoder_last_hidden_state=encoder_outputs.last_hidden_state,
-            # encoder_hidden_states=encoder_outputs.hidden_states,
-            # encoder_attentions=encoder_outputs.attentions,
-        )
+        # return Seq2SeqLMOutput(
+        #     loss=loss,
+        #     logits=decoder_outputs.logits,
+        #     past_key_values=decoder_outputs.past_key_values,
+        #     decoder_hidden_states=decoder_outputs.hidden_states,
+        #     decoder_attentions=decoder_outputs.attentions,
+        #     cross_attentions=decoder_outputs.cross_attentions,
+        #     # encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+        #     # encoder_hidden_states=encoder_outputs.hidden_states,
+        #     # encoder_attentions=encoder_outputs.attentions,
+        # )
+        return loss
 
+    def generate(self, input_ids, attention_mask, image, do_sample, num_beams=3, max_length=30, min_length=10, top_p=0.9, repetition_penalty=1.0):
+        image_embeds = self.visual_encoder(**image).image_embeds
+            
+        image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long)
+        model_kwargs = {"encoder_hidden_states": image_embeds, "encoder_attention_mask":image_atts}
+        
+        #prompt = [self.prompt] * image.size(0)
+        input_ids[:,0] = self.tokenizer.bos_token_id
+        input_ids = input_ids[:, :-1] 
+
+        output = self.multimodal_decoder.generate(
+            input_ids=input_ids,
+            attention_mask = attention_mask,
+            max_length=max_length,
+            do_sample=do_sample,
+            **model_kwargs
+        )
+        # if sample:
+        #     #nucleus sampling
+        #     outputs = self.text_decoder.generate(input_ids=input_ids,
+        #                                           max_length=max_length,
+        #                                           min_length=min_length,
+        #                                           do_sample=True,
+        #                                           top_p=top_p,
+        #                                           num_return_sequences=1,
+        #                                           eos_token_id=self.tokenizer.sep_token_id,
+        #                                           pad_token_id=self.tokenizer.pad_token_id, 
+        #                                           repetition_penalty=1.1,                                            
+        #                                           **model_kwargs)
+        # else:
+        #     #beam search
+        #     outputs = self.text_decoder.generate(input_ids=input_ids,
+        #                                           max_length=max_length,
+        #                                           min_length=min_length,
+        #                                           num_beams=num_beams,
+        #                                           eos_token_id=self.tokenizer.sep_token_id,
+        #                                           pad_token_id=self.tokenizer.pad_token_id,     
+        #                                           repetition_penalty=repetition_penalty,
+        #                                           **model_kwargs)            
+            
+        # captions = []    
+        # for output in outputs:
+        #     caption = self.tokenizer.decode(output, skip_special_tokens=True)    
+        #     captions.append(caption[len(self.prompt):])
+        return output  #captions
 
 class VLModel(pl.LightningModule):
     def __init__(self, args):
@@ -164,10 +225,9 @@ class VLModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels", "images"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        
-        model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+
+        loss = self.model(**model_batch)
+        #loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
@@ -176,9 +236,8 @@ class VLModel(pl.LightningModule):
         cols = ["input_ids", "attention_mask", "labels", "images"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
-        model_batch["decoder_input_ids"] = model_batch["input_ids"].clone()
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+        loss = self.model(**model_batch)
+        #loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
@@ -227,7 +286,7 @@ class VLModel(pl.LightningModule):
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"], max_length=self.args.max_length, decoder_input_ids=batch["input_ids"],
+        batch["samples"] = generate_func(input_ids=batch["input_ids"], image = batch['images'], attention_mask=batch["attention_mask"], max_length=self.args.max_length,
                                          do_sample=False)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
