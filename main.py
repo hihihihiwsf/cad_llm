@@ -46,7 +46,7 @@ def main():
     #accelerator = Accelerator()
 
     print("Loading model...")
-    model = CodeT5Model(args=args)
+    model = VLModel(args=args)
     #model = accelerator.prepare(model)
 
     print("Loading data...")

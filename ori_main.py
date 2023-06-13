@@ -49,7 +49,7 @@ def main():
    # accelerator = Accelerator()
 
     print("Loading model...")
-    model = CodeT5Model(args=args)
+    model = VLModel(args=args)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)

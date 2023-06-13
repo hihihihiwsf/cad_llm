@@ -27,8 +27,6 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
 
-from transformers import CLIPVisionModelWithProjection
-
 class CodeT5Model(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
