@@ -23,8 +23,8 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from transformers import T5Tokenizer, AutoModelForSeq2SeqLM
 import numpy as np
-import bitsandbytes as bnb
-from accelerate import dispatch_model, infer_auto_device_map
+# import bitsandbytes as bnb
+# from accelerate import dispatch_model, infer_auto_device_map
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args):

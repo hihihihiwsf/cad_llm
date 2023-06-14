@@ -22,7 +22,7 @@ import os
 def main():
     
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    # torch.set_float32_matmul_precision('high')
+    torch.set_float32_matmul_precision('high')
     
     """Entry point for our training script"""
     args = get_training_args()
@@ -70,7 +70,7 @@ def main():
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
         check_val_every_n_epoch=args.val_every_n_epoch,
-        # precision='16',
+        precision='16',
         # limit_train_batches=0.01,
         # limit_val_batches=0.01,
     )
