@@ -29,7 +29,7 @@ def get_launch_args():
     parser.add_argument(
         "--s3_dataset",
         type=str,
-        default="sifan_test_ascii",
+        default="deepmind_strings_v1_ascii1_max64",
         help="Name of the dataset folder to use in s3"
     )
     parser.add_argument(
