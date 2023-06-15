@@ -409,6 +409,7 @@ class BertEncoder(nn.Module):
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
 
         next_decoder_cache = () if use_cache else None
+        assert attention_mask.device == hidden_states.device
                
         for i in range(self.config.num_hidden_layers):
             layer_module = self.layer[i]
@@ -741,6 +742,7 @@ class BertModel(BertPreTrainedModel):
         # ourselves in which case we just need to make it broadcastable to all heads.
         extended_attention_mask: torch.Tensor = self.get_extended_attention_mask(attention_mask, input_shape, 
                                                                                  device, is_decoder)
+        assert extended_attention_mask.device == attention_mask.device
 
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
@@ -760,7 +762,7 @@ class BertModel(BertPreTrainedModel):
                 encoder_extended_attention_mask = self.invert_attention_mask(encoder_attention_mask)
         else:
             encoder_extended_attention_mask = None
-
+        #assert encoder_attention_mask.device == attention_mask.device
         # Prepare head mask if needed
         # 1.0 in head_mask indicate we keep the head
         # attention_probs has shape bsz x n_heads x N x N
@@ -911,7 +913,7 @@ class BertLMHeadModel(BertPreTrainedModel):
             # we are doing next-token prediction; shift prediction scores and input ids by one
             shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
             labels = labels[:, 1:].contiguous()
-            loss_fct = CrossEntropyLoss(reduction=reduction, label_smoothing=0.1) 
+            loss_fct = CrossEntropyLoss(reduction=reduction, label_smoothing=0.1,ignore_index=-100) 
             lm_loss = loss_fct(shifted_prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
             if reduction=='none':
                 lm_loss = lm_loss.view(prediction_scores.size(0),-1).sum(1)               

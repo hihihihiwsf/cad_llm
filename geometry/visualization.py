@@ -28,8 +28,8 @@ def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
 
 
 def draw_curves(curves, ax, box_lim, color, draw_points=False):
-    ax.set_xlim(left=-box_lim, right=box_lim)
-    ax.set_ylim(bottom=-box_lim, top=box_lim)
+    ax.set_xlim(left=-3, right=box_lim)
+    ax.set_ylim(bottom=-3, top=box_lim)
     ax.set_xticks([])
     ax.set_yticks([])
 
@@ -44,7 +44,6 @@ def visualize_sample(input_curves, box_lim):
     figure_size_inches = ( 512 / dpi, 512 / dpi)
     out = []
     for in_curve in input_curves:
-
 
         fig, ax = plt.subplots()
         fig.set_dpi(dpi)

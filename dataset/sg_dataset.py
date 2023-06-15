@@ -83,7 +83,7 @@ class SketchGraphsCollator:
         self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
 
     def tokenize(self, strings):
-        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        return self.tokenizer(strings, padding='max_length', truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
         input_strings = [sketch['input_text'] for sketch in sketch_dicts]
@@ -118,8 +118,8 @@ class SketchGraphsCollator:
         return batch
 
 
-def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
+def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle,drop_last):
     dataset = SketchGraphsDataset(split=split, args=args)
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
-    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
+    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,drop_last=drop_last,
                       num_workers=args.num_workers)

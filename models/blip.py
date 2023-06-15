@@ -7,9 +7,13 @@
 '''
 from models.med import BertConfig, BertModel, BertLMHeadModel
 
+#from transformers import BertLMHeadModel
 from transformers import BertTokenizer, AutoTokenizer
 from transformers import CLIPVisionModelWithProjection
 import transformers
+
+from transformers.utils import logging
+logger = logging.get_logger(__name__)
 transformers.logging.set_verbosity_error()
 
 import torch
@@ -103,7 +107,11 @@ class BLIP_Pretrain(nn.Module):
         
         # create the decoder
         decoder_config = BertConfig.from_json_file(med_config)
-        decoder_config.encoder_width = vision_width        
+        decoder_config.encoder_width = vision_width  
+        
+        decoder_config.is_decoder=True
+        decoder_config.add_cross_attention=True      
+        
         self.text_decoder = BertLMHeadModel.from_pretrained('bert-base-uncased',config=decoder_config)    
         self.text_decoder.resize_token_embeddings(len(self.tokenizer)) 
         tie_encoder_decoder_weights(self.text_encoder,self.text_decoder.bert,'','/attention')
@@ -113,12 +121,12 @@ class BLIP_Pretrain(nn.Module):
         with torch.no_grad():
             self.temp.clamp_(0.001,0.5)
         
-        image_embeds = self.visual_encoder(images).image_embeds
+        image_embeds = self.visual_encoder(images).image_embeds #image_embeds.shape = [2,512]
         
         seq_len = input_ids.size(1)
         image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
         
-        image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long)      
+        image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(images.device)    
         image_feat = F.normalize(self.vision_proj(image_embeds[:,0,:]),dim=-1)          
         
         # text = self.tokenizer(caption, padding='max_length', truncation=True, max_length=30, 
@@ -127,6 +135,7 @@ class BLIP_Pretrain(nn.Module):
                                         return_dict = True, mode = 'text')            
         text_feat = F.normalize(self.text_proj(text_output.last_hidden_state[:,0,:]),dim=-1)                 
              
+        
         # get momentum features
         with torch.no_grad():
             self._momentum_update()
@@ -157,15 +166,15 @@ class BLIP_Pretrain(nn.Module):
         loss_ita = (loss_i2t+loss_t2i)/2
 
         self._dequeue_and_enqueue(image_feat_m, text_feat_m)        
-
+        
         ###============== Image-text Matching ===================###
         encoder_input_ids = input_ids.clone()
         encoder_input_ids[:,0] = self.tokenizer.enc_token_id
         
         # forward the positve image-text pair
         bs = images.size(0)
-        
-        output_pos = self.text_encoder(encoder_input_ids,
+
+        output_pos = self.text_encoder(input_ids=encoder_input_ids,
                                        attention_mask = attention_mask,
                                        encoder_hidden_states = image_embeds,
                                        encoder_attention_mask = image_atts,      
@@ -232,19 +241,26 @@ class BLIP_Pretrain(nn.Module):
         return loss_ita, loss_itm, loss_lm
  
     def generate(self, images, input_ids, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
-        image_embeds = self.visual_encoder(images)
-
-        if not sample:
-            image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
+        vis_out = self.visual_encoder(images)
+        image_embeds = vis_out.image_embeds
+        seq_len = input_ids.size(1)
+        image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
+        
+        # if not sample:
+        #     image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
             
-        image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long)#.to(images.device)
+        image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(images.device)
         model_kwargs = {"encoder_hidden_states": image_embeds, "encoder_attention_mask":image_atts}
         
         # prompt = [self.prompt] * image.size(0)
         # input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
         input_ids[:,0] = self.tokenizer.bos_token_id
         input_ids = input_ids[:, :-1] 
-
+        '''
+        input_ids: (2,128)
+        encoder_hidden_states: 6,128, 512
+        encoder_attention_mask:
+        '''
         if sample:
             #nucleus sampling
             outputs = self.text_decoder.generate(input_ids=input_ids,
@@ -271,7 +287,7 @@ class BLIP_Pretrain(nn.Module):
         captions = []    
         for output in outputs:
             caption = self.tokenizer.decode(output, skip_special_tokens=True)    
-            captions.append(caption[len(self.prompt):])
+            captions.append(caption)
         return captions
 
     @torch.no_grad()    
@@ -279,6 +295,7 @@ class BLIP_Pretrain(nn.Module):
         for model_pair in self.model_pairs:           
             for param, param_m in zip(model_pair[0].parameters(), model_pair[1].parameters()):
                 param_m.data.copy_(param.data)  # initialize
+                #print(param_m.data.shape)
                 param_m.requires_grad = False  # not update by gradient    
 
             
