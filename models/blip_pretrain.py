@@ -27,39 +27,23 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
 
-import clip
-import numpy as np
+from models.blip import BLIP_Pretrain
 
-from transformers import CLIPProcessor, CLIPModel
-
-class CodeT5Model(pl.LightningModule):
+class BLIP_PretrainModel(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters()
 
-        if args.untrained_model:
-            config = T5Config.from_pretrained(args.model_name)
-            model = T5ForConditionalGeneration(config)
-            model._init_weights(model)  # maybe redundant
-        else:
-            model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-
-        self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
+        self.model = BLIP_Pretrain(args)
+        self.tokenizer = self.model.tokenizer
 
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-
-        # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
-
-        if args.lora:
-            self.add_lora()
+        self.alpha = 0.4
 
     def add_lora(self):
         lora_config = LoraConfig(
@@ -83,32 +67,24 @@ class CodeT5Model(pl.LightningModule):
 
         self.model.print_trainable_parameters()
 
-    def adjust_to_use_new_tokens(self):
-        # Add new tokens to the tokenizer
-        new_tokens = [f"<{i}>" for i in self.quantized_range]
-        self.tokenizer.add_tokens(new_tokens)
-
-        # Add new token embeddings and initialize using learned embeddings
-        self.model.resize_token_embeddings(len(self.tokenizer))
-        embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(1, len(new_tokens)+1):
-            # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[67 + i]
-
     def training_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
+        cols = ["input_ids", "attention_mask", "labels", "images"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        
+        alpha = self.alpha # *min(1,(epoch*len(data_loader)+i)/(2*len(data_loader))) 
+        loss_ita, loss_itm, loss_lm = self.model(**model_batch, alpha=alpha)
+        loss = loss_ita + loss_itm + loss_lm #outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
+        cols = ["input_ids", "attention_mask", "labels", "images"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+        alpha = self.alpha
+
+        loss_ita, loss_itm, loss_lm = self.model(**model_batch, alpha= alpha)
+        loss = loss_ita + loss_itm + loss_lm
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
@@ -153,10 +129,11 @@ class CodeT5Model(pl.LightningModule):
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"], max_length=self.args.max_length,
-                                         do_sample=False)
+        batch["string_samples"] = generate_func(input_ids=batch["input_ids"], images = batch['images'], 
+                                         max_length=self.args.max_length, #attention_mask=batch["attention_mask"]
+                                         )
 
-        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+        #batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
 
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]

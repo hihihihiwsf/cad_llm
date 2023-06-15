@@ -8,10 +8,11 @@ try:
 except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
 from models.codet5 import CodeT5Model
-from models.multimodel import VLModel
+from models.byt5 import ByT5Model
+from models.blip_pretrain import BLIP_PretrainModel
 
+from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
@@ -42,12 +43,8 @@ def main():
     # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
 
-    ## fsdp accelarator:
-    #accelerator = Accelerator()
-
     print("Loading model...")
-    model = VLModel(args=args)
-    #model = accelerator.prepare(model)
+    model = BLIP_PretrainModel(args=args)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
@@ -57,32 +54,18 @@ def main():
                                           using_sagemaker=args.using_sagemaker)
 
     call_backs.append(LearningRateMonitor(logging_interval='step'))
-    
-    # from peft.utils.other import fsdp_auto_wrap_policy
-    # if getattr(accelerator.state, "fsdp_plugin", None) is not None:
-    #     accelerator.state.fsdp_plugin.auto_wrap_policy = fsdp_auto_wrap_policy(model)
-    
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-    # lr_scheduler = {
-    #             "scheduler": torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, verbose=True), 
-    #             "interval": "epoch",
-    #             "frequency": 1,
-    #         }
 
-    # optimizer, train_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
-    #     optimizer, train_dataloader, val_dataloader, lr_scheduler
-    # )
- 
-    
-    WORLD_SIZE = torch.cuda.device_count()
     print("Training the model...")
     log_every_n_steps = 1000
+
+
+    from pytorch_lightning.strategies import DDPStrategy
+
     trainer = pl.Trainer(
         callbacks=call_backs,
-        accelerator="gpu",  #accelerator,
-        devices=WORLD_SIZE,
-        precision=16,
-        strategy= "fsdp_native", #args.strategy,
+        accelerator=args.accelerator,
+        devices=args.devices,
+        strategy=DDPStrategy(find_unused_parameters=True),
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,

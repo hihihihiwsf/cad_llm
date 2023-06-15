@@ -35,7 +35,7 @@ def get_parser():
     parser.add_argument("--val_every_n_epoch", type=int, default=1, help="Check validation after n training epochs")
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")
     parser.add_argument("--cosinedecay", type=int, default=0, help="Apply Cosine Learning rate decay if true")
-    parser.add_argument("--clipmodel", type=str, default="facebook/dino-vitb16", help="Apply Clip Vision information")
+    parser.add_argument("--clipmodel", type=str, default="openai/clip-vit-base-patch32", help="Apply Clip Vision information")
     
 
     return parser
