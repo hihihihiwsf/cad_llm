@@ -231,14 +231,15 @@ class BLIP_Pretrain(nn.Module):
 
         decoder_output = self.text_decoder(decoder_input_ids, 
                                            attention_mask = attention_mask, 
-                                           encoder_hidden_states = image_embeds,
-                                           encoder_attention_mask = image_atts,                  
+                                           #encoder_hidden_states = image_embeds,
+                                           #encoder_attention_mask = image_atts,                  
                                            labels = labels,
-                                           return_dict = True,   
+                                           return_dict = True, 
+                                           mode='text'  
                                           )   
           
         loss_lm = decoder_output.loss                
-        return loss_ita, loss_itm, loss_lm
+        return  loss_lm  # loss_ita, loss_itm, loss_lm
  
     def generate(self, images, input_ids, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
         vis_out = self.visual_encoder(images)

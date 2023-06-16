@@ -73,8 +73,8 @@ class BLIP_PretrainModel(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
         alpha = self.alpha # *min(1,(epoch*len(data_loader)+i)/(2*len(data_loader))) 
-        loss_ita, loss_itm, loss_lm = self.model(**model_batch, alpha=alpha)
-        loss = loss_ita + loss_itm + loss_lm #outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        loss = self.model(**model_batch, alpha=alpha) # loss_ita, loss_itm, 
+        # loss = loss_ita + loss_itm + loss_lm #outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
@@ -84,8 +84,8 @@ class BLIP_PretrainModel(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         alpha = self.alpha
 
-        loss_ita, loss_itm, loss_lm = self.model(**model_batch, alpha= alpha)
-        loss = loss_ita + loss_itm + loss_lm
+        loss = self.model(**model_batch, alpha= alpha)
+        #loss = loss_ita + loss_itm + loss_lm
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
