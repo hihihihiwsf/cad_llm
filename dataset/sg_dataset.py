@@ -53,8 +53,10 @@ class SketchGraphsDataset(Dataset):
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+        full_text = "".join([ent for i, ent in enumerate(entities)])
         sketch_dict['input_text'] = input_text
         sketch_dict['output_text'] = output_text
+        sketch_dict['full_text'] = full_text
         return sketch_dict
 
     def get_mask(self, n):
@@ -98,6 +100,10 @@ class SketchGraphsCollator:
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
         input_curves = [get_curves(point_input) for point_input in point_inputs]
         list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+
+        point_sketch = [get_point_entities(sketch["full_text"]) for sketch in sketch_dicts]
+        full_curves = [get_curves(point_input) for point_input in point_sketch]
+        list_full_img = visualize_sample(input_curves=full_curves, box_lim=64 + 3)
 
         batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
         batch_images = batch_images['pixel_values']

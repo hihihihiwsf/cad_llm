@@ -94,24 +94,25 @@ class BLIP_PretrainModel(pl.LightningModule):
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        mx = 0
-        for i,j in zip(batch['string_samples'], batch['string_labels']):
-            if i == j:
-                mx += 1
-        top1_full_sketch = mx/len(batch['string_labels'])
+
+        top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+
+        # mx = 0
+        # for i,j in zip(batch['string_samples'], batch['string_labels']):
+        #     if i == j:
+        #         mx += 1
+        # top1_full_sketch = mx/len(batch['string_labels'])
+
+        # mx = 0
+        # for i,j in zip(batch['string_samples'], batch['string_labels']):
+        #     label_all_ent = j.split(";")
+        #     first_ent = i.split(";")[0]
+        #     if first_ent in label_all_ent:
+        #         mx += 1
+        # top1_ent = mx/len(batch['string_labels'])
+
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-
-        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-
-
-        mx = 0
-        for i,j in zip(batch['string_samples'], batch['string_labels']):
-            label_all_ent = j.split(";")
-            first_ent = i.split(";")[0]
-            if first_ent in label_all_ent:
-                mx += 1
-        top1_ent = mx/len(batch['string_labels'])
 
         self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)

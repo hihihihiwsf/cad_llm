@@ -8,8 +8,8 @@ try:
 except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.codet5 import CodeT5Model
-from models.byt5 import ByT5Model
+# from models.codet5 import CodeT5Model
+# from models.byt5 import ByT5Model
 from models.blip_pretrain import BLIP_PretrainModel
 
 from torch.utils.data import DataLoader
@@ -69,10 +69,10 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        # resume_from_checkpoint=None,
+        # resume_from_checkpoint='',
         check_val_every_n_epoch=args.val_every_n_epoch,
-        # limit_train_batches=0.01,
-        # limit_val_batches=0.1,
+        limit_train_batches=0.01,
+        limit_val_batches=0.1,
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)

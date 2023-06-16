@@ -27,7 +27,6 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
 
-import clip
 import numpy as np
 
 from transformers import CLIPProcessor, CLIPModel
