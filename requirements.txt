@@ -15,4 +15,5 @@ peft
 ftfy
 regex
 tqdm
+matplotlib==3.7.1
 git+https://github.com/openai/CLIP.git

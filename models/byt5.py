@@ -10,7 +10,7 @@ import torch
 import torch.optim as optim
 # import lightning.pytorch as pl
 import pytorch_lightning as pl
-from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
+from transformers import T5Config, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
 import sys
 
@@ -25,7 +25,7 @@ from PIL import Image
 # import clip
 import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel
-
+from models.modeling_vlt5 import T5ForConditionalGeneration
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args):
@@ -53,7 +53,8 @@ class ByT5Model(pl.LightningModule):
         
         
         # self.clip_model, _ = clip.load(args.clipmodel)
-        self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
+        # self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
+        self.clip_model = CLIPVisionModel.from_pretrained(args.clipmodel, output_hidden_states=True)
         self.clip_model.requires_grad_(False)
 
 

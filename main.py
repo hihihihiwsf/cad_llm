@@ -64,15 +64,16 @@ def main():
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
-        strategy=args.strategy,
+        strategy=DDPStrategy(find_unused_parameters=True),
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
-        # precision='16',
+        precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
-        # limit_train_batches=0.001,
-        # limit_val_batches=0.01,
+        limit_train_batches=0.01,
+        limit_val_batches=0.1,
+        profiler='simple'
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
