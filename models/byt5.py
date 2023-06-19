@@ -53,8 +53,8 @@ class ByT5Model(pl.LightningModule):
         
         
         # self.clip_model, _ = clip.load(args.clipmodel)
-        # self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
-        self.clip_model = CLIPVisionModel.from_pretrained(args.clipmodel, output_hidden_states=True)
+        self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
+        # self.clip_model = CLIPVisionModel.from_pretrained(args.clipmodel, output_hidden_states=True)
         self.clip_model.requires_grad_(False)
 
 
