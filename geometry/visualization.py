@@ -30,7 +30,7 @@ def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
 def visualize_sample(input_curves, box_lim):
     batch_size = len(input_curves)
     dpi = 100
-    figure_size_inches = ( 512 / dpi, 512 / dpi)
+    figure_size_inches = ( 224 / dpi, 224 / dpi)
     out = []
     for in_curve in input_curves:
 
