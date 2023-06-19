@@ -110,8 +110,11 @@ class BertSelfAttention(nn.Module):
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         if is_cross_attention:
-            self.key = nn.Linear(config.encoder_width, self.all_head_size)
-            self.value = nn.Linear(config.encoder_width, self.all_head_size)
+            self.key = nn.Linear(config.hidden_size, self.all_head_size)
+            self.value = nn.Linear(config.hidden_size, self.all_head_size)
+
+            # self.key = nn.Linear(config.encoder_width, self.all_head_size)
+            # self.value = nn.Linear(config.encoder_width, self.all_head_size)
         else:
             self.key = nn.Linear(config.hidden_size, self.all_head_size)
             self.value = nn.Linear(config.hidden_size, self.all_head_size)
@@ -402,7 +405,7 @@ class BertEncoder(nn.Module):
         output_attentions=False,
         output_hidden_states=False,
         return_dict=True,
-        mode='multimodal',
+        mode=None,
     ):
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
@@ -684,7 +687,7 @@ class BertModel(BertPreTrainedModel):
         output_hidden_states=None,
         return_dict=None,
         is_decoder=False,
-        mode='multimodal',
+        mode=None,
     ):
         r"""
         encoder_hidden_states  (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`, `optional`):
@@ -847,7 +850,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         return_logits=False,            
         is_decoder=True,
         reduction='mean',
-        mode='multimodal', 
+        mode=None, 
     ):
         r"""
         encoder_hidden_states  (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`, `optional`):

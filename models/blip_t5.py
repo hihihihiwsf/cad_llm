@@ -5,10 +5,10 @@
  * For full license text, see LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  * By Junnan Li
 '''
-from models.med import BertConfig, BertModel, BertLMHeadModel
+#from models.med import BertConfig, BertModel, BertLMHeadModel
 
 #from transformers import BertLMHeadModel
-from transformers import BertTokenizer, AutoTokenizer
+from transformers import BertTokenizer, AutoTokenizer, T5ForConditionalGeneration, T5Config
 from transformers import CLIPVisionModelWithProjection
 import transformers
 
@@ -18,6 +18,7 @@ transformers.logging.set_verbosity_error()
 
 import torch
 from torch import nn
+from torch.nn import CrossEntropyLoss
 import torch.nn.functional as F
 
 def init_tokenizer():
@@ -40,7 +41,7 @@ class BLIP_Pretrain(nn.Module):
                 #  vit = 'base',
                 #  vit_grad_ckpt = False,
                 #  vit_ckpt_layer = 0,                    
-                embed_dim = 256,     
+                # embed_dim = text_width,     
                 queue_size = 57600,
                 momentum = 0.995,
                  ):
@@ -66,14 +67,22 @@ class BLIP_Pretrain(nn.Module):
         #     from timm.models.vision_transformer import default_cfgs
         #     load_custom_pretrained(self.visual_encoder,default_cfgs['vit_large_patch16_224_in21k'])        
                
-        #self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        self.tokenizer = init_tokenizer()
-        encoder_config = BertConfig.from_json_file(med_config)
-        encoder_config.encoder_width = vision_width
-        self.text_encoder = BertModel.from_pretrained('bert-base-uncased',config=encoder_config, add_pooling_layer=False)
-        self.text_encoder.resize_token_embeddings(len(self.tokenizer)) 
+        '''
+        blip bert encoder
+        '''
+        # self.tokenizer = init_tokenizer()
+        #encoder_config = BertConfig.from_json_file(med_config)
+        #encoder_config.encoder_width = vision_width
+        # self.text_encoder = BertModel.from_pretrained('bert-base-uncased',config=encoder_config, add_pooling_layer=False)
+        # self.text_encoder.resize_token_embeddings(len(self.tokenizer)) 
+
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+
+        self.text_encoder = model.encoder
 
         text_width = self.text_encoder.config.hidden_size
+        embed_dim = text_width
         
         self.vision_proj = nn.Linear(vision_width, embed_dim)
         self.text_proj = nn.Linear(text_width, embed_dim)
@@ -83,8 +92,10 @@ class BLIP_Pretrain(nn.Module):
         # create momentum encoders  
         self.visual_encoder_m, vision_width = create_vit(clipmodel)              
         self.vision_proj_m = nn.Linear(vision_width, embed_dim)
-        self.text_encoder_m = BertModel(config=encoder_config, add_pooling_layer=False)      
+        # self.text_encoder_m = BertModel(config=encoder_config, add_pooling_layer=False)      
         self.text_proj_m = nn.Linear(text_width, embed_dim)
+        config = T5Config.from_pretrained(args.model_name)
+        self.text_encoder_m = T5ForConditionalGeneration(config).encoder
         
         self.model_pairs = [[self.visual_encoder,self.visual_encoder_m],
                             [self.vision_proj,self.vision_proj_m],
@@ -106,16 +117,18 @@ class BLIP_Pretrain(nn.Module):
         self.temp = nn.Parameter(0.07*torch.ones([]))   
         
         # create the decoder
-        decoder_config = BertConfig.from_json_file(med_config)
-        decoder_config.encoder_width = vision_width  
+        #decoder_config = BertConfig.from_json_file(med_config)
+        #decoder_config.encoder_width = vision_width  
         
-        decoder_config.is_decoder=True
-        decoder_config.add_cross_attention=True      
+        #decoder_config.is_decoder=True
+        #decoder_config.add_cross_attention=True      
         
-        self.text_decoder = BertLMHeadModel.from_pretrained('bert-base-uncased',config=decoder_config)    
-        self.text_decoder.resize_token_embeddings(len(self.tokenizer)) 
-        tie_encoder_decoder_weights(self.text_encoder,self.text_decoder.bert,'','/attention')
+        # self.text_decoder = BertLMHeadModel.from_pretrained('bert-base-uncased',config=decoder_config)    
+        # self.text_decoder.resize_token_embeddings(len(self.tokenizer)) 
+        # tie_encoder_decoder_weights(self.text_encoder,self.text_decoder.bert,'','/attention')
         
+        self.text_decoder = model.decoder
+        self.lm_head = model.lm_head
         
     def forward(self, images, input_ids, attention_mask, labels, alpha):
         with torch.no_grad():
@@ -132,7 +145,7 @@ class BLIP_Pretrain(nn.Module):
         # text = self.tokenizer(caption, padding='max_length', truncation=True, max_length=30, 
         #                       return_tensors="pt").to(image.device)  
         text_output = self.text_encoder(input_ids, attention_mask = attention_mask,                      
-                                        return_dict = True, mode = 'text')            
+                                        return_dict = True) #, mode = 'text')            
         text_feat = F.normalize(self.text_proj(text_output.last_hidden_state[:,0,:]),dim=-1)                 
              
         
@@ -144,7 +157,7 @@ class BLIP_Pretrain(nn.Module):
             image_feat_all = torch.cat([image_feat_m.t(),self.image_queue.clone().detach()],dim=1)                   
             
             text_output_m = self.text_encoder_m(input_ids, attention_mask = attention_mask,                      
-                                                return_dict = True, mode = 'text')    
+                                                return_dict = True)#, mode = 'text')    
             text_feat_m = F.normalize(self.text_proj_m(text_output_m.last_hidden_state[:,0,:]),dim=-1) 
             text_feat_all = torch.cat([text_feat_m.t(),self.text_queue.clone().detach()],dim=1)
 
@@ -169,7 +182,7 @@ class BLIP_Pretrain(nn.Module):
         
         ###============== Image-text Matching ===================###
         encoder_input_ids = input_ids.clone()
-        encoder_input_ids[:,0] = self.tokenizer.pad_token_id
+        #encoder_input_ids[:,0] = self.tokenizer.pad_token_id #enc_token_id
         
         # forward the positve image-text pair
         bs = images.size(0)
@@ -179,7 +192,8 @@ class BLIP_Pretrain(nn.Module):
                                        encoder_hidden_states = image_embeds,
                                        encoder_attention_mask = image_atts,      
                                        return_dict = True,
-                                      )            
+                                      ) 
+                  
         with torch.no_grad():       
             weights_t2i = F.softmax(sim_t2i[:,:bs],dim=1)+1e-4 
             weights_t2i.fill_diagonal_(0)            
@@ -225,20 +239,23 @@ class BLIP_Pretrain(nn.Module):
         loss_itm = F.cross_entropy(vl_output, itm_labels)  
         
         ##================= LM ========================##     
-        decoder_input_ids = input_ids.clone()      
-        decoder_input_ids[:,0] = 0 #self.tokenizer.bos_token_id
+        decoder_input_ids = labels.clone()      
+        decoder_input_ids[:,0] = self.tokenizer.pad_token_id
         #decoder_targets = decoder_input_ids.masked_fill(decoder_input_ids == self.tokenizer.pad_token_id, -100) 
 
         decoder_output = self.text_decoder(decoder_input_ids, 
-                                           attention_mask = attention_mask, 
+                                           #attention_mask = attention_mask, 
                                            encoder_hidden_states = text_output.last_hidden_state, #image_embeds,
-                                           encoder_attention_mask = attention_mask,                  
-                                           labels = labels,
+                                           encoder_attention_mask = attention_mask,#image_atts,                  
+                                           #labels = labels,
                                            return_dict = True, 
-                                           mode='multimodal'  
-                                          )   
-          
-        loss_lm = decoder_output.loss                
+                                        )
+
+                                        #    mode='text'  
+                                        #   )   
+        lm_logits = self.lm_head(decoder_output['last_hidden_state'])
+        loss_fct = CrossEntropyLoss(ignore_index=-100)
+        loss_lm = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1)) #decoder_output.loss                
         return  loss_lm  # loss_ita, loss_itm, loss_lm
  
     def generate(self, images, input_ids, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
@@ -250,13 +267,14 @@ class BLIP_Pretrain(nn.Module):
         # if not sample:
         #     image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
             
-        image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(images.device)
-        model_kwargs = {"encoder_hidden_states": image_embeds, "encoder_attention_mask":image_atts}
+        #image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(input_ids.device)
+        #model_kwargs = {"encoder_hidden_states": image_embeds, "encoder_attention_mask":image_atts}
         
         # prompt = [self.prompt] * image.size(0)
         # input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
         input_ids[:,0] = self.tokenizer.pad_token_id
         input_ids = input_ids[:, :-1] 
+        encoder_embeds = self.text_encoder(input_ids)['last_hidden_state']
         '''
         input_ids: (2,128)
         encoder_hidden_states: 6,128, 512
@@ -272,7 +290,7 @@ class BLIP_Pretrain(nn.Module):
                                                   num_return_sequences=1,
                                                   eos_token_id=self.tokenizer.sep_token_id,
                                                   pad_token_id=self.tokenizer.pad_token_id, 
-                                                  repetition_penalty=1.1,                                            
+                                                  repetition_penalty=1.1,                                         
                                                   #**model_kwargs
                                                   )
         else:
