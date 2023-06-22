@@ -248,7 +248,7 @@ class BLIP_Pretrain(nn.Module):
         # decoder_input_ids[:,0] = 0 #self.tokenizer.bos_token_id
         #decoder_targets = decoder_input_ids.masked_fill(decoder_input_ids == self.tokenizer.pad_token_id, -100) 
 
-        decoder_output = self.text_decoder(decoder_input_ids, 
+        decoder_output = self.text_decoder(input_ids = decoder_input_ids, 
                                            #attention_mask = attention_mask, 
                                            encoder_hidden_states = encoder_output.last_hidden_state, #image_embeds,
                                            encoder_attention_mask = attention_mask,                  
