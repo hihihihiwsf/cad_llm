@@ -242,7 +242,7 @@ class BLIP_Pretrain(nn.Module):
         # loss_itm = F.cross_entropy(vl_output, itm_labels)  
         
         ##================= LM ========================## 
-        encoder_output = self.text_encoder(input_ids, attention_mask=attention_mask)    
+        encoder_output = self.text_encoder(input_ids=input_ids, attention_mask=attention_mask)    
         
         decoder_input_ids = self._shift_right(labels)   
         # decoder_input_ids[:,0] = 0 #self.tokenizer.bos_token_id
