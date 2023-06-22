@@ -255,7 +255,12 @@ class BLIP_Pretrain(nn.Module):
                                            #labels = labels,
                                            return_dict = True, 
                                            #mode='multimodal'  
-                                          )   
+                                          )  
+        if self.model.config.tie_word_embeddings:
+            # Rescale output before projecting on vocab
+            # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/transformer.py#L586
+            decoder_output = decoder_output * (self.model.config.d_model**-0.5)
+
         lm_logits = self.lm_head(decoder_output.last_hidden_state)
         loss_fct = CrossEntropyLoss(ignore_index=-100)
         loss_lm = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
