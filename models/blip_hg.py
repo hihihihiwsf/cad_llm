@@ -5,19 +5,16 @@
  * For full license text, see LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  * By Junnan Li
 '''
-#from models.med import BertConfig, BertModel, BertLMHeadModel
+from models.med import BertConfig, BertModel, BertLMHeadModel
 
 #from transformers import BertLMHeadModel
-from transformers import BertTokenizer, AutoTokenizer #, T5ForConditionalGeneration, T5Config
-from models.mt5 import T5ForConditionalGeneration, T5Config
-
-from transformers import CLIPVisionModelWithProjection
+from transformers import BertTokenizer, AutoTokenizer
+from transformers import CLIPVisionModelWithProjection, T5ForConditionalGeneration
 import transformers
 
 from transformers.utils import logging
 logger = logging.get_logger(__name__)
 transformers.logging.set_verbosity_error()
-from typing import Iterable, Optional, Tuple
 
 import torch
 from torch import nn
@@ -44,7 +41,7 @@ class BLIP_Pretrain(nn.Module):
                 #  vit = 'base',
                 #  vit_grad_ckpt = False,
                 #  vit_ckpt_layer = 0,                    
-                embed_dim = 32,     
+                embed_dim = 256,     
                 queue_size = 57600,
                 momentum = 0.995,
                  ):
@@ -70,26 +67,21 @@ class BLIP_Pretrain(nn.Module):
         #     from timm.models.vision_transformer import default_cfgs
         #     load_custom_pretrained(self.visual_encoder,default_cfgs['vit_large_patch16_224_in21k'])        
                
-        '''
-        blip bert encoder
-        '''
+        
         # self.tokenizer = init_tokenizer()
-        #encoder_config = BertConfig.from_json_file(med_config)
-        #encoder_config.encoder_width = vision_width
+        # encoder_config = BertConfig.from_json_file(med_config)
+        # encoder_config.encoder_width = vision_width
         # self.text_encoder = BertModel.from_pretrained('bert-base-uncased',config=encoder_config, add_pooling_layer=False)
         # self.text_encoder.resize_token_embeddings(len(self.tokenizer)) 
 
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
         self.model = model
-
-        self.config = model.config
+        model_config = self.model.config
         self.text_encoder = self.model.encoder
-
+        #encoder_config = self.text_encoder.config
         text_width = self.text_encoder.config.hidden_size
-        #embed_dim = text_width
-
-        self.shared = model.shared
+        
         self.vision_proj = nn.Linear(vision_width, embed_dim)
         self.text_proj = nn.Linear(text_width, embed_dim)
 
@@ -98,10 +90,8 @@ class BLIP_Pretrain(nn.Module):
         # create momentum encoders  
         self.visual_encoder_m, vision_width = create_vit(clipmodel)              
         self.vision_proj_m = nn.Linear(vision_width, embed_dim)
-        # self.text_encoder_m = BertModel(config=encoder_config, add_pooling_layer=False)      
+        self.text_encoder_m = T5ForConditionalGeneration(config=model_config).encoder     
         self.text_proj_m = nn.Linear(text_width, embed_dim)
-        config = T5Config.from_pretrained(args.model_name)
-        self.text_encoder_m = T5ForConditionalGeneration(config).encoder
         
         self.model_pairs = [[self.visual_encoder,self.visual_encoder_m],
                             [self.vision_proj,self.vision_proj_m],
@@ -123,40 +113,20 @@ class BLIP_Pretrain(nn.Module):
         self.temp = nn.Parameter(0.07*torch.ones([]))   
         
         # create the decoder
-        #decoder_config = BertConfig.from_json_file(med_config)
-        #decoder_config.encoder_width = vision_width  
+        # decoder_config = BertConfig.from_json_file(med_config)
+        # decoder_config.encoder_width = vision_width  
         
-        #decoder_config.is_decoder=True
-        #decoder_config.add_cross_attention=True      
+        # decoder_config.is_decoder=True
+        # decoder_config.add_cross_attention=True      
         
         # self.text_decoder = BertLMHeadModel.from_pretrained('bert-base-uncased',config=decoder_config)    
         # self.text_decoder.resize_token_embeddings(len(self.tokenizer)) 
         # tie_encoder_decoder_weights(self.text_encoder,self.text_decoder.bert,'','/attention')
+        decoder_config = self.model.decoder.config
+        self.text_decoder = self.model.decoder
+        self.lm_head = self.model.lm_head
         
-        self.text_decoder = model.decoder
-        self.lm_head = model.lm_head
-    
-    def get_input_embeddings(self):
-        return self.text_encoder.shared
-
-    def set_input_embeddings(self, new_embeddings):
-        self.shared = new_embeddings
-        self.text_encoder.set_input_embeddings(new_embeddings)
-        self.text_decoder.set_input_embeddings(new_embeddings)
-
-    def set_output_embeddings(self, new_embeddings):
-        self.lm_head = new_embeddings
-
-    def get_output_embeddings(self):
-        return self.lm_head
-
-    def get_encoder(self):
-        return self.text_encoder
-
-    def get_decoder(self):
-        return self.text_decoder
-    
-    def forward(self, images, input_ids, attention_mask, labels, alpha=0.4):
+    def forward(self, images, input_ids, attention_mask, labels, alpha):
         with torch.no_grad():
             self.temp.clamp_(0.001,0.5)
         
@@ -171,7 +141,7 @@ class BLIP_Pretrain(nn.Module):
         # text = self.tokenizer(caption, padding='max_length', truncation=True, max_length=30, 
         #                       return_tensors="pt").to(image.device)  
         text_output = self.text_encoder(input_ids, attention_mask = attention_mask,                      
-                                        return_dict = True) #, mode = 'text')            
+                                        return_dict = True)            
         text_feat = F.normalize(self.text_proj(text_output.last_hidden_state[:,0,:]),dim=-1)                 
              
         
@@ -183,7 +153,7 @@ class BLIP_Pretrain(nn.Module):
             image_feat_all = torch.cat([image_feat_m.t(),self.image_queue.clone().detach()],dim=1)                   
             
             text_output_m = self.text_encoder_m(input_ids, attention_mask = attention_mask,                      
-                                                return_dict = True)#, mode = 'text')    
+                                                return_dict = True) #, mode = 'text')    
             text_feat_m = F.normalize(self.text_proj_m(text_output_m.last_hidden_state[:,0,:]),dim=-1) 
             text_feat_all = torch.cat([text_feat_m.t(),self.text_queue.clone().detach()],dim=1)
 
@@ -208,7 +178,7 @@ class BLIP_Pretrain(nn.Module):
         
         ###============== Image-text Matching ===================###
         encoder_input_ids = input_ids.clone()
-        #encoder_input_ids[:,0] = self.tokenizer.pad_token_id #enc_token_id
+        encoder_input_ids[:,0] = self.tokenizer.pad_token_id
         
         # forward the positve image-text pair
         bs = images.size(0)
@@ -218,8 +188,7 @@ class BLIP_Pretrain(nn.Module):
                                        encoder_hidden_states = image_embeds,
                                        encoder_attention_mask = image_atts,      
                                        return_dict = True,
-                                      ) 
-                  
+                                      )            
         with torch.no_grad():       
             weights_t2i = F.softmax(sim_t2i[:,:bs],dim=1)+1e-4 
             weights_t2i.fill_diagonal_(0)            
@@ -266,25 +235,24 @@ class BLIP_Pretrain(nn.Module):
         
         ##================= LM ========================##     
         decoder_input_ids = input_ids.clone()      
-        decoder_input_ids[:,0] = self.tokenizer.pad_token_id
+        decoder_input_ids[:,0] = 0 #self.tokenizer.bos_token_id
         #decoder_targets = decoder_input_ids.masked_fill(decoder_input_ids == self.tokenizer.pad_token_id, -100) 
 
         decoder_output = self.text_decoder(decoder_input_ids, 
-                                           #attention_mask = attention_mask, 
+                                           attention_mask = attention_mask, 
                                            encoder_hidden_states = text_output.last_hidden_state, #image_embeds,
-                                           encoder_attention_mask = attention_mask,#image_atts,                  
+                                           encoder_attention_mask = attention_mask,                  
                                            #labels = labels,
                                            return_dict = True, 
-                                        )
-
-                                        #    mode='text'  
-                                        #   )   
-        lm_logits = self.lm_head(decoder_output['last_hidden_state'])
+                                           #mode='multimodal'  
+                                          )   
+        lm_logits = self.lm_head(decoder_output.last_hidden_state)
         loss_fct = CrossEntropyLoss(ignore_index=-100)
-        loss_lm = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1)) #decoder_output.loss                
+        loss_lm = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+        #loss_lm = decoder_output.loss                
         return  loss_lm  # loss_ita, loss_itm, loss_lm
- 
-    def generate_t5(self, images, input_ids, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
+    
+    def generate_t5(self, images, input_ids, attention_mask, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
         vis_out = self.visual_encoder(images)
         image_embeds = vis_out.image_embeds
         seq_len = input_ids.size(1)
@@ -298,46 +266,33 @@ class BLIP_Pretrain(nn.Module):
         
         # prompt = [self.prompt] * image.size(0)
         # input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
-        input_ids[:,0] = self.tokenizer.pad_token_id
-        input_ids = input_ids[:, :-1] 
+        #input_ids[:,0] = self.tokenizer.pad_token_id
+        #input_ids = input_ids[:, :-1] 
         encoder_outputs = self.text_encoder(input_ids)
-
-        
         '''
         input_ids: (2,128)
         encoder_hidden_states: 6,128, 512
         encoder_attention_mask:
         '''
-        # if sample:
-        #     #nucleus sampling
-        #     outputs = self.text_decoder.generate(input_ids=input_ids,
-        #                                           max_length=max_length,
-        #                                           min_length=min_length,
-        #                                           do_sample=True,
-        #                                           top_p=top_p,
-        #                                           num_return_sequences=1,
-        #                                           eos_token_id=self.tokenizer.sep_token_id,
-        #                                           pad_token_id=self.tokenizer.pad_token_id, 
-        #                                           repetition_penalty=1.1,                                         
-        #                                           encoder_outputs = encoder_outputs
-        #                                           )
-        # else:
-        #     #beam search
+        # input_ids[:,0] = self.tokenizer.pad_token_id
+        # decoder_input_ids = input_ids[:, :-1]
         outputs = self.model.generate(decoder_input_ids=input_ids,
+                                attention_mask = attention_mask,
                                 max_length=max_length,
                                 min_length=min_length,
-                                num_beams=num_beams,
-                                #eos_token_id=self.tokenizer.sep_token_id,
+                                #num_beams=num_beams,
+                                encoder_outputs = encoder_outputs,
+                                eos_token_id=self.tokenizer.sep_token_id,
                                 pad_token_id=self.tokenizer.pad_token_id,     
                                 #repetition_penalty=repetition_penalty,
                                 #**model_kwargs
-                                encoder_outputs = encoder_outputs
                                 )            
             
         captions = []    
         for output in outputs:
             caption = self.tokenizer.decode(output, skip_special_tokens=True)    
-            captions.append(caption)
+            captions.append(caption) 
+
         return captions
 
     @torch.no_grad()    
@@ -373,100 +328,6 @@ class BLIP_Pretrain(nn.Module):
         ptr = (ptr + batch_size) % self.queue_size  # move pointer
 
         self.queue_ptr[0] = ptr 
-
-    def prepare_inputs_for_generation(
-        self,
-        images,
-        input_ids,
-        past_key_values=None,
-        attention_mask=None,
-        head_mask=None,
-        decoder_head_mask=None,
-        decoder_attention_mask=None,
-        cross_attn_head_mask=None,
-        use_cache=None,
-        encoder_outputs=None,
-        **kwargs,
-    ):
-        # cut decoder_input_ids if past is used
-        if past_key_values is not None:
-            input_ids = input_ids[:, -1:]
-
-        return {
-            "decoder_input_ids": input_ids,
-            "past_key_values": past_key_values,
-            "encoder_outputs": encoder_outputs,
-            "attention_mask": attention_mask,
-            "head_mask": head_mask,
-            "decoder_head_mask": decoder_head_mask,
-            "decoder_attention_mask": decoder_attention_mask,
-            "cross_attn_head_mask": cross_attn_head_mask,
-            "use_cache": use_cache,
-        }
-
-    def adjust_logits_during_generation(self, logits, **kwargs):
-        return logits
-
-    def _use_cache(self, outputs, use_cache):
-        """During generation, decide whether to pass the `past` variable to the next forward pass."""
-        if len(outputs) <= 1 or use_cache is False:
-            return False
-        if hasattr(self.config, "mem_len") and self.config.mem_len == 0:
-            return False
-        return True
-
-    def enforce_repetition_penalty_(self, lprobs, batch_size, num_beams, prev_output_tokens, repetition_penalty):
-        """repetition penalty (from CTRL paper https://arxiv.org/abs/1909.05858). """
-        for i in range(batch_size * num_beams):
-            for previous_token in set(prev_output_tokens[i].tolist()):
-                # if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
-                if lprobs[i, previous_token] < 0:
-                    lprobs[i, previous_token] *= repetition_penalty
-                else:
-                    lprobs[i, previous_token] /= repetition_penalty
-
-    def postprocess_next_token_scores(
-        self,
-        scores,
-        input_ids,
-        no_repeat_ngram_size,
-        bad_words_ids,
-        cur_len,
-        min_length,
-        max_length,
-        eos_token_id,
-        repetition_penalty,
-        batch_size,
-        num_beams,
-    ):
-        # repetition penalty (from CTRL paper https://arxiv.org/abs/1909.05858)
-        if repetition_penalty != 1.0:
-            self.enforce_repetition_penalty_(
-                scores, batch_size, num_beams, input_ids, repetition_penalty,
-            )
-
-        # set eos token prob to zero if min_length is not reached
-        if eos_token_id is not None and cur_len < min_length:
-            scores[:, eos_token_id] = -float("inf")
-
-        if no_repeat_ngram_size > 0:
-            # calculate a list of banned tokens to prevent repetitively generating the same ngrams
-            num_batch_hypotheses = batch_size * num_beams
-            # from fairseq: https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345
-            banned_batch_tokens = calc_banned_ngram_tokens(
-                input_ids, num_batch_hypotheses, no_repeat_ngram_size, cur_len
-            )
-            for i, banned_tokens in enumerate(banned_batch_tokens):
-                scores[i, banned_tokens] = -float("inf")
-
-        if bad_words_ids is not None:
-            # calculate a list of banned tokens according to bad words
-            banned_tokens = calc_banned_bad_words_ids(input_ids, bad_words_ids)
-
-            for i, banned_tokens in enumerate(banned_tokens):
-                scores[i, banned_tokens] = -float("inf")
-
-        return scores
 
 
 def blip_pretrain(**kwargs):
@@ -557,159 +418,6 @@ def tie_encoder_decoder_weights(encoder: nn.Module, decoder: nn.Module, base_mod
 
             uninitialized_encoder_weights += list(all_encoder_weights)
 
-
-    @staticmethod
-    def _reorder_cache(past: Tuple, beam_idx: Tensor) -> Tuple[Tensor]:
-        return tuple(layer_past.index_select(1, beam_idx) for layer_past in past)
-    
-
     # tie weights recursively
     tie_encoder_to_decoder_recursively(decoder, encoder, base_model_prefix, uninitialized_encoder_weights, skip_key)  
 
-from torch import Tensor
-def calc_banned_ngram_tokens(prev_input_ids: Tensor, num_hypos: int, no_repeat_ngram_size: int, cur_len: int) -> None:
-    """Copied from fairseq for no_repeat_ngram in beam_search"""
-    if cur_len + 1 < no_repeat_ngram_size:
-        # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
-        return [[] for _ in range(num_hypos)]
-    generated_ngrams = [{} for _ in range(num_hypos)]
-    for idx in range(num_hypos):
-        gen_tokens = prev_input_ids[idx].tolist()
-        generated_ngram = generated_ngrams[idx]
-        for ngram in zip(*[gen_tokens[i:] for i in range(no_repeat_ngram_size)]):
-            prev_ngram_tuple = tuple(ngram[:-1])
-            generated_ngram[prev_ngram_tuple] = generated_ngram.get(prev_ngram_tuple, []) + [ngram[-1]]
-
-    def _get_generated_ngrams(hypo_idx):
-        # Before decoding the next token, prevent decoding of ngrams that have already appeared
-        start_idx = cur_len + 1 - no_repeat_ngram_size
-        ngram_idx = tuple(prev_input_ids[hypo_idx, start_idx:cur_len].tolist())
-        return generated_ngrams[hypo_idx].get(ngram_idx, [])
-
-    banned_tokens = [_get_generated_ngrams(hypo_idx) for hypo_idx in range(num_hypos)]
-    return banned_tokens
-
-
-def calc_banned_bad_words_ids(prev_input_ids: Iterable[int], bad_words_ids: Iterable[int]) -> Iterable[int]:
-    banned_tokens = []
-
-    def _tokens_match(prev_tokens, tokens):
-        if len(tokens) == 0:
-            # if bad word tokens is just one token always ban it
-            return True
-        if len(tokens) > len(prev_input_ids):
-            # if bad word tokens are longer then prev input_ids they can't be equal
-            return False
-
-        if prev_tokens[-len(tokens) :] == tokens:
-            # if tokens match
-            return True
-        else:
-            return False
-
-    for prev_input_ids_slice in prev_input_ids:
-        banned_tokens_slice = []
-
-        for banned_token_seq in bad_words_ids:
-            assert len(banned_token_seq) > 0, "Banned words token sequences {} cannot have an empty list".format(
-                bad_words_ids
-            )
-
-            if _tokens_match(prev_input_ids_slice.tolist(), banned_token_seq[:-1]) is False:
-                # if tokens do not match continue
-                continue
-
-            banned_tokens_slice.append(banned_token_seq[-1])
-
-        banned_tokens.append(banned_tokens_slice)
-
-    return banned_tokens
-
-
-def top_k_top_p_filtering(
-    logits: Tensor,
-    top_k: int = 0,
-    top_p: float = 1.0,
-    filter_value: float = -float("Inf"),
-    min_tokens_to_keep: int = 1,
-) -> Tensor:
-    """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
-        Args:
-            logits: logits distribution shape (batch size, vocabulary size)
-            if top_k > 0: keep only top k tokens with highest probability (top-k filtering).
-            if top_p < 1.0: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
-                Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
-            Make sure we keep at least min_tokens_to_keep per batch example in the output
-        From: https://gist.github.com/thomwolf/1a5a29f6962089e871b94cbd09daf317
-    """
-    if top_k > 0:
-        top_k = min(max(top_k, min_tokens_to_keep), logits.size(-1))  # Safety check
-        # Remove all tokens with a probability less than the last token of the top-k
-        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-        logits[indices_to_remove] = filter_value
-
-    if top_p < 1.0:
-        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-        # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
-        sorted_indices_to_remove = cumulative_probs > top_p
-        if min_tokens_to_keep > 1:
-            # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
-            sorted_indices_to_remove[..., :min_tokens_to_keep] = 0
-        # Shift the indices to the right to keep also the first token above the threshold
-        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-        sorted_indices_to_remove[..., 0] = 0
-
-        # scatter sorted tensors to original indexing
-        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-        logits[indices_to_remove] = filter_value
-    return logits
-
-
-class BeamHypotheses(object):
-    def __init__(self, num_beams, max_length, length_penalty, early_stopping):
-        """
-        Initialize n-best list of hypotheses.
-        """
-        self.max_length = max_length - 1  # ignoring bos_token
-        self.length_penalty = length_penalty
-        self.early_stopping = early_stopping
-        self.num_beams = num_beams
-        self.beams = []
-        self.worst_score = 1e9
-
-    def __len__(self):
-        """
-        Number of hypotheses in the list.
-        """
-        return len(self.beams)
-
-    def add(self, hyp, sum_logprobs):
-        """
-        Add a new hypothesis to the list.
-        """
-        score = sum_logprobs / len(hyp) ** self.length_penalty
-        if len(self) < self.num_beams or score > self.worst_score:
-            self.beams.append((score, hyp))
-            if len(self) > self.num_beams:
-                sorted_scores = sorted([(s, idx) for idx, (s, _) in enumerate(self.beams)])
-                del self.beams[sorted_scores[0][1]]
-                self.worst_score = sorted_scores[1][0]
-            else:
-                self.worst_score = min(score, self.worst_score)
-
-    def is_done(self, best_sum_logprobs, cur_len):
-        """
-        If there are enough hypotheses and that none of the hypotheses being generated
-        can become better than the worst one in the heap, then we are done with this sentence.
-        """
-
-        if len(self) < self.num_beams:
-            return False
-        elif self.early_stopping:
-            return True
-        else:
-            cur_score = best_sum_logprobs / cur_len ** self.length_penalty
-            ret = self.worst_score >= cur_score
-            return ret
