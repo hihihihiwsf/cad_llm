@@ -1,10 +1,18 @@
-from .base import FusionGalleryBase
-from .point import FusionGalleryPoint
-from ..deepmind_geometry.base import DeepmindLine
+from preprocess.fusiongallery_geometry.base import FusionGalleryBase
+from preprocess.fusiongallery_geometry.point import FusionGalleryPoint
+from preprocess.deepmind_geometry.line import DeepmindLine
 
 
 class FusionGalleryLine(FusionGalleryBase):
     def __init__(self, ent, point_map):
+        """
+        Intialize a FusionGalleryLine
+
+        Args
+            ent (DeepmindLine): Line
+            point_map (dict): Dictionary where keys are unique hashes and 
+                                values are of type FusionGalleryPoint 
+        """
         super().__init__(ent)
         # Currently we only support intialization from Deepmind data
         assert isinstance(ent, DeepmindLine)

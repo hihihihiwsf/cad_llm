@@ -1,5 +1,6 @@
-from .base import FusionGalleryBase
-# from .arc import FusionGalleryArc
-# from .circle import FusionGalleryCircle
-from .line import FusionGalleryLine
-from .point import FusionGalleryPoint
+from preprocess.fusiongallery_geometry.base import FusionGalleryBase
+from preprocess.fusiongallery_geometry.arc import FusionGalleryArc
+from preprocess.fusiongallery_geometry.circle import FusionGalleryCircle
+from preprocess.fusiongallery_geometry.line import FusionGalleryLine
+from preprocess.fusiongallery_geometry.point import FusionGalleryPoint
+from preprocess.fusiongallery_geometry.point_map import FusionGalleryPointMap

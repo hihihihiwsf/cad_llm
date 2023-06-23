@@ -1,6 +1,6 @@
-from .base import FusionGalleryBase
-from .point import FusionGalleryPoint
-from ..deepmind_geometry.base import DeepmindCircle
+from preprocess.fusiongallery_geometry.base import FusionGalleryBase
+from preprocess.fusiongallery_geometry.point import FusionGalleryPoint
+from preprocess.deepmind_geometry.circle import DeepmindCircle
 
 
 class FusionGalleryCircle(FusionGalleryBase):
@@ -12,7 +12,7 @@ class FusionGalleryCircle(FusionGalleryBase):
         self.center = FusionGalleryPoint.from_xy_map(ent.center[0], ent.center[1], point_map)
         self.r = ent.r
 
-    def to_dict(self, point_map):
+    def to_dict(self):
         """
         Make a Fusion 360 Gallery format dict like this
         {

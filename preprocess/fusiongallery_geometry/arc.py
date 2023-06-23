@@ -1,9 +1,9 @@
 import math
 import numpy as np
 
-from .base import FusionGalleryBase
-from .point import FusionGalleryPoint
-from ..deepmind_geometry.base import DeepmindArc
+from preprocess.fusiongallery_geometry.base import FusionGalleryBase
+from preprocess.fusiongallery_geometry.point import FusionGalleryPoint
+from preprocess.deepmind_geometry.arc import DeepmindArc
 
 
 class FusionGalleryArc(FusionGalleryBase):
@@ -45,12 +45,16 @@ class FusionGalleryArc(FusionGalleryBase):
         arc_dict = self.create_common_entity_fields()
         arc_dict["type"] = "SketchArc"
         arc_dict.update(self.create_ent_points())
+        # Fusion Gallery data uses the assumption that
+        # an arc's direction is always anti-clockwise        
+        cor_start_point = self.start
+        cor_end_point = self.end
         if self.is_clockwise:
-            # Fusion Gallery data uses the assumption that
-            # an arc's direction is always anti-clockwise
             temp = arc_dict["start_point"]
             arc_dict["start_point"] = arc_dict["end_point"]
             arc_dict["end_point"] = temp
+            cor_start_point = self.end
+            cor_end_point = self.start
         arc_dict["center_point"] = self.center.uuid
         arc_dict["radius"] = self.get_radius()
 
@@ -64,11 +68,11 @@ class FusionGalleryArc(FusionGalleryBase):
         }
 
         angle_x_to_dir = FusionGalleryArc.angle_from_vector_to_x(ref_vec)
-        center = self.merged_points[arc_dict["center_point"]]
-        start_point = self.merged_points[arc_dict["start_point"]]
-        end_point = self.merged_points[arc_dict["end_point"]]
-        angle_x_to_start = self.angle_of_two_points_from_x(center, start_point)
-        angle_x_to_end = self.angle_of_two_points_from_x(center, end_point)
+        center = np.array(self.center.point)
+        start_point = np.array(cor_start_point.point)
+        end_point = np.array(cor_end_point.point)
+        angle_x_to_start = FusionGalleryArc.angle_of_two_points_from_x(center, start_point)
+        angle_x_to_end = FusionGalleryArc.angle_of_two_points_from_x(center, end_point)
         start_angle = angle_x_to_start - angle_x_to_dir
         end_angle = angle_x_to_end - angle_x_to_dir
         arc_dict["start_angle"] = start_angle
@@ -81,7 +85,7 @@ class FusionGalleryArc(FusionGalleryBase):
     def get_reference_vector(self):
         """"Get the unitized vector from the center point to the start point"""
         return FusionGalleryArc.get_vector_between_pts(
-            self.center.point, self.start.point
+            np.array(self.center.point), np.array(self.start.point)
         )
 
     @staticmethod
@@ -121,4 +125,13 @@ class FusionGalleryArc(FusionGalleryBase):
                 angle = math.pi + math.asin(-vec[1])
         return angle
 
+    @staticmethod
+    def angle_of_two_points_from_x(pt1, pt2):
+        vec = pt2-pt1
+        length = np.linalg.norm(vec)
+        if length > 1e-8:
+            nvec = vec / length
+        else:
+            nvec = [1, 0]
+        return FusionGalleryArc.angle_from_vector_to_x(nvec)
 

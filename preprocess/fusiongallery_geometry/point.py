@@ -1,5 +1,5 @@
-from .base import FusionGalleryBase
-from ..deepmind_geometry.base import DeepmindPoint
+from preprocess.fusiongallery_geometry.base import FusionGalleryBase
+from preprocess.deepmind_geometry.point import DeepmindPoint
 
 
 class FusionGalleryPoint(FusionGalleryBase):

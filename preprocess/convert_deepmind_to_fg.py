@@ -6,7 +6,7 @@ into the Fusion 360 Gallery dataset format
 """
 
 from deepmind_geometry import DeepmindLine, DeepmindArc, DeepmindCircle, DeepmindPoint
-from fusiongallery_geometry import FusionGalleryPoint
+from fusiongallery_geometry import FusionGalleryPoint, FusionGalleryPointMap
 import numpy as np
 import json
 from pathlib import Path
@@ -71,50 +71,12 @@ def create_sketch_points(dm_entities):
     # Dict of unique points
     # key: string of the form point.x_point.y
     # value: FusionGalleryPoint object
-    point_map = get_point_map(dm_entities)
+    point_map = FusionGalleryPointMap(dm_entities).map
     # Sketch points data structure in the FG format
     point_data = {}
     for key, fg_point in point_map.items():
         point_data[fg_point.uuid] = fg_point.to_dict()
-    return point_data, point_map
-
-
-def get_point_map(dm_entities):
-    """Get a dictionary of unique points used by the sketch entities"""
-    point_dict = {}
-    point_count = 0
-    for dm_ent in dm_entities:
-        points = find_all_geom_points(dm_ent)
-        for point in points:
-            point_count += 1
-            # First make a deepmind point then pass that to our fusion gallery point
-            dm_point = DeepmindPoint(point)
-            fg_point = FusionGalleryPoint(dm_point)
-            if not fg_point.key in point_dict:
-                point_dict[fg_point.key] = fg_point
-    print(f"Created vertex dictionary with {len(point_dict)} of {point_count} total vertices")
-    return point_dict
-
-
-def find_all_geom_points(dm_ent):
-    """Given an OnShape entity, return all of its points"""
-    assert len(dm_ent) == 1, "Expected on entry in the dict"
-    entity_name = get_dm_ent_name(dm_ent)
-    entity_data = dm_ent[entity_name]
-
-    if entity_name == "pointEntity":
-        return [entity_data["point"]]
-    if entity_name == "lineEntity":
-        return [entity_data["start"], entity_data["end"]]
-    if entity_name == "circleArcEntity":
-        if "arcParams" in entity_data:
-            return [
-                entity_data["center"],
-                entity_data["arcParams"]["start"],
-                entity_data["arcParams"]["end"]
-            ]
-        elif "circleParams" in entity_data:
-            return [entity_data["center"]]            
+    return point_data, point_map    
 
 
 def main(args):

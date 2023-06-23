@@ -1,15 +1,15 @@
 import uuid
 
-from ..deepmind_geometry.base import DeepmindBase
+from preprocess.deepmind_geometry import *
 
 class FusionGalleryBase:
     def __init__(self, ent):
         # Currently we only support intialization from Deepmind data
-        if not issubclass(ent, DeepmindBase):
+        if not isinstance(ent, (DeepmindArc, DeepmindCircle, DeepmindLine, DeepmindPoint)):
             raise Exception("Unsupported initialization data, expected Deepmind data")
         
         self.ent = ent
-        self.is_construction = ent.get("isConstruction", False)
+        self.is_construction = ent.is_construction
         self.uuid = str(uuid.uuid1())
 
     def create_common_entity_fields(self):
