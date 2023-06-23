@@ -1,10 +1,10 @@
-import numpy as np
-import json
-from preprocess_utils import get_files, get_output_dir, save_splits
-from preprocessing import preprocess_sketch
 import argparse
-from deduplicate import deduplicate_splits
+import json
+import numpy as np
 from tqdm import tqdm
+from preprocess.preprocess_utils import get_files, get_output_dir, save_splits
+from preprocess.preprocessing import preprocess_sketch
+from preprocess.deduplicate import deduplicate_splits
 
 
 def convert_obj_data_to_strings(obj_data, offset):
