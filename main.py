@@ -63,8 +63,8 @@ def main():
 
     trainer = pl.Trainer(
         callbacks=call_backs,
-        accelerator=args.accelerator,
-        devices=args.devices,
+        accelerator="cput", #args.accelerator,
+        #devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),
         logger=loggers,
         max_epochs=args.epochs,
