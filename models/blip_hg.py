@@ -283,14 +283,12 @@ class BLIP_Pretrain(nn.Module):
         # input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
         #input_ids[:,0] = self.tokenizer.pad_token_id
         #input_ids = input_ids[:, :-1] 
-        encoder_outputs = self.text_encoder(input_ids)
+        #encoder_outputs = self.text_encoder(input_ids)
         '''
         input_ids: (2,128)
         encoder_hidden_states: 6,128, 512
         encoder_attention_mask:
         '''
-        # input_ids[:,0] = self.tokenizer.pad_token_id
-        # decoder_input_ids = input_ids[:, :-1]
         # outputs = self.model.generate(decoder_input_ids=input_ids,
         #                         attention_mask = attention_mask,
         #                         max_length=max_length,
