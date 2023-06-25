@@ -12,6 +12,13 @@ from transformers import BertTokenizer, AutoTokenizer
 from transformers import CLIPVisionModelWithProjection, T5ForConditionalGeneration
 import transformers
 
+from transformers.modeling_outputs import (
+    BaseModelOutput,
+    BaseModelOutputWithPastAndCrossAttentions,
+    Seq2SeqLMOutput,
+    Seq2SeqModelOutput,
+)
+
 from transformers.utils import (
     DUMMY_INPUTS,
     DUMMY_MASK,
@@ -273,6 +280,7 @@ class BLIP_Pretrain(nn.Module):
         image_embeds = vis_out.image_embeds
         seq_len = input_ids.size(1)
         image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
+
         
         # if not sample:
         #     image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
@@ -285,6 +293,12 @@ class BLIP_Pretrain(nn.Module):
         #input_ids[:,0] = self.tokenizer.pad_token_id
         #input_ids = input_ids[:, :-1] 
         encoder_outputs = self.text_encoder(input_ids)
+        
+        encoder_outputs = BaseModelOutput(
+                last_hidden_state=image_embeds,
+                hidden_states= None,
+                attentions=None,
+            )
         '''
         input_ids: (2,128)
         encoder_hidden_states: 6,128, 512
@@ -302,7 +316,7 @@ class BLIP_Pretrain(nn.Module):
         #                         #**model_kwargs
         #                         )    
         
-        outputs2 = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, encoder_outputs = encoder_outputs,max_length = max_length)        
+        outputs2 = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, encoder_outputs = encoder_outputs, max_length = max_length)        
         #outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
 
         return outputs2
