@@ -290,21 +290,22 @@ class BLIP_Pretrain(nn.Module):
         encoder_hidden_states: 6,128, 512
         encoder_attention_mask:
         '''
-        outputs = self.model.generate(input_ids=input_ids,
-                                attention_mask = attention_mask,
-                                max_length=max_length,
-                                min_length=min_length,
-                                #num_beams=num_beams,
-                                encoder_outputs = encoder_outputs,
-                                eos_token_id=self.tokenizer.sep_token_id,
-                                pad_token_id=self.tokenizer.pad_token_id,     
-                                #repetition_penalty=repetition_penalty,
-                                #**model_kwargs
-                                )    
-
+        # outputs = self.model.generate(input_ids=input_ids,
+        #                         attention_mask = attention_mask,
+        #                         max_length=max_length,
+        #                         min_length=min_length,
+        #                         #num_beams=num_beams,
+        #                         encoder_outputs = encoder_outputs,
+        #                         eos_token_id=self.tokenizer.sep_token_id,
+        #                         pad_token_id=self.tokenizer.pad_token_id,     
+        #                         #repetition_penalty=repetition_penalty,
+        #                         #**model_kwargs
+        #                         )    
+        
+        outputs2 = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, encoder_outputs = encoder_outputs,max_length = max_length)        
         #outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
 
-        return outputs
+        return outputs2
 
     @torch.no_grad()    
     def copy_params(self):
