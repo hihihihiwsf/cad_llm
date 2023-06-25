@@ -266,7 +266,7 @@ class BLIP_Pretrain(nn.Module):
         loss_fct = CrossEntropyLoss(ignore_index=-100)
         loss_lm = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
         #loss_lm = decoder_output.loss                
-        return  loss_lm  # loss_ita, loss_itm, loss_lm
+        return  loss_lm, loss_lm, loss_lm  # loss_ita, loss_itm, loss_lm
     
     def generate_t5(self, images, input_ids, attention_mask, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
         vis_out = self.visual_encoder(images)
