@@ -284,25 +284,25 @@ class BLIP_Pretrain(nn.Module):
         # input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
         #input_ids[:,0] = self.tokenizer.pad_token_id
         #input_ids = input_ids[:, :-1] 
-        #encoder_outputs = self.text_encoder(input_ids)
+        encoder_outputs = self.text_encoder(input_ids)
         '''
         input_ids: (2,128)
         encoder_hidden_states: 6,128, 512
         encoder_attention_mask:
         '''
-        # outputs = self.model.generate(decoder_input_ids=input_ids,
-        #                         attention_mask = attention_mask,
-        #                         max_length=max_length,
-        #                         min_length=min_length,
-        #                         #num_beams=num_beams,
-        #                         encoder_outputs = encoder_outputs,
-        #                         eos_token_id=self.tokenizer.sep_token_id,
-        #                         pad_token_id=self.tokenizer.pad_token_id,     
-        #                         #repetition_penalty=repetition_penalty,
-        #                         #**model_kwargs
-        #                         )    
+        outputs = self.model.generate(input_ids=input_ids,
+                                attention_mask = attention_mask,
+                                max_length=max_length,
+                                min_length=min_length,
+                                #num_beams=num_beams,
+                                encoder_outputs = encoder_outputs,
+                                eos_token_id=self.tokenizer.sep_token_id,
+                                pad_token_id=self.tokenizer.pad_token_id,     
+                                #repetition_penalty=repetition_penalty,
+                                #**model_kwargs
+                                )    
 
-        outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
+        #outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
 
         return outputs
 

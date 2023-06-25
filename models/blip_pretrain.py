@@ -27,8 +27,8 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
 
-from models.blip_t5 import BLIP_Pretrain
-#from models.blip_hg import BLIP_Pretrain
+#from models.blip_t5 import BLIP_Pretrain
+from models.blip_hg import BLIP_Pretrain
 #from models.blip import BLIP_Pretrain
 
 class BLIP_PretrainModel(pl.LightningModule):
