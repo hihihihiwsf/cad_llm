@@ -86,7 +86,7 @@ class BLIP_Pretrain(nn.Module):
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
         self.model = model
         model_config = self.model.config
-        self.text_encoder = self.model.encoder
+        self.text_encoder = self.model.get_encoder()
         #encoder_config = self.text_encoder.config
         text_width = self.text_encoder.config.hidden_size
         
@@ -131,8 +131,8 @@ class BLIP_Pretrain(nn.Module):
         # self.text_decoder.resize_token_embeddings(len(self.tokenizer)) 
         # tie_encoder_decoder_weights(self.text_encoder,self.text_decoder.bert,'','/attention')
         decoder_config = self.model.decoder.config
-        self.text_decoder = self.model.decoder
-        self.lm_head = self.model.lm_head
+        self.text_decoder = self.model.get_decoder()
+        self.lm_head = self.model.get_output_embeddings()
         
     def forward(self, images, input_ids, attention_mask, labels, alpha):
         # with torch.no_grad():
@@ -256,12 +256,13 @@ class BLIP_Pretrain(nn.Module):
                                            return_dict = True, 
                                            #mode='multimodal'  
                                           )  
+        sequence_output = decoder_output[0]
         if self.model.config.tie_word_embeddings:
             # Rescale output before projecting on vocab
             # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/transformer.py#L586
-            decoder_output = decoder_output * (self.model.config.d_model**-0.5)
+            sequence_output = sequence_output * (self.model_dim**-0.5)
 
-        lm_logits = self.lm_head(decoder_output.last_hidden_state)
+        lm_logits = self.lm_head(sequence_output)
         loss_fct = CrossEntropyLoss(ignore_index=-100)
         loss_lm = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
         #loss_lm = decoder_output.loss                
@@ -302,10 +303,8 @@ class BLIP_Pretrain(nn.Module):
         #                         )    
 
         outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
-        captions = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
-
-        return captions
+        return outputs
 
     @torch.no_grad()    
     def copy_params(self):
