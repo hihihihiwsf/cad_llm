@@ -1,8 +1,9 @@
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import random
 import json
+import random
 from pathlib import Path
+
+import numpy as np
+from torch.utils.data import Dataset, DataLoader
 
 
 class SketchGraphsDataset(Dataset):

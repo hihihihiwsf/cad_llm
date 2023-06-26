@@ -9,7 +9,7 @@ class Circle(Curve):
         super(Circle, self).__init__(points)
         self.find_circle_geometry()
 
-    def draw(self, ax, draw_points=True, linewidth=1, color="blue"):
+    def draw(self, ax, draw_points=True, linewidth=1, color="red"):
         assert self.good, "The curve is not in the good state"
         ap = patches.Circle(self.center, self.radius, lw=linewidth, fill=None, color=color)
         ax.add_patch(ap)

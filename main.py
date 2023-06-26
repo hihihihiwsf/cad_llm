@@ -16,6 +16,25 @@ from pathlib import Path
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
+from models.segformer import SegformerModel
+from dataset.vertex_grid_dataset import get_vertex_grid_dataset
+
+
+def get_model(args):
+    if "segformer" in args.model_name:
+        return SegformerModel()
+
+    return ByT5Model(args=args)
+
+
+def get_dataloader(args, split, shuffle, model):
+    if "segformer" in args.model_name:
+        datasets = get_vertex_grid_dataset(path=args.dataset)
+        train_dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
+                                      num_workers=args.num_workers)
+        return train_dataloader
+
+    return get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split=split, shuffle=shuffle)
 
 
 def main():
@@ -41,13 +60,14 @@ def main():
     pl.seed_everything(args.seed)
 
     print("Loading model...")
-    model = ByT5Model(args=args)
+
+    model = get_model(args)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False)
+    train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
+    val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
 
-    model.set_total_train_steps(num_train_batches=len(train_dataloader))
+    # model.set_total_train_steps(num_train_batches=len(train_dataloader))
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
