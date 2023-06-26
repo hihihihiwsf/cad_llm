@@ -29,7 +29,7 @@ from PIL import Image
 
 #from models.blip_t5 import BLIP_Pretrain
 from models.blip_hg import BLIP_Pretrain
-#from models.blip_t5 import BLIP_Pretrain
+
 
 class BLIP_PretrainModel(pl.LightningModule):
     def __init__(self, args):

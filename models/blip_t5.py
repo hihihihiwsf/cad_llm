@@ -12,7 +12,12 @@ from models.mt5 import T5ForConditionalGeneration
 from transformers import BertTokenizer, AutoTokenizer
 from transformers import CLIPVisionModelWithProjection#, T5ForConditionalGeneration
 import transformers
-
+from transformers.modeling_outputs import (
+    BaseModelOutput,
+    BaseModelOutputWithPastAndCrossAttentions,
+    Seq2SeqLMOutput,
+    Seq2SeqModelOutput,
+)
 from transformers.utils import (
     DUMMY_INPUTS,
     DUMMY_MASK,
@@ -278,13 +283,13 @@ class BLIP_Pretrain(nn.Module):
         image_embeds = self.vision_proj(image_embeds)
         image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
 
-        encoder_output = torch.unsqueeze(image_embeds, 0)
+        #encoder_output = torch.unsqueeze(image_embeds, 0)
+        encoder_output = BaseModelOutput(last_hidden_state=image_embeds)
         # if not sample:
         #     image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
             
         image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(input_ids.device)
         #model_kwargs = {"encoder_hidden_states": image_embeds, "encoder_attention_mask":image_atts}
-        model_kwargs = {"encoder_outputs": encoder_output}
 
         # prompt = [self.prompt] * image.size(0)
         # input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
@@ -296,19 +301,19 @@ class BLIP_Pretrain(nn.Module):
         encoder_hidden_states: 6,128, 512
         encoder_attention_mask:
         '''
-        outputs = self.model.generate(input_ids=input_ids,
-                                attention_mask = attention_mask,
-                                max_length=max_length,
-                                min_length=min_length,
-                                #num_beams=num_beams,
-                                encoder_outputs = encoder_output,
-                                #encoder_attention_mask = image_atts,
-                                eos_token_id=self.tokenizer.sep_token_id,
-                                pad_token_id=self.tokenizer.pad_token_id,     
-                                #repetition_penalty=repetition_penalty,
-                                )    
+        # outputs = self.model.generate(input_ids=input_ids,
+        #                         attention_mask = attention_mask,
+        #                         max_length=max_length,
+        #                         min_length=min_length,
+        #                         #num_beams=num_beams,
+        #                         encoder_outputs = encoder_output,
+        #                         #encoder_attention_mask = image_atts,
+        #                         eos_token_id=self.tokenizer.sep_token_id,
+        #                         pad_token_id=self.tokenizer.pad_token_id,     
+        #                         #repetition_penalty=repetition_penalty,
+        #                         )    
 
-        # outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
+        outputs = self.model.generate(encoder_outputs=encoder_output, attention_mask = attention_mask, max_length = max_length)        
 
         return outputs
 
