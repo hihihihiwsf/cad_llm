@@ -276,12 +276,11 @@ class BLIP_Pretrain(nn.Module):
         return  loss_lm, loss_lm, loss_lm  # loss_ita, loss_itm, loss_lm
     
     def generate_t5(self, images, input_ids, attention_mask, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
-        vis_out = self.visual_encoder(images)
-        image_embeds = vis_out.image_embeds
-        seq_len = input_ids.size(1)
-        image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
-
-        
+        # vis_out = self.visual_encoder(images)
+        # image_embeds = vis_out.image_embeds
+        # seq_len = input_ids.size(1)
+        # image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
+        #     
         # if not sample:
         #     image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
             
@@ -294,11 +293,11 @@ class BLIP_Pretrain(nn.Module):
         #input_ids = input_ids[:, :-1] 
         encoder_outputs = self.text_encoder(input_ids)
         
-        encoder_outputs = BaseModelOutput(
-                last_hidden_state=image_embeds,
-                hidden_states= None,
-                attentions=None,
-            )
+        # encoder_outputs = BaseModelOutput(
+        #         last_hidden_state=image_embeds,
+        #         hidden_states= None,
+        #         attentions=None,
+        #     )
         '''
         input_ids: (2,128)
         encoder_hidden_states: 6,128, 512
