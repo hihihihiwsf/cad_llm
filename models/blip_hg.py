@@ -315,7 +315,7 @@ class BLIP_Pretrain(nn.Module):
         #                         #**model_kwargs
         #                         )    
         
-        outputs2 = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, encoder_outputs = encoder_outputs, max_length = max_length)        
+        outputs2 = self.model.generate(attention_mask = attention_mask, encoder_outputs = encoder_outputs, max_length = max_length)        
         #outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
 
         return outputs2
