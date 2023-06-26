@@ -31,6 +31,9 @@ class SegformerModel(pl.LightningModule):
 
         self.weighted_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor([0.5, 256.]))
 
+    def set_total_train_steps(self, num_train_batches):
+        pass
+
     def forward(self, pixel_values, labels):
         unused_loss, logits = self.model(pixel_values=pixel_values, labels=labels)
 

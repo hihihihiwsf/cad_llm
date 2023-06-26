@@ -67,7 +67,7 @@ def main():
     train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
     val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
 
-    # model.set_total_train_steps(num_train_batches=len(train_dataloader))
+    model.set_total_train_steps(num_train_batches=len(train_dataloader))
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
