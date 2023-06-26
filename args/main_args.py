@@ -32,7 +32,7 @@ def get_parser():
     parser.add_argument("--seed", type=int, default=0, help="Random seed to use")
     parser.add_argument("--limit_data", type=float, default=1.0, help="Percentage of data to train on")
     # parser.add_argument("--val_every_n_epoch", type=int, default=1, help="Check validation after n training epochs")
-    parser.add_argument("--val_check_interval", type=float, default=1., help="Check validation after n training steps")
+    parser.add_argument("--val_check_interval", type=float, default=1., help="Check validation after fraction of epoch")
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")
     parser.add_argument("--cosinedecay", type=int, default=1, help="Apply Cosine Learning rate decay if true")
 
