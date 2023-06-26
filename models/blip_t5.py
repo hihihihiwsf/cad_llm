@@ -6,10 +6,11 @@
  * By Junnan Li
 '''
 from models.med import BertConfig, BertModel, BertLMHeadModel
+from models.mt5 import T5ForConditionalGeneration
 
 #from transformers import BertLMHeadModel
 from transformers import BertTokenizer, AutoTokenizer
-from transformers import CLIPVisionModelWithProjection, T5ForConditionalGeneration
+from transformers import CLIPVisionModelWithProjection#, T5ForConditionalGeneration
 import transformers
 
 from transformers.utils import (
