@@ -7,8 +7,9 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset import get_sketchgraphs_dataloader
+from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
+from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
@@ -45,7 +46,9 @@ def main():
     pl.seed_everything(args.seed)
 
     print("Loading model...")
-    model = ByT5Model(args=args)
+    # model = ByT5Model(args=args)
+    model = VisRecon(args=args)
+    model.tokenizer = None
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
@@ -69,7 +72,7 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
-        precision='16',
+        # precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
         limit_train_batches=0.01,
         limit_val_batches=0.1,

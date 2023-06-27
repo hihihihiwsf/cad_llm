@@ -8,7 +8,7 @@ from geometry.visualization import visualize_batch, visualize_sample
 # import clip
 import torch 
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
-
+import multiprocessing as mp
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
@@ -80,25 +80,22 @@ class SketchGraphsCollator:
         self.max_length = max_length
         self.args = args
         # _, self.clip_preprocess = clip.load("ViT-B/32")
-        self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
+        # self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
     def tokenize(self, strings):
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
-        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
-        output_strings = [sketch['output_text'] for sketch in sketch_dicts]
-        tokenized_input = self.tokenize(input_strings)
-        tokenized_output = self.tokenize(output_strings)
-
-        labels = tokenized_output.input_ids
-        # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
-        labels[labels == self.tokenizer.pad_token_id] = -100
 
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
         input_curves = [get_curves(point_input) for point_input in point_inputs]
+        
+        # proc = mp.Process(target=visualize_sample(input_curves=input_curves, box_lim=64 + 3))
         list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        # proc.daemon=True
+        # proc.start()
+        # proc.join()
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
@@ -111,9 +108,6 @@ class SketchGraphsCollator:
 
 
         batch = {
-            "input_ids": tokenized_input.input_ids,
-            "attention_mask": tokenized_input.attention_mask,
-            "labels": labels,
             "sketches": sketch_dicts,
             "images": batch_images,
         }

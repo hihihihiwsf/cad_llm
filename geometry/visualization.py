@@ -1,5 +1,11 @@
-import matplotlib.pyplot as plt
 from PIL import Image
+import os
+import matplotlib
+# matplotlib.use('agg')
+import matplotlib.pyplot as plt
+import gc
+import requests
+
 
 def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
     batch_size = len(input_curves)
@@ -32,9 +38,10 @@ def visualize_sample(input_curves, box_lim):
     dpi = 100
     figure_size_inches = ( 224 / dpi, 224 / dpi)
     out = []
+    url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     for in_curve in input_curves:
 
-
+        # import matplotlib.pyplot as plt
         fig, ax = plt.subplots()
         fig.set_dpi(dpi)
         fig.set_size_inches(figure_size_inches)
@@ -45,10 +52,22 @@ def visualize_sample(input_curves, box_lim):
 
         fig.canvas.draw()
         img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-
+        # plt.pause(3.)
         plt.close()
+        # plt.cla()
+        # plt.clf()
+        # plt.close('all')
+        # plt.close(fig)
+        # gc.collect()
+        
+        del fig, ax
         out.append(img)
 
+        # image = Image.open(requests.get(url, stream=True).raw)
+        # out.append(image)
+
+    # gc.collect()
+        
     return out
 
 
@@ -62,5 +81,5 @@ def draw_curves(curves, ax, box_lim, color, draw_points=False):
 
     for curve in curves:
         if curve and curve.good:
-            curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
+                curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
             
