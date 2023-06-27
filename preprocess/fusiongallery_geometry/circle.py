@@ -5,6 +5,14 @@ from preprocess.deepmind_geometry.circle import DeepmindCircle
 
 class FusionGalleryCircle(FusionGalleryBase):
     def __init__(self, ent, point_map):
+        """
+        Intialize a FusionGalleryCircle
+
+        Args
+            ent (DeepmindCircle): Circle
+            point_map (dict): Dictionary where keys are unique hashes and 
+                                values are of type FusionGalleryPoint 
+        """
         super().__init__(ent)
         # Currently we only support intialization from Deepmind data
         assert isinstance(ent, DeepmindCircle)

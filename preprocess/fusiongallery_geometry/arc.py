@@ -8,6 +8,14 @@ from preprocess.deepmind_geometry.arc import DeepmindArc
 
 class FusionGalleryArc(FusionGalleryBase):
     def __init__(self, ent, point_map):
+        """
+        Intialize a FusionGalleryArc
+
+        Args
+            ent (DeepmindArc): Arc
+            point_map (dict): Dictionary where keys are unique hashes and 
+                                values are of type FusionGalleryPoint 
+        """        
         super().__init__(ent)
         # Currently we only support intialization from Deepmind data
         assert isinstance(ent, DeepmindArc)

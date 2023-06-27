@@ -4,3 +4,4 @@ from preprocess.fusiongallery_geometry.circle import FusionGalleryCircle
 from preprocess.fusiongallery_geometry.line import FusionGalleryLine
 from preprocess.fusiongallery_geometry.point import FusionGalleryPoint
 from preprocess.fusiongallery_geometry.point_map import FusionGalleryPointMap
+from preprocess.fusiongallery_geometry.constraint import FusionGalleryConstraint
