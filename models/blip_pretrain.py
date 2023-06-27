@@ -28,9 +28,8 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from PIL import Image
 
 #from models.blip_t5 import BLIP_Pretrain
-#from models.blip_hg import BLIP_Pretrain
 from models.blip_hgt5 import BLIP_Pretrain
-
+#from models.blip import BLIP_Pretrain
 
 class BLIP_PretrainModel(pl.LightningModule):
     def __init__(self, args):
@@ -78,8 +77,8 @@ class BLIP_PretrainModel(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
         alpha = self.alpha # *min(1,(epoch*len(data_loader)+i)/(2*len(data_loader))) 
-        loss_lm = self.model(**model_batch, alpha=alpha) # loss_ita, loss_itm, 
-        loss = loss_lm #outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        loss = self.model(**model_batch, alpha=alpha) # loss_ita, loss_itm, 
+        # loss = loss_ita + loss_itm + loss_lm #outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
@@ -89,8 +88,8 @@ class BLIP_PretrainModel(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         alpha = self.alpha
 
-        loss_lm = self.model(**model_batch, alpha= alpha)
-        loss = loss_lm
+        loss = self.model(**model_batch, alpha= alpha)
+        #loss = loss_ita + loss_itm + loss_lm
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
@@ -136,11 +135,11 @@ class BLIP_PretrainModel(pl.LightningModule):
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate_t5
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], images = batch['images'], 
+        batch["string_samples"] = generate_func(input_ids=batch["input_ids"], images = batch['images'], 
                                          max_length=self.args.max_length, attention_mask=batch["attention_mask"]
                                          )
 
-        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+        #batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
 
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]

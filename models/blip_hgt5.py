@@ -305,7 +305,7 @@ class BLIP_Pretrain(nn.Module):
         captions = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 
-        return outputs
+        return captions
 
     @torch.no_grad()    
     def copy_params(self):
