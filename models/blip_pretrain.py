@@ -27,7 +27,7 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
 
-from models.blip import BLIP_Pretrain
+from models.blip_hgt5 import BLIP_Pretrain
 
 
 class BLIP_PretrainModel(pl.LightningModule):
@@ -132,7 +132,7 @@ class BLIP_PretrainModel(pl.LightningModule):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         batch["string_samples"] = generate_func(input_ids=batch["input_ids"], images = batch['images'], 
-                                         max_length=self.args.max_length, #attention_mask=batch["attention_mask"]
+                                         max_length=self.args.max_length, attention_mask=batch["attention_mask"]
                                          )
 
         #batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
