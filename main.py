@@ -8,7 +8,7 @@ try:
 except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader
-# from models.codet5 import CodeT5Model
+from models.codet5 import CodeT5Model
 # from models.byt5 import ByT5Model
 from models.blip_pretrain import BLIP_PretrainModel
 
@@ -44,7 +44,8 @@ def main():
     pl.seed_everything(args.seed)
 
     print("Loading model...")
-    model = BLIP_PretrainModel(args=args)
+    #model = BLIP_PretrainModel(args=args)
+    model = CodeT5Model(args=args)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True, drop_last=False)
