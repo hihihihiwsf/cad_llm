@@ -70,24 +70,7 @@ class BLIP_Pretrain(nn.Module):
         
         clipmodel = args.clipmodel #"facebook/dino-vitb16"
         self.visual_encoder, vision_width = create_vit(clipmodel)
-        
-        # if vit=='base':
-        #     checkpoint = torch.hub.load_state_dict_from_url(
-        #         url="https://dl.fbaipublicfiles.com/deit/deit_base_patch16_224-b5f2ef4d.pth",
-        #         map_location="cpu", check_hash=True)
-        #     state_dict = checkpoint["model"]     
-        #     msg = self.visual_encoder.load_state_dict(state_dict,strict=False)
-        # elif vit=='large':
-        #     from timm.models.helpers import load_custom_pretrained
-        #     from timm.models.vision_transformer import default_cfgs
-        #     load_custom_pretrained(self.visual_encoder,default_cfgs['vit_large_patch16_224_in21k'])        
-               
-        
-        # self.tokenizer = init_tokenizer()
-        # encoder_config = BertConfig.from_json_file(med_config)
-        # encoder_config.encoder_width = vision_width
-        # self.text_encoder = BertModel.from_pretrained('bert-base-uncased',config=encoder_config, add_pooling_layer=False)
-        # self.text_encoder.resize_token_embeddings(len(self.tokenizer)) 
+ 
 
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
@@ -142,111 +125,111 @@ class BLIP_Pretrain(nn.Module):
         self.lm_head = self.model.get_output_embeddings()
         
     def forward(self, images, input_ids, attention_mask, labels, alpha):
-        # with torch.no_grad():
-        #     self.temp.clamp_(0.001,0.5)
+        with torch.no_grad():
+            self.temp.clamp_(0.001,0.5)
         
-        # image_embeds = self.visual_encoder(images).image_embeds #image_embeds.shape = [2,512]
+        image_embeds = self.visual_encoder(images).image_embeds #image_embeds.shape = [2,512]
         
-        # seq_len = input_ids.size(1)
-        # image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
+        seq_len = input_ids.size(1)
+        image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
         
-        # image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(images.device)    
-        # image_feat = F.normalize(self.vision_proj(image_embeds[:,0,:]),dim=-1)          
+        image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(images.device)    
+        image_feat = F.normalize(self.vision_proj(image_embeds[:,0,:]),dim=-1)          
         
-        # # text = self.tokenizer(caption, padding='max_length', truncation=True, max_length=30, 
-        # #                       return_tensors="pt").to(image.device)  
-        # text_output = self.text_encoder(input_ids, attention_mask = attention_mask,                      
-        #                                 return_dict = True)            
-        # text_feat = F.normalize(self.text_proj(text_output.last_hidden_state[:,0,:]),dim=-1)                 
+        # text = self.tokenizer(caption, padding='max_length', truncation=True, max_length=30, 
+        #                       return_tensors="pt").to(image.device)  
+        text_output = self.text_encoder(input_ids, attention_mask = attention_mask,                      
+                                        return_dict = True)            
+        text_feat = F.normalize(self.text_proj(text_output.last_hidden_state[:,0,:]),dim=-1)                 
              
         
-        # # get momentum features
-        # with torch.no_grad():
-        #     self._momentum_update()
-        #     image_embeds_m = self.visual_encoder_m(images).image_embeds
-        #     image_feat_m = F.normalize(self.vision_proj_m(image_embeds_m),dim=-1)  
-        #     image_feat_all = torch.cat([image_feat_m.t(),self.image_queue.clone().detach()],dim=1)                   
+        # get momentum features
+        with torch.no_grad():
+            self._momentum_update()
+            image_embeds_m = self.visual_encoder_m(images).image_embeds
+            image_feat_m = F.normalize(self.vision_proj_m(image_embeds_m),dim=-1)  
+            image_feat_all = torch.cat([image_feat_m.t(),self.image_queue.clone().detach()],dim=1)                   
             
-        #     text_output_m = self.text_encoder_m(input_ids, attention_mask = attention_mask,                      
-        #                                         return_dict = True) #, mode = 'text')    
-        #     text_feat_m = F.normalize(self.text_proj_m(text_output_m.last_hidden_state[:,0,:]),dim=-1) 
-        #     text_feat_all = torch.cat([text_feat_m.t(),self.text_queue.clone().detach()],dim=1)
+            text_output_m = self.text_encoder_m(input_ids, attention_mask = attention_mask,                      
+                                                return_dict = True) #, mode = 'text')    
+            text_feat_m = F.normalize(self.text_proj_m(text_output_m.last_hidden_state[:,0,:]),dim=-1) 
+            text_feat_all = torch.cat([text_feat_m.t(),self.text_queue.clone().detach()],dim=1)
 
-        #     sim_i2t_m = image_feat_m @ text_feat_all / self.temp  
-        #     sim_t2i_m = text_feat_m @ image_feat_all / self.temp 
+            sim_i2t_m = image_feat_m @ text_feat_all / self.temp  
+            sim_t2i_m = text_feat_m @ image_feat_all / self.temp 
 
-        #     sim_targets = torch.zeros(sim_i2t_m.size()).to(input_ids.device)
-        #     sim_targets.fill_diagonal_(1)          
+            sim_targets = torch.zeros(sim_i2t_m.size()).to(input_ids.device)
+            sim_targets.fill_diagonal_(1)          
 
-        #     sim_i2t_targets = alpha * F.softmax(sim_i2t_m, dim=1) + (1 - alpha) * sim_targets
-        #     sim_t2i_targets = alpha * F.softmax(sim_t2i_m, dim=1) + (1 - alpha) * sim_targets        
+            sim_i2t_targets = alpha * F.softmax(sim_i2t_m, dim=1) + (1 - alpha) * sim_targets
+            sim_t2i_targets = alpha * F.softmax(sim_t2i_m, dim=1) + (1 - alpha) * sim_targets        
 
-        # sim_i2t = image_feat @ text_feat_all / self.temp
-        # sim_t2i = text_feat @ image_feat_all / self.temp
+        sim_i2t = image_feat @ text_feat_all / self.temp
+        sim_t2i = text_feat @ image_feat_all / self.temp
                              
-        # loss_i2t = -torch.sum(F.log_softmax(sim_i2t, dim=1)*sim_i2t_targets,dim=1).mean()
-        # loss_t2i = -torch.sum(F.log_softmax(sim_t2i, dim=1)*sim_t2i_targets,dim=1).mean() 
+        loss_i2t = -torch.sum(F.log_softmax(sim_i2t, dim=1)*sim_i2t_targets,dim=1).mean()
+        loss_t2i = -torch.sum(F.log_softmax(sim_t2i, dim=1)*sim_t2i_targets,dim=1).mean() 
 
-        # loss_ita = (loss_i2t+loss_t2i)/2
+        loss_ita = (loss_i2t+loss_t2i)/2
 
-        # self._dequeue_and_enqueue(image_feat_m, text_feat_m)        
+        self._dequeue_and_enqueue(image_feat_m, text_feat_m)        
         
-        # ###============== Image-text Matching ===================###
-        # encoder_input_ids = input_ids.clone()
-        # encoder_input_ids[:,0] = self.tokenizer.pad_token_id
+        ###============== Image-text Matching ===================###
+        encoder_input_ids = input_ids.clone()
+        encoder_input_ids[:,0] = self.tokenizer.pad_token_id
         
-        # # forward the positve image-text pair
-        # bs = images.size(0)
+        # forward the positve image-text pair
+        bs = images.size(0)
 
-        # output_pos = self.text_encoder(input_ids=encoder_input_ids,
-        #                                attention_mask = attention_mask,
-        #                                encoder_hidden_states = image_embeds,
-        #                                encoder_attention_mask = image_atts,      
-        #                                return_dict = True,
-        #                               )            
-        # with torch.no_grad():       
-        #     weights_t2i = F.softmax(sim_t2i[:,:bs],dim=1)+1e-4 
-        #     weights_t2i.fill_diagonal_(0)            
-        #     weights_i2t = F.softmax(sim_i2t[:,:bs],dim=1)+1e-4  
-        #     weights_i2t.fill_diagonal_(0)   
+        output_pos = self.text_encoder(input_ids=encoder_input_ids,
+                                       attention_mask = attention_mask,
+                                       encoder_hidden_states = image_embeds,
+                                       encoder_attention_mask = image_atts,      
+                                       return_dict = True,
+                                      )            
+        with torch.no_grad():       
+            weights_t2i = F.softmax(sim_t2i[:,:bs],dim=1)+1e-4 
+            weights_t2i.fill_diagonal_(0)            
+            weights_i2t = F.softmax(sim_i2t[:,:bs],dim=1)+1e-4  
+            weights_i2t.fill_diagonal_(0)   
             
-        # # select a negative image for each text
-        # image_embeds_neg = []    
-        # for b in range(bs):
-        #     neg_idx = torch.multinomial(weights_t2i[b], 1).item()
-        #     image_embeds_neg.append(image_embeds[neg_idx])
-        # image_embeds_neg = torch.stack(image_embeds_neg,dim=0)   
+        # select a negative image for each text
+        image_embeds_neg = []    
+        for b in range(bs):
+            neg_idx = torch.multinomial(weights_t2i[b], 1).item()
+            image_embeds_neg.append(image_embeds[neg_idx])
+        image_embeds_neg = torch.stack(image_embeds_neg,dim=0)   
 
-        # # select a negative text for each image
-        # text_ids_neg = []
-        # text_atts_neg = []
-        # for b in range(bs):
-        #     neg_idx = torch.multinomial(weights_i2t[b], 1).item()
-        #     text_ids_neg.append(encoder_input_ids[neg_idx])
-        #     text_atts_neg.append(attention_mask[neg_idx])
+        # select a negative text for each image
+        text_ids_neg = []
+        text_atts_neg = []
+        for b in range(bs):
+            neg_idx = torch.multinomial(weights_i2t[b], 1).item()
+            text_ids_neg.append(encoder_input_ids[neg_idx])
+            text_atts_neg.append(attention_mask[neg_idx])
 
-        # text_ids_neg = torch.stack(text_ids_neg,dim=0)   
-        # text_atts_neg = torch.stack(text_atts_neg,dim=0)      
+        text_ids_neg = torch.stack(text_ids_neg,dim=0)   
+        text_atts_neg = torch.stack(text_atts_neg,dim=0)      
 
-        # text_ids_all = torch.cat([encoder_input_ids, text_ids_neg],dim=0)     
-        # text_atts_all = torch.cat([attention_mask, text_atts_neg],dim=0)     
+        text_ids_all = torch.cat([encoder_input_ids, text_ids_neg],dim=0)     
+        text_atts_all = torch.cat([attention_mask, text_atts_neg],dim=0)     
 
-        # image_embeds_all = torch.cat([image_embeds_neg,image_embeds],dim=0)
-        # image_atts_all = torch.cat([image_atts,image_atts],dim=0)
+        image_embeds_all = torch.cat([image_embeds_neg,image_embeds],dim=0)
+        image_atts_all = torch.cat([image_atts,image_atts],dim=0)
 
-        # output_neg = self.text_encoder(text_ids_all,
-        #                                attention_mask = text_atts_all,
-        #                                encoder_hidden_states = image_embeds_all,
-        #                                encoder_attention_mask = image_atts_all,      
-        #                                return_dict = True,
-        #                               )                            
+        output_neg = self.text_encoder(text_ids_all,
+                                       attention_mask = text_atts_all,
+                                       encoder_hidden_states = image_embeds_all,
+                                       encoder_attention_mask = image_atts_all,      
+                                       return_dict = True,
+                                      )                            
 
-        # vl_embeddings = torch.cat([output_pos.last_hidden_state[:,0,:], output_neg.last_hidden_state[:,0,:]],dim=0)
-        # vl_output = self.itm_head(vl_embeddings)            
+        vl_embeddings = torch.cat([output_pos.last_hidden_state[:,0,:], output_neg.last_hidden_state[:,0,:]],dim=0)
+        vl_output = self.itm_head(vl_embeddings)            
 
-        # itm_labels = torch.cat([torch.ones(bs,dtype=torch.long),torch.zeros(2*bs,dtype=torch.long)],
-        #                        dim=0).to(images.device)
-        # loss_itm = F.cross_entropy(vl_output, itm_labels)  
+        itm_labels = torch.cat([torch.ones(bs,dtype=torch.long),torch.zeros(2*bs,dtype=torch.long)],
+                               dim=0).to(images.device)
+        loss_itm = F.cross_entropy(vl_output, itm_labels)  
         
         ##================= LM ========================## 
         encoder_output = self.text_encoder(input_ids=input_ids, attention_mask=attention_mask)    
@@ -273,31 +256,32 @@ class BLIP_Pretrain(nn.Module):
         loss_fct = CrossEntropyLoss(ignore_index=-100)
         loss_lm = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
         #loss_lm = decoder_output.loss                
-        return  loss_lm, loss_lm, loss_lm  # loss_ita, loss_itm, loss_lm
+        return loss_ita, loss_itm, loss_lm
     
     def generate_t5(self, images, input_ids, attention_mask, sample=False, num_beams=3, max_length=100, min_length=20, top_p=0.9, repetition_penalty=1.0):
-        # vis_out = self.visual_encoder(images)
-        # image_embeds = vis_out.image_embeds
-        # seq_len = input_ids.size(1)
-        # image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
-        #     
+        vis_out = self.visual_encoder(images)
+        image_embeds = vis_out.image_embeds
+        seq_len = input_ids.size(1)
+        image_embeds = torch.unsqueeze(image_embeds, 1).repeat(1,seq_len,1)
+            
         # if not sample:
         #     image_embeds = image_embeds.repeat_interleave(num_beams,dim=0)
             
         #image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(input_ids.device)
         #model_kwargs = {"encoder_hidden_states": image_embeds, "encoder_attention_mask":image_atts}
+        encoder_outputs = BaseModelOutput(
+                last_hidden_state=image_embeds,
+                hidden_states= None,
+                attentions=None,
+            )
         
         # prompt = [self.prompt] * image.size(0)
         # input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(image.device) 
         #input_ids[:,0] = self.tokenizer.pad_token_id
         #input_ids = input_ids[:, :-1] 
-        encoder_outputs = self.text_encoder(input_ids=input_ids, attention_mask = attention_mask)
+        #encoder_outputs = self.text_encoder(input_ids=input_ids, attention_mask = attention_mask)
         
-        # encoder_outputs = BaseModelOutput(
-        #         last_hidden_state=image_embeds,
-        #         hidden_states= None,
-        #         attentions=None,
-        #     )
+
         '''
         input_ids: (2,128)
         encoder_hidden_states: 6,128, 512
@@ -315,7 +299,7 @@ class BLIP_Pretrain(nn.Module):
         #                         #**model_kwargs
         #                         )    
         
-        outputs2 = self.model.generate(input_ids = input_ids, attention_mask = attention_mask,max_length = max_length)        
+        outputs2 = self.model.generate(encoder_outputs=encoder_outputs, attention_mask = attention_mask, max_length = max_length)        
         #outputs = self.model.generate(input_ids=input_ids, attention_mask = attention_mask, max_length = max_length)        
 
         return outputs2
