@@ -32,7 +32,8 @@ class VisRecon(pl.LightningModule):
         self.save_hyperparameters()
 
         self.model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
-
+        # self.model.requires_grad_(False)
+        
         self.args = args
 
         self.lr = self.args.lr

@@ -1,7 +1,7 @@
 from PIL import Image
 import os
 import matplotlib
-# matplotlib.use('agg')
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import gc
 import requests
@@ -39,6 +39,8 @@ def visualize_sample(input_curves, box_lim):
     figure_size_inches = ( 224 / dpi, 224 / dpi)
     out = []
     url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+    
+    
     for in_curve in input_curves:
 
         # import matplotlib.pyplot as plt
@@ -62,12 +64,13 @@ def visualize_sample(input_curves, box_lim):
         
         del fig, ax
         out.append(img)
-
+        
+        # img.close()
         # image = Image.open(requests.get(url, stream=True).raw)
         # out.append(image)
 
     # gc.collect()
-        
+    # del matplotlib, plt
     return out
 
 
