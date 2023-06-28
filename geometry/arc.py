@@ -57,8 +57,9 @@ class Arc(Curve):
 
             return
 
-        center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.uint)
-        radius = (self.radius * cell_size).astype(dtype=np.uint)
+        # Round to integers for plotting with cv2.ellipse
+        center = np.rint(self.shift_point(self.center, cell_size=cell_size)).astype(np.int32)
+        radius = np.rint(self.radius * cell_size).astype(np.int32)
 
         start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
         end_angle = geom_utils.rads_to_degs(self.end_angle_rads)

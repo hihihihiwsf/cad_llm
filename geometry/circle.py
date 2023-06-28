@@ -21,12 +21,12 @@ class Circle(Curve):
     def draw_np(self, np_image, draw_points=True, linewidth=2, color="red", cell_size=4):
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
 
-        shifted_center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.uint)
-        radius = (self.radius * cell_size).astype(dtype=np.uint)
+        shifted_center = np.rint(self.shift_point(self.center, cell_size=cell_size)).astype(dtype=np.int32)
+        radius = np.rint(self.radius * cell_size).astype(dtype=np.uint)
 
         cv2.circle(
             np_image,
-            center=shifted_center.astype(dtype=np.uint),
+            center=shifted_center,
             radius=radius,
             color=CV2_COLORS[color],
             thickness=linewidth,
