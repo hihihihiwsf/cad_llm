@@ -7,7 +7,7 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
+from dataset.sg_datatset_full_image import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
