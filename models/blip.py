@@ -37,7 +37,7 @@ class BLIPModel(pl.LightningModule):
             model = BlipForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name,padding_side="left")
         self.args = args
 
         self.lr = self.args.lr
