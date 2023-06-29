@@ -9,20 +9,22 @@ from models.segformer import SegformerModel
 
 class TestRenderedSketchesDataset(unittest.TestCase):
     def test_get_rendered_sketch_dataset(self):
-        path = "/Users/katzm/data/sg_entities_v5/"
+        path = "mock_entities_data/"
 
         dataset = get_rendered_sketch_dataset(path)
         self.assertEqual(dataset.keys(), {"test", "train", "val"})
 
-        example = dataset['val'][0]
+        example = dataset['val'][1]
 
         np_pixel_values = np.array(example["pixel_values"], dtype=np.uint8) * 255
-        Image.fromarray(np_pixel_values.transpose(1, 2, 0), mode="RGB").show()
+        channel_first_pixel_values = np_pixel_values.transpose(1, 2, 0)
+        rgb_np_pixel_values = channel_first_pixel_values[:, :, ::-1]
+        Image.fromarray(rgb_np_pixel_values, mode="RGB").show()
 
-        np_labels = np.array(example["labels"], dtype=np.uint8) * 255
+        np_labels = np.array(1 - example["labels"], dtype=np.uint8) * 255
         Image.fromarray(np_labels, mode="L").show()
 
-        model = SegformerModel()
+        model = SegformerModel("nvidia/segformer-b0-finetuned-ade-512-512")
 
         batch_size = 2
         batch = dataset['val'][:batch_size]

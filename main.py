@@ -18,18 +18,19 @@ import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
 from models.segformer import SegformerModel
 from dataset.vertex_grid_dataset import get_vertex_grid_dataset
+from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
 
 
 def get_model(args):
     if "segformer" in args.model_name:
-        return SegformerModel()
+        return SegformerModel(model_name=args.model_name)
 
     return ByT5Model(args=args)
 
 
 def get_dataloader(args, split, shuffle, model):
     if "segformer" in args.model_name:
-        datasets = get_vertex_grid_dataset(path=args.dataset)
+        datasets = get_rendered_sketch_dataset(path=args.dataset)
         train_dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
                                       num_workers=args.num_workers)
         return train_dataloader

@@ -8,7 +8,8 @@ from dataset.dataset_utils import get_random_mask
 
 def get_vertex_grid_dataset(path):
     splits = ["val", "train", "test"]
-    data_files = {split: str(Path(path) / f"{split}.json.zip") for split in splits}
+    # Match json and zipped json files
+    data_files = {split: str(Path(path) / f"{split}.json*") for split in splits}
 
     dataset = load_dataset("json", data_files=data_files)
     dataset.set_transform(batch_split_and_render_vertices)

@@ -8,13 +8,13 @@ import torch
 
 class TestVertexGrid(unittest.TestCase):
     def test_get_vertex_grid_dataset(self):
-        path = "/Users/katzm/data/sg_entities_v5/"
+        path = "mock_entities_data/"
 
         dataset = get_vertex_grid_dataset(path)
         self.assertEqual(dataset.keys(), {"test", "train", "val"})
 
-        example = dataset['val'][0]
-        example_v2 = dataset['val'][0]
+        example = dataset['val'][1]
+        example_v2 = dataset['val'][1]
 
         np_pixel_values = np.array(example["pixel_values"], dtype=np.uint8) * 255
         Image.fromarray(np_pixel_values[0, :, :], mode="L").show()

@@ -1,3 +1,14 @@
+"""
+Supports huggingface SegFormer models:
+
+nvidia/segformer-b0-finetuned-ade-512-512 3.7M
+nvidia/segformer-b1-finetuned-ade-512-512 13.7M
+nvidia/segformer-b2-finetuned-ade-512-512 27.3M
+nvidia/segformer-b3-finetuned-ade-512-512 47M
+nvidia/segformer-b4-finetuned-ade-512-512 64M
+
+"""
+
 from transformers import SegformerForSemanticSegmentation, SegformerFeatureExtractor
 import pytorch_lightning as pl
 from datasets import load_metric
@@ -7,16 +18,16 @@ from PIL import Image
 
 class SegformerModel(pl.LightningModule):
 
-    def __init__(self):
+    def __init__(self, model_name):
         super().__init__()
 
-        # self.save_hyperparameters()
+        self.save_hyperparameters()
 
         self.num_classes = 2
         self.metrics_interval = 500
 
         self.model = SegformerForSemanticSegmentation.from_pretrained(
-            "nvidia/segformer-b0-finetuned-ade-512-512",
+            model_name,
             return_dict=False,
             num_labels=self.num_classes,
             ignore_mismatched_sizes=True,
@@ -29,7 +40,9 @@ class SegformerModel(pl.LightningModule):
 
         self.lr = 3e-4
 
-        self.weighted_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor([0.5, 256.]))
+        # Use weights calculated with sklearn compute_class_weight
+        self.weighted_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor([0.5, 6.]))
+        # self.weighted_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor([0.5, 256.]))
 
     def set_total_train_steps(self, num_train_batches):
         pass
@@ -92,7 +105,7 @@ class SegformerModel(pl.LightningModule):
 
         # Log images to comet if comet is enabled
         if batch_idx < 4 and len(self.loggers) == 3:
-            np_image = torch.cat([batch["labels"], predicted], dim=-1).type(torch.uint8).numpy()
+            np_image = torch.cat([batch["labels"], predicted], dim=-1).type(torch.uint8).detach().cpu().numpy()
             np_image = (1 - np_image) * 255
 
             batch_size = predicted.shape[0]

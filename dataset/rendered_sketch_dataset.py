@@ -8,11 +8,12 @@ from datasets import load_dataset
 
 from dataset.dataset_utils import get_random_mask
 from geometry.parse import get_curves
+from geometry.visualization import render_sketch_opencv
 
 
 def get_rendered_sketch_dataset(path):
     splits = ["val", "train", "test"]
-    data_files = {split: str(Path(path) / f"{split}.json.zip") for split in splits}
+    data_files = {split: str(Path(path) / f"{split}.json*") for split in splits}
 
     dataset = load_dataset("json", data_files=data_files)
     dataset.set_transform(batch_split_and_render)
@@ -43,8 +44,8 @@ def batch_split_and_render(batch, input_res=256, output_res=64):
         # batch_output_entities.append(output_entities)
 
         # Render input and output curves
-        rendered_input = render_sketch(input_entities, pixel_size=input_res)
-        rendered_output = render_sketch(output_entities, pixel_size=output_res)
+        rendered_input = render_sketch_opencv(input_entities, size=256, quantize_bins=64).transpose((2, 0, 1))
+        rendered_output = render_sketch_opencv(output_entities, size=64, quantize_bins=64).transpose((2, 0, 1))
 
         # Set pixel_values to scaled rendered_input
         pixel_values[batch_index, :, :, :] = torch.tensor(rendered_input, dtype=torch.float) / 255
@@ -58,7 +59,7 @@ def batch_split_and_render(batch, input_res=256, output_res=64):
     }
 
 
-def render_sketch(entities, pixel_size, linewidth=2):
+def render_sketch_using_plt_slow(entities, pixel_size, linewidth=2):
     # Shift coordinates by 0.5 for symmetric render
     entities = [[[x + 0.5, y + 0.5] for x, y in entity] for entity in entities]
 
