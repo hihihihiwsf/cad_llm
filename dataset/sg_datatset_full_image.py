@@ -10,6 +10,32 @@ import torch
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 import multiprocessing as mp
 
+from diffusers import RePaintPipeline, RePaintScheduler
+
+def test_diffusion(original_image, mask_image):
+    # Load the original image and the mask as PIL images
+    original_image = original_image.resize((256, 256))
+    mask_image = mask_image.resize((256, 256))
+
+    # Load the RePaint scheduler and pipeline based on a pretrained DDPM model
+    scheduler = RePaintScheduler.from_pretrained("google/ddpm-ema-celebahq-256")
+    pipe = RePaintPipeline.from_pretrained("google/ddpm-ema-celebahq-256", scheduler=scheduler)
+    pipe = pipe.to("cuda")
+
+    generator = torch.Generator(device="cuda").manual_seed(0)
+    output = pipe(
+        image=original_image,
+        mask_image=mask_image,
+        num_inference_steps=250,
+        eta=0.0,
+        jump_length=10,
+        jump_n_sample=10,
+        generator=generator,
+    )
+    inpainted_image = output.images[0]
+
+    return inpainted_image
+
 def get_ids_restore(full_pixel, masked_pixel):
     k=0
     keep_len=0
@@ -115,26 +141,27 @@ class SketchGraphsCollator:
         input_curves = [get_curves(point_input) for point_input in point_inputs]
         
         # proc = mp.Process(target=visualize_sample(input_curves=input_curves, box_lim=64 + 3))
-        list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        list_of_img_ori = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
         # proc.daemon=True
         # proc.start()
         # proc.join()
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
-        batch_pixel_values = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        batch_pixel_values = self.vitmae_preprocess(list_of_img_ori, return_tensors="pt")
 
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
         input_curves = [get_curves(point_input) for point_input in point_inputs]
         
-        list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        list_of_img_mask = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
         
-        batch_masked_values = self.vitmae_preprocess(list_of_img, return_tensors="pt")
-
+        batch_masked_values = self.vitmae_preprocess(list_of_img_mask, return_tensors="pt")
+    
         batch_ids_restore, batch_masks = get_ids_restore(batch_pixel_values, batch_masked_values)
         batch = {
             "sketches": sketch_dicts,
-            "pixel_values": batch_pixel_values,
-            "masked_values": batch_masked_values,
+            "image": batch_pixel_values,
+            "original_image": list_of_img_ori,
+            "masked_image": list_of_img_mask,
             "ids_restore": batch_ids_restore,
             "batch_mask": batch_masks
         }
@@ -146,3 +173,4 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+

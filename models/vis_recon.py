@@ -28,6 +28,34 @@ from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEM
 
 from models.modeling_vitmae import ViTMAEForPreTraining
 
+
+from diffusers import RePaintPipeline, RePaintScheduler
+
+
+def test_diffusion(original_image, mask_image):
+    # Load the original image and the mask as PIL images
+    # original_image = download_image(img_url).resize((256, 256))
+    # mask_image = download_image(mask_url).resize((256, 256))
+
+    # Load the RePaint scheduler and pipeline based on a pretrained DDPM model
+    scheduler = RePaintScheduler.from_pretrained("google/ddpm-ema-celebahq-256")
+    pipe = RePaintPipeline.from_pretrained("google/ddpm-ema-celebahq-256", scheduler=scheduler)
+
+
+    generator = torch.Generator(device=pipe.device)
+    output = pipe(
+        image=original_image,
+        mask_image=mask_image,
+        num_inference_steps=250,
+        eta=0.0,
+        jump_length=10,
+        jump_n_sample=10,
+        generator=generator,
+    )
+    inpainted_image = output.images[0]
+
+    return inpainted_image
+
 class VisRecon(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
@@ -101,6 +129,7 @@ class VisRecon(pl.LightningModule):
     def training_step(self, batch, batch_idx):
 
         outputs = self.model(**batch['images'])
+
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -111,6 +140,9 @@ class VisRecon(pl.LightningModule):
 
 
         outputs = self.model(**batch['images'])
+
+        output = test_diffusion(ba)
+
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)

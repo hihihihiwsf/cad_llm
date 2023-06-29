@@ -10,6 +10,7 @@ except ImportError:
 from dataset.sg_datatset_full_image import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
 from models.vis_recon import VisRecon
+from test_diffusion import Diffusion
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
@@ -48,6 +49,7 @@ def main():
     print("Loading model...")
     # model = ByT5Model(args=args)
     model = VisRecon(args=args)
+    #model = Diffusion(args=args)
     model.tokenizer = None
 
     print("Loading data...")
@@ -61,7 +63,7 @@ def main():
 
     print("Training the model...")
     log_every_n_steps = 1000
-    # os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
         callbacks=call_backs,
