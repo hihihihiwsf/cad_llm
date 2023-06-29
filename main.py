@@ -7,8 +7,9 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
+from dataset.sg_dataset_vl import get_sketchgraphs_dataloader
+#from models.byt5 import ByT5Model
+from models.blip import BLIPModel
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
@@ -24,7 +25,7 @@ def get_model(args):
     if "segformer" in args.model_name:
         return SegformerModel()
 
-    return ByT5Model(args=args)
+    return BLIPModel(args=args)
 
 
 def get_dataloader(args, split, shuffle, model):

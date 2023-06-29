@@ -1,8 +1,5 @@
 import matplotlib.pyplot as plt
-import numpy as np
-
-from geometry.parse import get_curves
-
+from PIL import Image
 
 def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
     batch_size = len(input_curves)
@@ -30,25 +27,40 @@ def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
     return fig
 
 
+def visualize_sample(input_curves, box_lim):
+    batch_size = len(input_curves)
+    dpi = 100
+    figure_size_inches = ( 512 / dpi, 512 / dpi)
+    out = []
+    for in_curve in input_curves:
+
+
+        fig, ax = plt.subplots()
+        fig.set_dpi(dpi)
+        fig.set_size_inches(figure_size_inches)
+        # fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
+
+        draw_curves(in_curve, ax=ax, box_lim=box_lim, color="black")
+        # draw_curves(label_curves[i], ax=ax, box_lim=box_lim, color="blue")
+
+        fig.canvas.draw()
+        img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+
+        plt.close()
+        out.append(img)
+
+    return out
+
+
 def draw_curves(curves, ax, box_lim, color, draw_points=False):
-    ax.set_xlim(left=-box_lim, right=box_lim)
-    ax.set_ylim(bottom=-box_lim, top=box_lim)
+    ax.set_xlim(left=-3, right=box_lim)
+    ax.set_ylim(bottom=-3, top=box_lim)
     ax.set_xticks([])
     ax.set_yticks([])
 
+    colors = {2: 'red', 3:'green', 4:'blue'}
+
     for curve in curves:
         if curve and curve.good:
-            curve.draw(ax=ax,  color=color, draw_points=draw_points)
-
-
-def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
-    np_image = np.ones((size, size, 3), np.uint8) * 255
-    cell_size = size // quantize_bins
-
-    curves = get_curves(point_entities)
-    assert all(curve for curve in curves)
-
-    for curve in curves:
-        curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)
-
-    return np_image
+            curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
+            
