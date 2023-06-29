@@ -10,6 +10,26 @@ import torch
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 import multiprocessing as mp
 
+def get_ids_restore(full_pixel, masked_pixel):
+    k=0
+    keep_len=0
+    bsz, seq_length, dim = full_pixel.shape
+    batch_mask = np.zero((bsz,seq_length))
+    masks_ = np.ones((bsz,seq_length))
+    batch_ids_restore = np.rand(bsz, seq_length)
+    for k, (full, masked) in enumerate(zip(full_pixel, masked_pixel)):
+        dif = torch.eq(full, masked)
+        for i in seq_length:
+            if torch.all(dif[i]):
+                batch_mask[k][i] = 0
+                keep_len = 0
+            else:
+                batch_mask[k][i]=1
+    masks_[:,:keep_len] = 0
+    batch_ids_restore = (masks_.unsqueeze(0) == batch_mask.unsqueeze(1)).nonzero()[:, -2]
+    
+    return batch_ids_restore, batch_mask
+
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
@@ -51,10 +71,13 @@ class SketchGraphsDataset(Dataset):
             np.random.shuffle(entities)
         mask = self.get_mask(len(entities))
         sketch_dict["mask"] = mask
-        input_text = "".join([ent for i, ent in enumerate(entities) ])
-        output_text = "".join([ent for i, ent in enumerate(entities) ]) #if not mask[i]
+        full_text = "".join([ent for i, ent in enumerate(entities)])
+        input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
+        output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]]) #if not mask[i]
         sketch_dict['input_text'] = input_text
         sketch_dict['output_text'] = output_text
+        sketch_dict['full_text'] = full_text
+
         return sketch_dict
 
     def get_mask(self, n):
@@ -88,7 +111,7 @@ class SketchGraphsCollator:
 
     def __call__(self, sketch_dicts):
 
-        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        point_inputs = [get_point_entities(sketch["full_text"]) for sketch in sketch_dicts]
         input_curves = [get_curves(point_input) for point_input in point_inputs]
         
         # proc = mp.Process(target=visualize_sample(input_curves=input_curves, box_lim=64 + 3))
@@ -98,18 +121,22 @@ class SketchGraphsCollator:
         # proc.join()
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
-        batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        batch_pixel_values = self.vitmae_preprocess(list_of_img, return_tensors="pt")
 
-        # images = []
-        # for img in list_of_img:
-        #     images.append(self.clip_preprocess(img))
-        #     batch_images = torch.tensor(np.stack(images))
+        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        input_curves = [get_curves(point_input) for point_input in point_inputs]
+        
+        list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        
+        batch_masked_values = self.vitmae_preprocess(list_of_img, return_tensors="pt")
 
-
-
+        batch_ids_restore, batch_masks = get_ids_restore(batch_pixel_values, batch_masked_values)
         batch = {
             "sketches": sketch_dicts,
-            "images": batch_images,
+            "pixel_values": batch_pixel_values,
+            "masked_values": batch_masked_values,
+            "ids_restore": batch_ids_restore,
+            "batch_mask": batch_masks
         }
         return batch
 

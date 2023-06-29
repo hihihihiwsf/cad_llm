@@ -24,7 +24,9 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from PIL import Image
 # import clip
 import numpy as np
-from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel, ViTMAEForPreTraining
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel
+
+from models.modeling_vitmae import ViTMAEForPreTraining
 
 class VisRecon(pl.LightningModule):
     def __init__(self, args):
@@ -97,8 +99,6 @@ class VisRecon(pl.LightningModule):
             embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
-
-
 
         outputs = self.model(**batch['images'])
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
