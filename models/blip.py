@@ -10,7 +10,7 @@ import torch
 import torch.optim as optim
 # import lightning.pytorch as pl
 import pytorch_lightning as pl
-from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer, BlipForConditionalGeneration
+from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer, BlipForConditionalGeneration, BlipConfig, AutoModelForVision2Seq
 from transformers.modeling_utils import unwrap_model
 import sys
 
@@ -30,11 +30,11 @@ class BLIPModel(pl.LightningModule):
         self.save_hyperparameters()
 
         if args.untrained_model:
-            config = T5Config.from_pretrained(args.model_name)
-            model = T5ForConditionalGeneration(config)
+            config = BlipConfig.from_pretrained(args.model_name)
+            model = BlipForConditionalGeneration(config)
             model._init_weights(model)  # maybe redundant
         else:
-            model = BlipForConditionalGeneration.from_pretrained(args.model_name)
+            model = AutoModelForVision2Seq.from_pretrained(args.model_name)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name,padding_side="left")
