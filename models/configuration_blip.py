@@ -329,6 +329,7 @@ class BlipConfig(PretrainedConfig):
         self,
         text_config=None,
         vision_config=None,
+        multimodal_config=None,
         projection_dim=512,
         logit_scale_init_value=2.6592,
         image_text_hidden_size=256,
@@ -344,8 +345,9 @@ class BlipConfig(PretrainedConfig):
             vision_config = {}
             logger.info("`vision_config` is `None`. Initializing the `BlipVisionConfig` with default values.")
 
-        self.text_config = BlipTextConfig(**text_config)
+        self.text_config = BlipTextConfig(**text_config, is_decoder=False)
         self.vision_config = BlipVisionConfig(**vision_config)
+        self.multimodal_config = BlipTextConfig(**multimodal_config, is_decoder=True)
 
         self.text_config.encoder_hidden_size = self.vision_config.hidden_size
 
@@ -356,7 +358,7 @@ class BlipConfig(PretrainedConfig):
         self.image_text_hidden_size = image_text_hidden_size
 
     @classmethod
-    def from_text_vision_configs(cls, text_config: BlipTextConfig, vision_config: BlipVisionConfig, **kwargs):
+    def from_text_vision_configs(cls, text_config: BlipTextConfig, vision_config: BlipVisionConfig, multimodal_config: BlipTextConfig, **kwargs):
         r"""
         Instantiate a [`BlipConfig`] (or a derived class) from blip text model configuration and blip vision model
         configuration.
@@ -365,7 +367,7 @@ class BlipConfig(PretrainedConfig):
             [`BlipConfig`]: An instance of a configuration object
         """
 
-        return cls(text_config=text_config.to_dict(), vision_config=vision_config.to_dict(), **kwargs)
+        return cls(text_config=text_config.to_dict(), vision_config=vision_config.to_dict(), multimodal_config = multimodal_config.to_dict(), **kwargs)
 
     def to_dict(self):
         """
@@ -377,5 +379,6 @@ class BlipConfig(PretrainedConfig):
         output = copy.deepcopy(self.__dict__)
         output["text_config"] = self.text_config.to_dict()
         output["vision_config"] = self.vision_config.to_dict()
+        output["multimodal_config"] = self.multimodal_config.to_dict()
         output["model_type"] = self.__class__.model_type
         return output

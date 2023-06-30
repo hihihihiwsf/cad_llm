@@ -32,7 +32,7 @@ from transformers.utils import (
     logging,
     replace_return_docstrings,
 )
-from configuration_blip import BlipConfig, BlipTextConfig, BlipVisionConfig
+from configuration_blip import BlipConfig, BlipTextConfig, BlipVisionConfig, BlipDecodeConfig
 from modeling_blip_text import BlipTextLMHeadModel, BlipTextModel
 
 
@@ -936,13 +936,13 @@ class BlipForConditionalGeneration(BlipPreTrainedModel):
         super().__init__(config)
 
         '''add encoder-decoder'''
-        self.blip_model = BlipModel(config)
+        #self.blip_model = BlipModel(config)
 
         self.vision_model = BlipVisionModel(config.vision_config)
-        self.text_decoder = BlipTextLMHeadModel(config.text_config)
+        self.text_decoder = BlipTextLMHeadModel(config.multimodal_config)
 
-        self.decoder_input_ids = config.text_config.bos_token_id
-        self.decoder_pad_token_id = config.text_config.pad_token_id
+        self.decoder_input_ids = config.multimodal_config.bos_token_id
+        self.decoder_pad_token_id = config.multimodal_config.pad_token_id
 
         # Initialize weights and apply final processing
         self.post_init()

@@ -15,7 +15,7 @@ def get_parser():
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
     parser.add_argument("--ascii_encoding", type=int, default=0,
                         help="Use ascii ByT5 encoding instead of single token encoding")
-    parser.add_argument("--model_name", type=str, default="Salesforce/blip2-flan-t5-xl" , help="Huggingface model name") #"Salesforce/blip2-flan-t5-xl"  #"Salesforce/blip-image-captioning-base"
+    parser.add_argument("--model_name", type=str, default="Salesforce/blip2" , help="Huggingface model name") #"Salesforce/blip2-flan-t5-xl"  #"Salesforce/blip-image-captioning-base"
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
     parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")

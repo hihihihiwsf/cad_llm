@@ -37,6 +37,8 @@ from transformers.modeling_utils import (
 from transformers.utils import logging
 from configuration_blip import BlipTextConfig
 
+from modeling_t5 import T5Stack
+
 
 logger = logging.get_logger(__name__)
 
@@ -816,6 +818,17 @@ class BlipTextLMHeadModel(BlipTextPreTrainedModel):
 
         self.bert = BlipTextModel(config, add_pooling_layer=False)
         self.cls = BlipTextOnlyMLMHead(config)
+
+        # self.model_dim = config.d_model
+
+        # self.shared = nn.Embedding(config.vocab_size, config.d_model)
+        # decoder_config = copy.deepcopy(config)
+        # decoder_config.is_decoder = True
+        # decoder_config.is_encoder_decoder = False
+        # decoder_config.num_layers = config.num_decoder_layers
+        # self.blip_decoder = T5Stack(decoder_config, self.shared)
+
+        # self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
