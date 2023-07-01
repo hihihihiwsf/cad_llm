@@ -4,11 +4,12 @@ import random
 import json
 from pathlib import Path
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch, visualize_sample
+from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv
 # import clip
 import torch 
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 import multiprocessing as mp
+import time 
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
@@ -92,7 +93,8 @@ class SketchGraphsCollator:
         input_curves = [get_curves(point_input) for point_input in point_inputs]
         
         # proc = mp.Process(target=visualize_sample(input_curves=input_curves, box_lim=64 + 3))
-        list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        # list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
         # proc.daemon=True
         # proc.start()
         # proc.join()

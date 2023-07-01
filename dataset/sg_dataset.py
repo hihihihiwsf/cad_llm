@@ -4,7 +4,7 @@ import random
 import json
 from pathlib import Path
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch, visualize_sample
+from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv
 # import clip
 import torch 
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
@@ -80,7 +80,7 @@ class SketchGraphsCollator:
         self.max_length = max_length
         self.args = args
         # _, self.clip_preprocess = clip.load("ViT-B/32")
-        self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
+        # self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
     def tokenize(self, strings):
@@ -97,19 +97,22 @@ class SketchGraphsCollator:
         labels[labels == self.tokenizer.pad_token_id] = -100
 
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
-        input_curves = [get_curves(point_input) for point_input in point_inputs]
-        list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        # input_curves = [get_curves(point_input) for point_input in point_inputs]
+        # list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
+        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
-
+        batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
         # images = []
         # for img in list_of_img:
         #     images.append(self.clip_preprocess(img))
         #     batch_images = torch.tensor(np.stack(images))
 
-
-
+        # for im in list_of_img:
+        #     im.close()
+        
+              
         batch = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,

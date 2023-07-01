@@ -13,7 +13,7 @@ import pytorch_lightning as pl
 from transformers import T5Config, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
 import sys
-
+from models.vis_recon import VisRecon
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
 from util import get_quantized_range
@@ -24,11 +24,11 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from PIL import Image
 # import clip
 import numpy as np
-from transformers import CLIPVisionModelWithProjection, CLIPVisionModel
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
 from models.modeling_vlt5 import T5ForConditionalGeneration
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args):
+    def __init__(self, args, vit_mae=None):
         super().__init__()
         self.save_hyperparameters()
 
@@ -52,15 +52,29 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
         
         
+        m = VisRecon(args=args)
+        m.load_from_checkpoint('checkpoints/vitmae_deepmind/best.ckpt')
+        self.vit_mae = m.model
+        del m
+        # self.vit_mae = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
+        # self.vit_mae = vit_mae
+        
         # self.clip_model, _ = clip.load(args.clipmodel)
-        self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
+        # self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
         # self.clip_model = CLIPVisionModel.from_pretrained(args.clipmodel, output_hidden_states=True)
-        self.clip_model.requires_grad_(False)
+        # self.clip_model.requires_grad_(False)
 
+        if self.vit_mae is not None:
+            self.vis_model = self.vit_mae
+            self.vis_model.config.mask_ratio = 0.
+            self.vis_model.requires_grad_(False)
+            self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
+        
         # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
-        self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
+        # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
         # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
+        self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
 
 
 
@@ -115,8 +129,11 @@ class ByT5Model(pl.LightningModule):
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         with torch.no_grad():
             # image_features = self.clip_model.encode_image(batch['images'])
-            oi = self.clip_model(**batch['images'])
-            image_features = oi.image_embeds
+            # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
+            oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
+            image_features = torch.sum(oi['last_hidden_state'], 1)
+            # oi = self.clip_model(**batch['images'])
+            # image_features = oi.image_embeds
             # image_features = oi['pooler_output']
 
 
@@ -147,8 +164,10 @@ class ByT5Model(pl.LightningModule):
 
         
         # image_features = self.clip_model.encode_image(batch['images'])
-        oi = self.clip_model(**batch['images'])
-        image_features = oi.image_embeds
+        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
+        image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
+        # image_features = oi.image_embeds
         # image_features = oi['pooler_output']
 
 
@@ -182,7 +201,8 @@ class ByT5Model(pl.LightningModule):
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-
+        
+        
         # Generate and process samples
         self.generate_samples(batch)
 
@@ -219,7 +239,7 @@ class ByT5Model(pl.LightningModule):
         # # Plot sketches
         if batch_idx < 5:
             self.log_samples(batch=batch, batch_idx=batch_idx)
-
+        
         return loss
 
     def generate_samples(self, batch):

@@ -5,6 +5,8 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import gc
 import requests
+import numpy as np
+from geometry.parse import get_curves
 
 
 def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
@@ -74,6 +76,19 @@ def visualize_sample(input_curves, box_lim):
     return out
 
 
+def visualize_sample_cv(point_entities, box_lim):
+    dpi = 100
+    figure_size_inches = ( 224 / dpi, 224 / dpi)
+    out = []
+    
+    for entities in point_entities:
+        np_image = render_sketch_opencv(entities, size=256, quantize_bins=64)
+        pil_image = np_image[:, :, ::-1]  # BGR to RGB
+        img = Image.fromarray(pil_image, mode='RGB')
+        out.append(img)
+
+    return out
+
 def draw_curves(curves, ax, box_lim, color, draw_points=False):
     ax.set_xlim(left=-3, right=box_lim)
     ax.set_ylim(bottom=-3, top=box_lim)
@@ -86,3 +101,16 @@ def draw_curves(curves, ax, box_lim, color, draw_points=False):
         if curve and curve.good:
                 curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
             
+
+def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
+
+    np_image = np.ones((size, size, 3), np.uint8) * 255
+    cell_size = size // quantize_bins
+
+    curves = get_curves(point_entities)
+    assert all(curve for curve in curves)
+
+    for curve in curves:
+        curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)
+
+    return np_image

@@ -25,6 +25,8 @@ from PIL import Image
 # import clip
 import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel, ViTMAEForPreTraining
+from geometry.visualize_vit import Visualize_VIT
+
 
 class VisRecon(pl.LightningModule):
     def __init__(self, args):
@@ -33,6 +35,7 @@ class VisRecon(pl.LightningModule):
 
         self.model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
         # self.model.requires_grad_(False)
+        # self.m = torch.load('checkpoints/vitmae_deepmind/best.ckpt')
         
         self.args = args
 
@@ -41,6 +44,7 @@ class VisRecon(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
+        self.vis_vit = Visualize_VIT(self.model)
         
         
         # self.clip_model, _ = clip.load(args.clipmodel)
@@ -103,6 +107,11 @@ class VisRecon(pl.LightningModule):
 
         outputs = self.model(**batch['images'])
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        
+        # px = batch['images']
+        # px = px['pixel_values']
+        # self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
+        
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
@@ -113,6 +122,11 @@ class VisRecon(pl.LightningModule):
 
         outputs = self.model(**batch['images'])
         loss = outputs.loss
+        
+        px = batch['images']
+        px = px['pixel_values']
+        self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
+        
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 

@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.patches as patches
 from geometry.curve import Curve
+import cv2
+from geometry.opencv_colors import CV2_COLORS
 
 
 class Circle(Curve):
@@ -9,12 +11,31 @@ class Circle(Curve):
         super(Circle, self).__init__(points)
         self.find_circle_geometry()
 
-    def draw(self, ax, draw_points=True, linewidth=1, color="blue"):
+    def draw(self, ax, draw_points=True, linewidth=1, color="red"):
         assert self.good, "The curve is not in the good state"
         ap = patches.Circle(self.center, self.radius, lw=linewidth, fill=None, color=color)
         ax.add_patch(ap)
         if draw_points:
             self.draw_points(ax)
+
+    def draw_np(self, np_image, draw_points=True, linewidth=2, color="red", cell_size=4):
+        """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
+
+        shifted_center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.uint)
+        radius = (self.radius * cell_size).astype(dtype=np.uint)
+
+        cv2.circle(
+            np_image,
+            center=shifted_center.astype(dtype=np.uint),
+            radius=radius,
+            color=CV2_COLORS[color],
+            thickness=linewidth,
+        )
+
+        if draw_points:
+            self.draw_points_np(np_image, cell_size=cell_size)
+
+        return np_image
 
     def find_circle_geometry(self):
         mid = np.mean(self.points, axis=0)
