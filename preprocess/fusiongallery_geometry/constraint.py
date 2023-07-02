@@ -237,3 +237,26 @@ class FusionGalleryConstraint:
             "line_one": self.entities[0]["uuid"],
             "line_two": self.entities[1]["uuid"]
         }
+
+    def make_vertical_constraint_dict(self):
+        """
+        {
+            "line": "35512506-e0c6-11ea-88c8-c85b76a75ed8",
+            "type": "VerticalConstraint"
+        }
+        """
+        if self.entity_count == 2:
+            if self.is_entity_point(0) and self.is_entity_point(1):
+                return {
+                    "point_one": self.entities[0]["uuid"],
+                    "point_two": self.entities[1]["uuid"],
+                    "type": "VerticalPointsConstraint"
+                }
+        elif self.is_entity_line(0):
+            return {
+                "line": self.entities[0]["uuid"],
+                "type": "VerticalConstraint"
+            }
+        else:
+            assert False, "Unknown vertical constraint entities"
+        return None
