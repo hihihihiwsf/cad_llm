@@ -105,6 +105,15 @@ class FusionGalleryConstraint:
     def is_entity_point(self, index):
         return self.is_entity_type(index, "Point3D")
 
+    def entity_points_identical(self):
+        first_uuid = self.entities[0]["uuid"]
+        for ent in self.entities:
+            if ent["type"] != "Point3D":
+                return False
+            if ent["uuid"] != first_uuid:
+                return False
+        return True
+
     def is_entity_line(self, index):
         return self.is_entity_type(index, "SketchLine")
 
@@ -115,7 +124,8 @@ class FusionGalleryConstraint:
         return self.is_entity_type(index, "SketchCircle")
 
     def make_coincident_constraint_cases(self):
-        assert self.entity_count == 2
+
+        # assert self.entity_count == 2
         if self.is_entity_line(0) and self.is_entity_line(1):
             return self.make_collinear_constraint_dict()
         if self.is_entity_point(0) or self.is_entity_point(1):
@@ -132,7 +142,8 @@ class FusionGalleryConstraint:
             # from the data.
 
             # Check if both entities refer to the same merged point to skip 
-            if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
+            # if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
+            if self.entity_points_identical():
                 return None
             return self.make_coincident_constraint_dict()
         if self.is_entity_arc(0) or self.is_entity_arc(1):

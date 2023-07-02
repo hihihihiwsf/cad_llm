@@ -6,10 +6,9 @@ into the Fusion 360 Gallery dataset format
 """
 
 import argparse
-import uuid
 import json
 from pathlib import Path
-import numpy as np
+from tqdm import tqdm
 
 from preprocess.deepmind_geometry import *
 from preprocess.fusiongallery_geometry import *
@@ -18,8 +17,13 @@ from preprocess.preprocess_utils import get_files, get_output_dir
 
 
 def convert_data(dm_data):
-    for i, dm_sketch in enumerate(dm_data):
+    for i, dm_sketch in enumerate(tqdm(dm_data)):
         fg_sketch = convert_sketch(dm_sketch)
+        if fg_sketch is None:
+            print(f"Skipping sketch {i}")
+        else:
+            # TODO: Do something with the FG sketch
+            pass
 
 
 def convert_sketch(dm_sketch):
@@ -27,8 +31,8 @@ def convert_sketch(dm_sketch):
     dm_constraints = dm_sketch["constraintSequence"]["constraints"]
     points, point_map = create_sketch_points(dm_entities)
     curves, constraint_entity_map = create_sketch_curves(dm_entities, point_map)
-    # TODO: Filter out sketches with no curves
-    assert len(curves) > 0
+    if curves is None or len(curves) == 0:
+        return None
     constraints = create_constraints(dm_constraints, points, curves, constraint_entity_map)
     # dimensions = create_dimensions()
     fusion_gallery_sketch = {
@@ -48,7 +52,8 @@ def create_sketch_curves(dm_entities, point_map):
     curve_data = {}
     # Mapping from the constraint entities index array to uuids in either the points or curves dict
     constraint_entity_map = {}
-    for index, dm_ent in enumerate(dm_entities):
+    constraint_entity_index = 0
+    for dm_ent in dm_entities:
         assert len(dm_ent) == 1, "Expected on entry in the dict"
         entity_name = list(dm_ent.keys())[0]
         entity_data = dm_ent[entity_name]
@@ -60,12 +65,12 @@ def create_sketch_curves(dm_entities, point_map):
                 entity_data["point"]["y"],
                 point_map.map
             )
-            constraint_entity_map[index] = {
-                "type": "point",
-                "uuid": fg_obj.uuid
-            }
-            # Continue here as we don't want to add points to the curve data
-            continue
+            # constraint_entity_map[index] = {
+            #     "type": "point",
+            #     "uuid": fg_obj.uuid
+            # }
+            # # Continue here as we don't want to add points to the curve data
+            # continue
 
         elif entity_name == "lineEntity":
             dm_obj = DeepmindLine(entity_data)
@@ -77,17 +82,118 @@ def create_sketch_curves(dm_entities, point_map):
             elif "circleParams" in entity_data:
                 dm_obj = DeepmindCircle(entity_data)
                 fg_obj = FusionGalleryCircle(dm_obj, point_map.map)
+        elif entity_name == "interpolatedSplineEntity":
+            print("Warning - interpolatedSplineEntity not supported")
+            return None, None
         else:
-            print("Warning - unexpected entity name", entity_name)
-            print(dm_ent)
-            continue
-        curve_data[fg_obj.uuid] = fg_obj.to_dict()
-        constraint_entity_map[index] = {
+            print("Warning - unexpected entity type", entity_name)
+            return None, None
+        fg_dict = fg_obj.to_dict()
+        
+        constraint_entity_map, constraint_entity_index = update_constraint_entity_map(
+            constraint_entity_map,
+            fg_obj,
+            fg_dict,
+            constraint_entity_index
+        )
+    return curve_data, constraint_entity_map
+        
+
+def update_constraint_entity_map(entity_map, fg_obj, fg_dict, index):
+    """
+    Update the given entity in the constraint entity map
+    The key in the entity_map is an index counted based on a specific layout:
+
+    entity0.part0, entity0.part1, ..., entity0.partN, entity1.part0, entity1.part1, ...
+
+    The following entity types and parts are used in the layout
+
+    Entity type                | Parts
+    ---------------------------+-------------------------------------------------------------
+    point_entity               | entity
+    interpolated_spline_entity | entity, interp_point0, ..., interp_pointM, start_derivative,
+                               |     end_derivative, start_point, end_point
+    circle_arc_entity          | entity, center, [start_point, end_point] (if not closed)
+    line_entity                | entity, start_point, end_point
+
+    See: https://github.com/deepmind/deepmind-research/issues/377#issuecomment-1218204488
+    
+    """
+    updated_index = index
+
+    if fg_dict["type"] == "Point3D":
+        # entity
+        entity_map[updated_index] = {
+            "type": "point",
+            "uuid": fg_obj.uuid
+        }
+        updated_index += 1
+    
+    elif fg_dict["type"] == "SketchCircle":
+        # entity
+        entity_map[updated_index] = {
             "type": "curve",
             "uuid": fg_obj.uuid
         }
-    return curve_data, constraint_entity_map
-        
+        updated_index += 1
+        # center
+        entity_map[updated_index] = {
+            "type": "point",
+            "uuid": fg_dict["center_point"]
+        }
+        updated_index += 1
+
+    elif fg_dict["type"] == "SketchArc":
+        # entity
+        entity_map[updated_index] = {
+            "type": "curve",
+            "uuid": fg_obj.uuid
+        }
+        updated_index += 1
+        # center
+        entity_map[updated_index] = {
+            "type": "point",
+            "uuid": fg_dict["center_point"]
+        }
+        updated_index += 1
+        # start_point
+        entity_map[updated_index] = {
+            "type": "point",
+            "uuid": fg_dict["start_point"]
+        }
+        updated_index += 1
+        # end_point
+        entity_map[updated_index] = {
+            "type": "point",
+            "uuid": fg_dict["end_point"]
+        }
+        updated_index += 1
+    
+    elif fg_dict["type"] == "SketchLine":
+        # entity
+        entity_map[updated_index] = {
+            "type": "curve",
+            "uuid": fg_obj.uuid
+        }
+        updated_index += 1
+        # start_point
+        entity_map[updated_index] = {
+            "type": "point",
+            "uuid": fg_dict["start_point"]
+        }
+        updated_index += 1
+        # end_point
+        entity_map[updated_index] = {
+            "type": "point",
+            "uuid": fg_dict["end_point"]
+        }
+        updated_index += 1
+    
+    else:
+        print("Warning - unexpected entity type", fg_dict["type"])
+
+    return entity_map, updated_index
+
 
 def create_sketch_points(dm_entities):
     """Create the sketch points data structure"""

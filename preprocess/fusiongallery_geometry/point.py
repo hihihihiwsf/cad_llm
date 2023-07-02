@@ -40,7 +40,7 @@ class FusionGalleryPoint(FusionGalleryBase):
         return None
 
     @staticmethod
-    def get_key(x, y, precision=17):
+    def get_key(x, y, precision=15):
         """
         Return a hash key used to merge points
         """
