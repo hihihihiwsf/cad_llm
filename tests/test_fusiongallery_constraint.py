@@ -43,4 +43,16 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         fg_cst_dict = fg_cst.to_dict()
         # We remove these types of constraints between merged points
         self.assertIsNone(fg_cst_dict)
-
+    
+    def test_parallel_constraint(self):
+        cst = self.dm_constraints[8]
+        fg_cst = FusionGalleryConstraint(cst, self.points, self.curves, self.entity_map)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_dict)
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "ParallelConstraint")
+        self.assertIn("line_one", fg_cst_dict)
+        self.assertIn("line_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["line_one"], self.curves)
+        self.assertIn(fg_cst_dict["line_two"], self.curves)
+        

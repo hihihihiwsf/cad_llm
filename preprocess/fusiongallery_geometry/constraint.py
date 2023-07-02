@@ -222,7 +222,7 @@ class FusionGalleryConstraint:
             assert False, "Unknown horizontal contraint entities"
         return None
     
-    def make_parallel_constraint_dict(self, cst):
+    def make_parallel_constraint_dict(self):
         """
         {
             "type": "ParallelConstraint",

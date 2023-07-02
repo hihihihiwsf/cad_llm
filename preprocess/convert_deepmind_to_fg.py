@@ -50,6 +50,7 @@ def create_sketch_curves(dm_entities, point_map):
     """Create the sketch curves data structure"""
     # Curve dictionary as stored in FG json format
     curve_data = {}
+    add_curve = False
     # Mapping from the constraint entities index array to uuids in either the points or curves dict
     constraint_entity_map = {}
     constraint_entity_index = 0
@@ -65,37 +66,44 @@ def create_sketch_curves(dm_entities, point_map):
                 entity_data["point"]["y"],
                 point_map.map
             )
-            # constraint_entity_map[index] = {
-            #     "type": "point",
-            #     "uuid": fg_obj.uuid
-            # }
-            # # Continue here as we don't want to add points to the curve data
-            # continue
 
         elif entity_name == "lineEntity":
             dm_obj = DeepmindLine(entity_data)
             fg_obj = FusionGalleryLine(dm_obj, point_map.map)
+            add_curve = True
+
         elif entity_name == "circleArcEntity":
             if "arcParams" in entity_data:
                 dm_obj = DeepmindArc(entity_data)
                 fg_obj = FusionGalleryArc(dm_obj, point_map.map)
+                add_curve = True
             elif "circleParams" in entity_data:
                 dm_obj = DeepmindCircle(entity_data)
                 fg_obj = FusionGalleryCircle(dm_obj, point_map.map)
+                add_curve = True
+
         elif entity_name == "interpolatedSplineEntity":
             print("Warning - interpolatedSplineEntity not supported")
             return None, None
+
         else:
             print("Warning - unexpected entity type", entity_name)
             return None, None
+
+        # Generate the FG dict that will get saved to json for the entity
         fg_dict = fg_obj.to_dict()
-        
+        # Register the entity so we can map between the entity indices given in the deepmind
+        # data and the FG curve and point dicts
         constraint_entity_map, constraint_entity_index = update_constraint_entity_map(
             constraint_entity_map,
             fg_obj,
             fg_dict,
             constraint_entity_index
         )
+        # Add the entity to the FG curve dict if it is a line, arc, circle
+        if add_curve:
+            curve_data[fg_obj.uuid] = fg_dict
+
     return curve_data, constraint_entity_map
         
 
