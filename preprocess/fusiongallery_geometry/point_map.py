@@ -1,3 +1,9 @@
+"""
+
+FusionGalleryPointMap that maps between unique keys and FusionGalleryPoints
+
+"""
+
 
 from preprocess.deepmind_geometry.point import DeepmindPoint
 from preprocess.fusiongallery_geometry.point import FusionGalleryPoint
@@ -7,14 +13,23 @@ class FusionGalleryPointMap():
     
     def __init__(self, dm_entities):
         """
-        Create a FusionGalleryPointMap that maps between unique keys and FusionGalleryPoints
+        Create a FusionGalleryPointMap that maps between unique keys/uuids and FusionGalleryPoints
+        These maps can be accessed using self.map and self.uuid_map
 
         Args
             dm_entities (list): Entities from the DeepMind sketch dataset, 
                             i.e. ["entitySequence"]["entities"]
         """
-        # Map between unique keys and FusionGalleryPoint
+        # self.map containts a dict of unique points
+        #   - key: string of the form point.x_point.y
+        #   - value: FusionGalleryPoint object
         self.map = {}
+
+        # self.uuid_map containts a dict of unique points
+        #   - key: unique uuid string
+        #   - value: FusionGalleryPoint object
+        self.uuid_map = {}
+        
         point_count = 0
         for dm_ent in dm_entities:
             points = FusionGalleryPointMap.find_all_geom_points(dm_ent)
@@ -26,7 +41,6 @@ class FusionGalleryPointMap():
                 if not fg_point.key in self.map:
                     self.map[fg_point.key] = fg_point
         print(f"Created vertex dictionary with {len(self.map)} of {point_count} total vertices")
-        self.uuid_map = {}
         for key, value in self.map.items():
             self.uuid_map[value.uuid] = value
 

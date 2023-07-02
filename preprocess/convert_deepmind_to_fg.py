@@ -14,8 +14,6 @@ import numpy as np
 from preprocess.deepmind_geometry import *
 from preprocess.fusiongallery_geometry import *
 from preprocess.preprocess_utils import get_files, get_output_dir
-from preprocess.convert_deepmind_to_obj import load_data, get_dm_ent_name
-
 
 
 
@@ -31,7 +29,7 @@ def convert_sketch(dm_sketch):
     curves, constraint_entity_map = create_sketch_curves(dm_entities, point_map)
     # TODO: Filter out sketches with no curves
     assert len(curves) > 0
-    constraints = create_constraints(dm_constraints, points, point_map, curves, constraint_entity_map)
+    constraints = create_constraints(dm_constraints, points, curves, constraint_entity_map)
     # dimensions = create_dimensions()
     fusion_gallery_sketch = {
         "name": "Sketch1",
@@ -52,12 +50,16 @@ def create_sketch_curves(dm_entities, point_map):
     constraint_entity_map = {}
     for index, dm_ent in enumerate(dm_entities):
         assert len(dm_ent) == 1, "Expected on entry in the dict"
-        entity_name = get_dm_ent_name(dm_ent)
+        entity_name = list(dm_ent.keys())[0]
         entity_data = dm_ent[entity_name]
 
         if entity_name == "pointEntity":
             # Find the point in the point map
-            fg_obj = FusionGalleryPoint.from_xy_map(dm_ent.start[0], dm_ent.start[1], point_map)
+            fg_obj = FusionGalleryPoint.from_xy_map(
+                entity_data["point"]["x"],
+                entity_data["point"]["y"],
+                point_map.map
+            )
             constraint_entity_map[index] = {
                 "type": "point",
                 "uuid": fg_obj.uuid
@@ -89,7 +91,7 @@ def create_sketch_curves(dm_entities, point_map):
 
 def create_sketch_points(dm_entities):
     """Create the sketch points data structure"""
-    # Dict of unique points
+    # point_map.map containts a dict of unique points
     # key: string of the form point.x_point.y
     # value: FusionGalleryPoint object
     point_map = FusionGalleryPointMap(dm_entities)
@@ -100,11 +102,11 @@ def create_sketch_points(dm_entities):
     return point_data, point_map    
 
 
-def create_constraints(dm_constraints, points, point_map, curves, constraint_entity_map):
+def create_constraints(dm_constraints, points, curves, constraint_entity_map):
     """Create the constraints data structure"""
     constraints_data = {}
     for dm_cst in dm_constraints:
-        constraint = FusionGalleryConstraint(dm_cst, points, point_map, curves, constraint_entity_map)
+        constraint = FusionGalleryConstraint(dm_cst, points, curves, constraint_entity_map)
         cst_dict = constraint.to_dict()
         if cst_dict is not None:
             constraints_data[constraint.uuid] = cst_dict
@@ -122,7 +124,8 @@ def main(args):
     output_path = get_output_dir(args.output)
 
     for input_file_path in input_file_paths:
-        dm_data = load_data(input_file_path)
+        with open(input_file_path) as f:
+            dm_data = json.load(f)
         convert_data(dm_data)
 
         # filename = input_file_path.stem

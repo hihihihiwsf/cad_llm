@@ -1,3 +1,10 @@
+"""
+
+FusionGalleryLine represents a sketch line in the Fusion 360 Gallery format
+
+"""
+
+
 from preprocess.fusiongallery_geometry.base import FusionGalleryBase
 from preprocess.fusiongallery_geometry.point import FusionGalleryPoint
 from preprocess.deepmind_geometry.line import DeepmindLine

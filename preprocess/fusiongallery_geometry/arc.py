@@ -1,3 +1,10 @@
+"""
+
+FusionGalleryArc represents a sketch arc in the Fusion 360 Gallery format
+
+"""
+
+
 import math
 import numpy as np
 

@@ -1,9 +1,22 @@
+"""
+
+FusionGalleryBase class extended by other geometry classes
+
+"""
+
 import uuid
 
 from preprocess.deepmind_geometry import *
 
 class FusionGalleryBase:
     def __init__(self, ent):
+        """
+        Intialize a FusionGalleryArc
+
+        Args
+            ent (DeepmindBase): Deepmind entity, can be one of:
+                        DeepmindArc, DeepmindCircle, DeepmindLine, DeepmindPoint
+        """        
         # Currently we only support intialization from Deepmind data
         if not isinstance(ent, (DeepmindArc, DeepmindCircle, DeepmindLine, DeepmindPoint)):
             raise Exception("Unsupported initialization data, expected Deepmind data")

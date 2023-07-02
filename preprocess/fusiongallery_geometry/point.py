@@ -1,9 +1,22 @@
+"""
+
+FusionGalleryPoint represents a sketch point in the Fusion 360 Gallery format
+
+"""
+
+
 from preprocess.fusiongallery_geometry.base import FusionGalleryBase
 from preprocess.deepmind_geometry.point import DeepmindPoint
 
 
 class FusionGalleryPoint(FusionGalleryBase):
     def __init__(self, ent):
+        """
+        Intialize a FusionGalleryPoint
+
+        Args
+            ent (DeepmindPoint): point
+        """        
         super().__init__(ent)
         # Currently we only support intialization from Deepmind data
         assert isinstance(ent, DeepmindPoint)

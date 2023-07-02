@@ -1,9 +1,39 @@
+"""
+
+FusionGalleryConstraint represents a sketch constraint in the Fusion 360 Gallery format
+
+"""
+
 import uuid
 
 class FusionGalleryConstraint:
-    def __init__(self, constraint, points, point_map, curves, entity_map):
+    def __init__(self, constraint, points, curves, entity_map):
+        """
+        Intialize a FusionGalleryConstraint
+
+        Args
+            constraint (dict): Constraint in the deepmind format, 
+                            i.e. sketch["constraintSequence"]["constraints"][n]
+                            which contains for example:
+                            {
+                                "coincidentConstraint": {
+                                    "entities": [
+                                        1,
+                                        7
+                                    ]
+                                }
+                            }
+            points(dict): Dictionary of FG points, where keys are uuids and values
+                            are FG point dicts
+            curves (dict): Dictionary of FG curves, where keys are uuids and values
+                            are FG curve dicts
+            entity_map (dict): Dictionary where the keys are the original numeric
+                            index of the entity in the deepmind data, and the
+                            values contain a dict with a type and uuid. This map
+                            allows us to connect the deepmind indices to the 
+                            unique uuids used in the FG dicts
+        """        
         self.points = points
-        self.point_map = point_map
         self.curves = curves
         self.entity_map = entity_map
         # UUID of the constraint
@@ -11,8 +41,16 @@ class FusionGalleryConstraint:
         # Type of constraint in deepmind terms
         self.type = list(constraint.keys())[0]
         # The entities referenced in the deepmind data
+        # stored in order of their index, in FG dict format
+        # with the addition of a uuid key
         self.entities = []
+        # Count the number of valid entities
+        self.entity_count = 0
         for cst_ent_index in constraint[self.type]["entities"]:
+            # Check that the referenced entity actually exists
+            if cst_ent_index not in entity_map:
+                self.entities.append(None)
+                continue
             # Type is either point or curve
             cst_type = entity_map[cst_ent_index]["type"]
             # UUID into either the points or curves dicts
@@ -27,6 +65,7 @@ class FusionGalleryConstraint:
                 "uuid": cst_uuid
             }
             self.entities.append(ent_data)
+            self.entity_count += 1
     
     def to_dict(self):
         """Make a Fusion 360 Gallery format dict for the constraint"""
@@ -58,31 +97,53 @@ class FusionGalleryConstraint:
             return "SketchPoint"
         return ent_type
 
+    def is_entity_type(self, index, entity_type):
+        if self.entities[index]["type"] == entity_type:
+            return True
+        return False
+    
+    def is_entity_point(self, index):
+        return self.is_entity_type(index, "Point3D")
+
+    def is_entity_line(self, index):
+        return self.is_entity_type(index, "SketchLine")
+
+    def is_entity_arc(self, index):
+        return self.is_entity_type(index, "SketchArc")
+
+    def is_entity_circle(self, index):
+        return self.is_entity_type(index, "SketchCircle")
+
     def make_coincident_constraint_cases(self):
-        assert len(self.entities) == 2
-        entity1_type = self.type_for_entity(0)
-        entity2_type = self.type_for_entity(1)
-        if entity1_type is None or entity2_type is None:
-            return None
-        if entity1_type == "SketchLine" and entity2_type == "SketchLine":
+        assert self.entity_count == 2
+        if self.is_entity_line(0) and self.is_entity_line(1):
             return self.make_collinear_constraint_dict()
-        if entity1_type == "SketchPoint" or entity2_type == "SketchPoint":
-            # Handle the case where two end points are constrained together
-            # and we have already deduplicated them
-            # So what we want to do is check if the the coincident constraint references
-            # the same two points, and skip it is if does            
+        if self.is_entity_point(0) or self.is_entity_point(1):
+            # In the OnShape world geometric entities own their points.
+            # For example a line owns its start and end point.
+            # Coincident constraints are then used to hold the end points together.
+
+            # In the Fusion Gallery world things are a little different.
+            # Fusion Gallery has SketchPoints which are geometric entities all by themselves.
+            # Geometric entities like lines will then reference the point entities
+            # and conicindent constraints are not required to hold them together.
+
+            # Basically this means we need to remove some points and coincident constraints
+            # from the data.
+
+            # Check if both entities refer to the same merged point to skip 
             if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
                 return None
             return self.make_coincident_constraint_dict()
-        if entity1_type == "SketchArc" or entity2_type == "SketchArc":
+        if self.is_entity_arc(0) or self.is_entity_arc(1):
             print("Warning - SketchArc, SketchArc coincident constraint not supported")
             return None
-        if entity1_type == "SketchCircle" or entity2_type == "SketchCircle":
+        if self.is_entity_circle(0) or self.is_entity_circle(1):
             print("Warning - SketchCircle, SketchCircle coincident constraint not supported")
             return None
         assert False, "Unknown case"
 
-    def make_coincident_constraint_dict(self, cst):
+    def make_coincident_constraint_dict(self):
         """
         {
             "type": "CoincidentConstraint",
@@ -90,7 +151,14 @@ class FusionGalleryConstraint:
             "point": "30278562-b47f-11ea-be85-180373af3277"
         }
         """
-        point, entity = self.find_point_and_entity(cst)
+        point = None
+        entity = None
+        if self.is_entity_point(0):
+            point = self.entities[0]
+            entity = self.entities[1]
+        elif self.is_entity_point(1):
+            point = self.entities[1]
+            entity = self.entities[0]
         if point is None:
             # Unhandled case.  Coincident lines.  Should this be a colinear constraint?
             # {
@@ -102,7 +170,59 @@ class FusionGalleryConstraint:
             return
         return {
             "type": "CoincidentConstraint",
-            "entity": entity,
-            "point": point
+            "entity": entity["uuid"],
+            "point": point["uuid"]
         }
-        
+
+    def make_collinear_constraint_dict(self):
+        """
+        {
+        "type": "CollinearConstraint",
+        "line_one": "d7852898-b74c-11ea-b79f-180373af3277",
+        "line_two": "d7854f9e-b74c-11ea-9502-180373af3277"
+        }
+        """
+        return {
+            "type": "CollinearConstraint",
+            "line_one": self.entities[0]["uuid"],
+            "line_two": self.entities[1]["uuid"]
+        }
+    
+    def make_horizontal_constraint_dict(self):
+        """
+        {
+            "line": "35d8a464-e0c6-11ea-9b94-c85b76a75ed8",
+            "type": "HorizontalConstraint"
+        }
+        """
+        if self.entity_count == 2:
+            if self.is_entity_point(0) and self.is_entity_point(1):
+                return {
+                    "point_one": self.entities[0]["uuid"],
+                    "point_two": self.entities[1]["uuid"],
+                    "type": "VerticalPointsConstraint"
+                }
+        elif self.is_entity_line(0):
+            return {
+                "line": self.entities[0]["uuid"],
+                "type": "HorizontalConstraint"
+            }
+        else:
+            assert False, "Unknown horizontal contraint entities"
+        return None
+    
+    def make_parallel_constraint_dict(self, cst):
+        """
+        {
+            "type": "ParallelConstraint",
+            "line_one": "44fae288-b820-11ea-9c62-180373af3277",
+            "line_two": "44fc8ff4-b820-11ea-a78c-180373af3277"
+        }
+        """
+        assert self.is_entity_line(0)
+        assert self.is_entity_line(1)
+        return {
+            "type": "ParallelConstraint",
+            "line_one": self.entities[0]["uuid"],
+            "line_two": self.entities[1]["uuid"]
+        }
