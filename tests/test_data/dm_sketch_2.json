@@ -1,0 +1,138 @@
+{
+    "entitySequence": {
+        "entities": [
+            {
+                "circleArcEntity": {
+                    "isConstruction": true,
+                    "center": {
+                        "x": -1.6493390140462348e-14
+                    },
+                    "circleParams": {
+                        "radius": 0.9999989996009844
+                    }
+                }
+            },
+            {
+                "circleArcEntity": {
+                    "isConstruction": true,
+                    "center": {
+                        "x": -1.6493390140462348e-14
+                    },
+                    "circleParams": {
+                        "radius": 0.49999949980048297
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.9999989996009636
+                    },
+                    "end": {
+                        "x": -0.4999994998004941,
+                        "y": 0.8660245374134804
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": -0.49999949980051184,
+                        "y": 0.8660245374134804
+                    },
+                    "end": {
+                        "x": -0.4999994998005207,
+                        "y": -0.8660245374134662
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": -0.4999994998004994,
+                        "y": -0.8660245374134946
+                    },
+                    "end": {
+                        "x": 0.9999989996010009
+                    }
+                }
+            },
+            {
+                "pointEntity": {
+                    "point": {
+                        "x": -1.6493390140462348e-14
+                    }
+                }
+            },
+            {
+                "pointEntity": {
+                    "point": {
+                        "x": 0.24999974990022938,
+                        "y": 0.4330122687067189
+                    }
+                }
+            }
+        ]
+    },
+    "constraintSequence": {
+        "constraints": [
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        3,
+                        1
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        13,
+                        3
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        8,
+                        6
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        11,
+                        9
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        6,
+                        0
+                    ]
+                }
+            },
+            {
+                "diameterConstraint": {
+                    "length": 1.9999979992019683
+                }
+            },
+            {
+                "tangentConstraint": {
+                    "first": 2,
+                    "second": 4
+                }
+            },
+            {
+                "midpointConstraint": {
+                    "midpoint": 14,
+                    "entity": 4
+                }
+            }
+        ]
+    }
+}

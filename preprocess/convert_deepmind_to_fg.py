@@ -7,6 +7,7 @@ into the Fusion 360 Gallery dataset format
 
 import argparse
 import json
+import uuid
 from pathlib import Path
 from tqdm import tqdm
 
@@ -60,10 +61,11 @@ def create_sketch_curves(dm_entities, point_map):
         entity_data = dm_ent[entity_name]
 
         if entity_name == "pointEntity":
+            dm_obj = DeepmindPoint(entity_data)
             # Find the point in the point map
             fg_obj = FusionGalleryPoint.from_xy_map(
-                entity_data["point"]["x"],
-                entity_data["point"]["y"],
+                dm_obj.x,
+                dm_obj.y,
                 point_map.map
             )
 
@@ -221,9 +223,16 @@ def create_constraints(dm_constraints, points, curves, constraint_entity_map):
     constraints_data = {}
     for dm_cst in dm_constraints:
         constraint = FusionGalleryConstraint(dm_cst, points, curves, constraint_entity_map)
-        cst_dict = constraint.to_dict()
-        if cst_dict is not None:
-            constraints_data[constraint.uuid] = cst_dict
+        cst_dict_or_list = constraint.to_dict()
+        if cst_dict_or_list is not None:
+            # Single constraint
+            if isinstance(cst_dict_or_list, dict):
+                constraints_data[constraint.uuid] = cst_dict_or_list
+            # Multiple constraint case
+            elif isinstance(cst_dict_or_list, list):
+                for cst_dict in cst_dict_or_list:
+                    cst_uuid = str(uuid.uuid1())
+                    constraints_data[cst_uuid] = cst_dict
     return constraints_data
 
 def main(args):

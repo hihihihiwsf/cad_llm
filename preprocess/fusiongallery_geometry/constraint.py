@@ -46,7 +46,10 @@ class FusionGalleryConstraint:
         self.entities = []
         # Count the number of valid entities
         self.entity_count = 0
-        for cst_ent_index in constraint[self.type]["entities"]:
+        # Standardize the list of entity indices
+        dm_entities = self.prepare_entity_indices(constraint)
+
+        for cst_ent_index in dm_entities:
             # Check that the referenced entity actually exists
             if cst_ent_index not in entity_map:
                 self.entities.append(None)
@@ -91,6 +94,27 @@ class FusionGalleryConstraint:
 
         return constraint_dict
 
+    def prepare_entity_indices(self, constraint):
+        """Standardize the list of entity indices from the deepmind constraint data"""
+        entities = None
+        if self.type == "tangentConstraint" or self.type == "perpendicularConstraint":
+            entities = [
+                constraint[self.type]["first"],
+                constraint[self.type]["second"]
+            ]
+        elif self.type == "midpointConstraint":
+            entities = [
+                constraint[self.type]["midpoint"]
+            ]
+            if "entity" in constraint[self.type]:
+                entities.append(constraint[self.type]["entity"])
+            elif "endpoints" in constraint[self.type]:
+                entities.append(constraint[self.type]["endpoints"]["first"])
+                entities.append(constraint[self.type]["endpoints"]["second"])
+        else:
+            entities = constraint[self.type]["entities"]
+        return entities
+
     def type_for_entity(self, index):
         ent_type = self.entities[index]["type"]
         if ent_type == "Point3D":
@@ -114,6 +138,12 @@ class FusionGalleryConstraint:
                 return False
         return True
 
+    def are_entities_lines(self):
+        for ent in self.entities:
+            if ent["type"] != "SketchLine":
+                return False
+        return True
+
     def is_entity_line(self, index):
         return self.is_entity_type(index, "SketchLine")
 
@@ -122,6 +152,10 @@ class FusionGalleryConstraint:
 
     def is_entity_circle(self, index):
         return self.is_entity_type(index, "SketchCircle")
+    
+    def is_entity_curve(self, index):
+        ent_type = self.entities[index]["type"]
+        return ent_type == "SketchLine" or ent_type == "SketchArc" or ent_type == "SketchCircle"
 
     def make_coincident_constraint_cases(self):
 
@@ -206,21 +240,28 @@ class FusionGalleryConstraint:
             "type": "HorizontalConstraint"
         }
         """
-        if self.entity_count == 2:
-            if self.is_entity_point(0) and self.is_entity_point(1):
-                return {
-                    "point_one": self.entities[0]["uuid"],
-                    "point_two": self.entities[1]["uuid"],
-                    "type": "VerticalPointsConstraint"
-                }
-        elif self.is_entity_line(0):
+        if self.entity_count == 2 and self.is_entity_point(0) and self.is_entity_point(1):
+            return {
+                "point_one": self.entities[0]["uuid"],
+                "point_two": self.entities[1]["uuid"],
+                "type": "HorizontalPointsConstraint"
+            }
+        elif self.entity_count == 1 and self.is_entity_line(0):
             return {
                 "line": self.entities[0]["uuid"],
                 "type": "HorizontalConstraint"
             }
+        elif self.entity_count > 2 and self.are_entities_lines():
+            # Handle multiple separate constraints
+            multi_cst = []
+            for ent in self.entities:
+                multi_cst.append({
+                    "line": ent["uuid"],
+                    "type": "HorizontalConstraint"
+                })
+            return multi_cst
         else:
             assert False, "Unknown horizontal contraint entities"
-        return None
     
     def make_parallel_constraint_dict(self):
         """
@@ -260,3 +301,79 @@ class FusionGalleryConstraint:
         else:
             assert False, "Unknown vertical constraint entities"
         return None
+    
+    def make_tangent_constraint_dict(self):
+        """
+        {
+            "curve_one": "35528476-e0c6-11ea-95eb-c85b76a75ed8",
+            "curve_two": "3551c13b-e0c6-11ea-bfd3-c85b76a75ed8",
+            "type": "TangentConstraint"
+        }
+        """
+        assert self.is_entity_curve(0)
+        assert self.is_entity_curve(0)
+        return {
+            "curve_one": self.entities[0]["uuid"], # first
+            "curve_two": self.entities[1]["uuid"], # second
+            "type": "TangentConstraint"
+        }
+
+    def make_perpendicular_constraint_dict(self):
+        """
+        {
+            "line_one": "35520f42-e0c6-11ea-a553-c85b76a75ed8",
+            "line_two": "35512506-e0c6-11ea-88c8-c85b76a75ed8",
+            "type": "PerpendicularConstraint"
+        
+        """
+        assert self.is_entity_line(0)
+        assert self.is_entity_line(1)
+        return {
+            "line_one": self.entities[0]["uuid"], # first
+            "line_two": self.entities[1]["uuid"], # second
+            "type": "PerpendicularConstraint"
+    }
+
+    def make_midpoint_constraint_dict(self):
+        """
+        {
+            "type": "MidPointConstraint",
+            "point": "ea5239a8-b406-11ea-91aa-180373af3277",
+            "mid_point_curve": "ea4bab00-b406-11ea-8100-180373af3277"
+        }
+        """
+        if self.entity_count == 2:
+            # Two entity case maps directly to what the FG format provides, i.e.:
+            # - point	Returns the sketch point being constrained.
+            # - midPointCurve	Returns the curve defining the midpoint.
+            
+            # {
+            #     "midpointConstraint": {
+            #         "midpoint": 14,
+            #         "entity": 4
+            #     }
+            # }            
+            assert self.is_entity_point(0)
+            assert self.is_entity_curve(1)
+
+            return {
+                "type": "MidPointConstraint",
+                "point": self.entities[0]["uuid"],          # midpoint
+                "mid_point_curve": self.entities[1]["uuid"] # entity
+            }
+        elif self.entity_count == 3:
+            # TODO: Three entity case we need to handle in a special way...
+            # e.g. We could create a sketch line, set it as construction geometry, 
+            # then make the mid point the middle of the line
+            # {
+            #     "midpointConstraint": {
+            #         "midpoint": 12,
+            #         "endpoints": {
+            #             "first": 5,
+            #             "second": 1
+            #         }
+            #     }
+            # }
+            assert False, "Unknown midpoint constraint entities"
+        else:
+            assert False, "Unknown midpoint constraint entities"
