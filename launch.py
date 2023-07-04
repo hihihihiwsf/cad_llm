@@ -51,7 +51,7 @@ def launch_sagemaker():
     exp_name = main_args.exp_name
 
     exp_run_name = exp_name.replace("_", "-") + '-' + datetime.now().strftime("%m-%d-%y-%H%M")
-    job_name = f"amir-{exp_run_name}"
+    job_name = f"sifan-{exp_run_name}"
     output_path = f"s3://{launch_args.s3_bucket}/jobs"
     print("Job name:", job_name)
     print("Entry point:", entry_point)
