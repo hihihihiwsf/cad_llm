@@ -49,9 +49,9 @@ def main():
     print("Loading model...")
 
     from transformers import ViTMAEForPreTraining 
-    model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
-    # model = ByT5Model(args=args, vit_mae=None)
-    # model.tokenizer = None
+    vitmae_model = VisRecon(args=args)
+    model = ByT5Model(args=args, vit_mae=None)
+    #model.tokenizer = None
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
@@ -81,11 +81,11 @@ def main():
         # limit_val_batches=0.1,
     )
     if not args.eval: 
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        trainer.fit(vitmae_model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
-        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
+        trainer.validate(vitmae_model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
 
 if __name__ == "__main__":
