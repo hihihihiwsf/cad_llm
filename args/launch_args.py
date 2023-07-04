@@ -29,7 +29,7 @@ def get_launch_args():
     parser.add_argument(
         "--s3_dataset",
         type=str,
-        default="sg_strings_v4",
+        default="sifan_test_ascii",
         help="Name of the dataset folder to use in s3"
     )
     parser.add_argument(
