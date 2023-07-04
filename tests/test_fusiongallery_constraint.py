@@ -11,29 +11,26 @@ class TestFusionGalleryConstraint(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        dm_sketch_file0 = Path("tests/test_data/dm_sketch_0.json")
-        with open(dm_sketch_file0) as f:
-            cls.dm_sketch_data0 = json.load(f)
-        cls.dm_entities0 = cls.dm_sketch_data0["entitySequence"]["entities"]
-        cls.dm_constraints0 = cls.dm_sketch_data0["constraintSequence"]["constraints"]
-        cls.points0, cls.point_map0 = create_sketch_points(cls.dm_entities0)
-        cls.curves0, cls.entity_map0 = create_sketch_curves(cls.dm_entities0, cls.point_map0)
-
-        dm_sketch_file1 = Path("tests/test_data/dm_sketch_1.json")
-        with open(dm_sketch_file1) as f:
-            cls.dm_sketch_data1 = json.load(f)
-        cls.dm_entities1 = cls.dm_sketch_data1["entitySequence"]["entities"]
-        cls.dm_constraints1 = cls.dm_sketch_data1["constraintSequence"]["constraints"]
-        cls.points1, cls.point_map1 = create_sketch_points(cls.dm_entities1)
-        cls.curves1, cls.entity_map1 = create_sketch_curves(cls.dm_entities1, cls.point_map1)
-
-        dm_sketch_file2 = Path("tests/test_data/dm_sketch_2.json")
-        with open(dm_sketch_file2) as f:
-            cls.dm_sketch_data2 = json.load(f)
-        cls.dm_entities2 = cls.dm_sketch_data2["entitySequence"]["entities"]
-        cls.dm_constraints2 = cls.dm_sketch_data2["constraintSequence"]["constraints"]
-        cls.points2, cls.point_map2 = create_sketch_points(cls.dm_entities2)
-        cls.curves2, cls.entity_map2 = create_sketch_curves(cls.dm_entities2, cls.point_map2)
+        # Load our test data and assign different numbered variables
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_0.json"), 0)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_1.json"), 1)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_2.json"), 2)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_3.json"), 3)
+    
+    def load_data(self, dm_sketch_file, index):
+        with open(dm_sketch_file) as f:
+            dm_sketch_data = json.load(f)
+        dm_entities = dm_sketch_data["entitySequence"]["entities"]
+        dm_constraints = dm_sketch_data["constraintSequence"]["constraints"]
+        points, point_map = create_sketch_points(dm_entities)
+        curves, entity_map = create_sketch_curves(dm_entities, point_map)
+        # Set the class variables with a dynamic index
+        setattr(self, f"dm_entities{index}", dm_entities)
+        setattr(self, f"dm_constraints{index}", dm_constraints)
+        setattr(self, f"points{index}", points)
+        setattr(self, f"point_map{index}", point_map)
+        setattr(self, f"curves{index}", curves)
+        setattr(self, f"entity_map{index}", entity_map)
 
     def test_coincident_constraint_merged_points(self):
         # This constraint is between identical points that meet to 
@@ -82,6 +79,18 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         self.assertIn("line", fg_cst_dict)
         self.assertIn(fg_cst_dict["line"], self.curves0)
 
+    def test_horizontal_constraint_points(self):
+        cst = self.dm_constraints3[5]
+        fg_cst = FusionGalleryConstraint(cst, self.points3, self.curves3, self.entity_map3)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_dict)
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "HorizontalPointsConstraint")
+        self.assertIn("point_one", fg_cst_dict)
+        self.assertIn("point_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["point_one"], self.points3)
+        self.assertIn(fg_cst_dict["point_two"], self.points3)
+
     def test_horizontal_constraint_multiple_lines(self):
         cst = self.dm_constraints1[11]
         fg_cst = FusionGalleryConstraint(cst, self.points1, self.curves1, self.entity_map1)
@@ -95,7 +104,7 @@ class TestFusionGalleryConstraint(unittest.TestCase):
             self.assertIn("line", fg_cst)
             self.assertIn(fg_cst["line"], self.curves1)
         
-    def test_vertical_points_constraint(self):
+    def test_vertical_constraint_points(self):
         cst = self.dm_constraints0[12]
         fg_cst = FusionGalleryConstraint(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
