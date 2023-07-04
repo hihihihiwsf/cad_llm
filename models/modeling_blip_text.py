@@ -35,9 +35,8 @@ from transformers.modeling_utils import (
     prune_linear_layer,
 )
 from transformers.utils import logging
-from configuration_blip import BlipTextConfig
+from .configuration_blip import BlipTextConfig
 
-from modeling_t5 import T5Stack
 
 
 logger = logging.get_logger(__name__)

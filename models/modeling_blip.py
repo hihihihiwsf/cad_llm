@@ -32,8 +32,8 @@ from transformers.utils import (
     logging,
     replace_return_docstrings,
 )
-from configuration_blip import BlipConfig, BlipTextConfig, BlipVisionConfig, BlipDecodeConfig
-from modeling_blip_text import BlipTextLMHeadModel, BlipTextModel
+from .configuration_blip import BlipConfig, BlipTextConfig, BlipVisionConfig #, BlipDecodeConfig
+from .modeling_blip_text import BlipTextLMHeadModel, BlipTextModel
 
 
 logger = logging.get_logger(__name__)
@@ -936,10 +936,12 @@ class BlipForConditionalGeneration(BlipPreTrainedModel):
         super().__init__(config)
 
         '''add encoder-decoder'''
-        #self.blip_model = BlipModel(config)
-
-        self.vision_model = BlipVisionModel(config.vision_config)
+        self.blip = BlipModel(config)
+        
+        self.vision_model = self.blip.vision_model
+        self.text_encoder = self.blip.text_model
         self.text_decoder = BlipTextLMHeadModel(config.multimodal_config)
+        
 
         self.decoder_input_ids = config.multimodal_config.bos_token_id
         self.decoder_pad_token_id = config.multimodal_config.pad_token_id
@@ -989,20 +991,29 @@ class BlipForConditionalGeneration(BlipPreTrainedModel):
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-
-        vision_outputs = self.vision_model(
+        blip_out = self.blip(
+            input_id=input_ids,
             pixel_values=pixel_values,
+            attention_mask=attention_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
+            return_dict=return_dict
         )
+        # vision_outputs = self.vision_model(
+        #     pixel_values=pixel_values,
+        #     output_attentions=output_attentions,
+        #     output_hidden_states=output_hidden_states,
+        #     return_dict=return_dict,
+        # )
 
-        image_embeds = vision_outputs[0]
+        image_embeds = blip_out.image_embeds #= vision_outputs[0]
+        text_embeds = blip_out.text_embeds
+        multimodal_embeds = torch.cat(image_embeds, text_embeds, -1)
 
         outputs = self.text_decoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            encoder_hidden_states=image_embeds,
+            encoder_hidden_states=multimodal_embeds,
             labels=labels,
             return_dict=return_dict,
             reduction="mean",

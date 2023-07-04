@@ -347,7 +347,7 @@ class BlipConfig(PretrainedConfig):
 
         self.text_config = BlipTextConfig(**text_config, is_decoder=False)
         self.vision_config = BlipVisionConfig(**vision_config)
-        self.multimodal_config = BlipTextConfig(**multimodal_config, is_decoder=True)
+        self.multimodal_config = BlipTextConfig(**multimodal_config, hidden_size=1024,is_decoder=True)
 
         self.text_config.encoder_hidden_size = self.vision_config.hidden_size
 

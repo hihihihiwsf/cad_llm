@@ -77,11 +77,14 @@ def main():
 
     print("Training the model...")
     log_every_n_steps = 10000
+
+    world_size = torch.cuda.device_count()
     trainer = pl.Trainer(
         callbacks=call_backs,
-        accelerator=args.accelerator,
-        devices=args.devices,
-        strategy=args.strategy,
+        accelerator="gpu", #args.accelerator,
+        devices=world_size,
+        strategy="fsdp",
+        precision=16,
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,

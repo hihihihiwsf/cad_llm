@@ -10,7 +10,10 @@ import torch
 import torch.optim as optim
 # import lightning.pytorch as pl
 import pytorch_lightning as pl
-from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer, BlipForConditionalGeneration, BlipConfig, AutoModelForVision2Seq
+from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer, AutoModelForVision2Seq
+from transformers import Blip2ForConditionalGeneration, Blip2Config, BlipForConditionalGeneration, BlipConfig
+#from .modeling_blip import BlipForConditionalGeneration, BlipConfig
+
 from transformers.modeling_utils import unwrap_model
 import sys
 
@@ -34,7 +37,7 @@ class BLIPModel(pl.LightningModule):
             model = BlipForConditionalGeneration(config)
             model._init_weights(model)  # maybe redundant
         else:
-            model = AutoModelForVision2Seq.from_pretrained(args.model_name)
+            model = Blip2ForConditionalGeneration.from_pretrained(args.model_name, torch_dtype=torch.float16)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name,padding_side="left")
@@ -161,7 +164,7 @@ class BLIPModel(pl.LightningModule):
         self.total_train_steps = train_batches * self.args.epochs
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
 
