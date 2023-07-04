@@ -24,7 +24,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from PIL import Image
 # import clip
 import numpy as np
-from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel, ViTMAEForPreTraining
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel, ViTMAEForPreTraining, ViTMAEConfig
 from geometry.visualize_vit import Visualize_VIT
 
 
@@ -34,6 +34,12 @@ class VisRecon(pl.LightningModule):
         self.save_hyperparameters()
 
         self.model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
+
+        if args.untrained_model:
+            config = ViTMAEConfig(patch_size=32)
+            model = ViTMAEForPreTraining(config)
+            model._init_weights(model)  # maybe redundant
+            self.model = model
         # self.model.requires_grad_(False)
         # self.m = torch.load('checkpoints/vitmae_deepmind/best.ckpt')
         
