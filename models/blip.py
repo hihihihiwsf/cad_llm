@@ -37,7 +37,7 @@ class BLIPModel(pl.LightningModule):
             model = BlipForConditionalGeneration(config)
             model._init_weights(model)  # maybe redundant
         else:
-            model = Blip2ForConditionalGeneration.from_pretrained(args.model_name, torch_dtype=torch.float16)
+            model = Blip2ForConditionalGeneration.from_pretrained(args.model_name) #, torch_dtype=torch.float16)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name,padding_side="left")

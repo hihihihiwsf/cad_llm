@@ -80,7 +80,7 @@ class SketchGraphsCollator:
         self.max_length = max_length
         self.args = args
         # _, self.clip_preprocess = clip.load("ViT-B/32")
-        self.clip_preprocess = Blip2Processor.from_pretrained(self.args.model_name)
+        self.clip_preprocess = Blip2Processor.from_pretrained(self.args.model_name) #Blip2Processor
 
     def tokenize(self, strings):
         return self.tokenizer(strings, padding="max_length", truncation=True,max_length=self.max_length, return_tensors="pt")
