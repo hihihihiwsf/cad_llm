@@ -15,7 +15,7 @@ def get_parser():
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
     parser.add_argument("--ascii_encoding", type=int, default=1,
                         help="Use ascii ByT5 encoding instead of single token encoding")
-    parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-220m", help="Huggingface model name")
+    parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-770m", help="Huggingface model name")
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
     parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")
@@ -35,7 +35,6 @@ def get_parser():
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")
     parser.add_argument("--cosinedecay", type=int, default=0, help="Apply Cosine Learning rate decay if true")
     parser.add_argument("--clipmodel", type=str, default="ViT-B/32", choices=['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'ViT-L/14@336px', 'openai/clip-vit-base-patch32', 'openai/clip-vit-large-patch14', 'openai/clip-vit-base-patch16'], help="Which clip model to use")
-    parser.add_argument("--train_mae", type=int, default=0, help="Training vit mae different config")
 
     return parser
 

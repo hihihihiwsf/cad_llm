@@ -50,10 +50,12 @@ def main():
 
     print("Loading model...")
 
-    if args.train_mae:
-        model = VisRecon(args=args)
-    else:
+    if not args.untrained_model:
         model = ByT5Model(args=args, vit_mae=None)
+    else:
+        print("train_mae", args.untrained_model)
+        model = VisRecon(args=args)
+        
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
     print("Loading data...")

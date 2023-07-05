@@ -83,6 +83,7 @@ class ByT5Model(pl.LightningModule):
         self.layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
+
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
         self.gelu = torch.nn.GELU()
 
@@ -221,6 +222,7 @@ class ByT5Model(pl.LightningModule):
             int(np.sqrt(image_embeds.shape[1])),
             image_embeds.shape[-1],
         )
+        '''do patch embedding for visual tokens'''
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
