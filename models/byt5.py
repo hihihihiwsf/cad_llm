@@ -26,6 +26,7 @@ from PIL import Image
 import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
 from models.modeling_vlt5 import T5ForConditionalGeneration
+from geometry.visualize_vit import Visualize_VIT
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, vit_mae=None):
@@ -53,8 +54,10 @@ class ByT5Model(pl.LightningModule):
         
         
         m = VisRecon(args=args)
-        m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        self.vit_mae = m.model
+        #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
+        m.load_from_checkpoint('/home/ec2-user/results/vitmae_deepmind/checkpoints/best.ckpt')
+        self.vit_mae = m.model 
+        self.vis_vit = m.vis_vit
         del m
         # self.vit_mae = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
         # self.vit_mae = vit_mae
@@ -136,7 +139,9 @@ class ByT5Model(pl.LightningModule):
             # image_features = oi.image_embeds
             # image_features = oi['pooler_output']
 
-
+        px = batch['images']
+        px = px['pixel_values']
+        self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
 
         image_for_llm = self.mapper(image_features.float())
         txt_embedder = self.model.get_input_embeddings()
@@ -165,7 +170,7 @@ class ByT5Model(pl.LightningModule):
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images'])) 
         image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
         # image_features = oi.image_embeds
         # image_features = oi['pooler_output']

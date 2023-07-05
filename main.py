@@ -74,7 +74,7 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        # resume_from_checkpoint=None,
+        resume_from_checkpoint='s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
         # precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
         # limit_train_batches=0.01,
@@ -84,7 +84,7 @@ def main():
         trainer.fit(vitmae_model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     else:
         # loading the model from exp_name/best.ckpt
-        ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
+        ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
         trainer.validate(vitmae_model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
 
