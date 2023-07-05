@@ -53,13 +53,14 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
         
         
-        m = VisRecon(args=args)
-        #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-        m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        self.vit_mae = m.model 
-        self.vit_mae.requires_grad_(False)
+        # m = VisRecon(args=args)
+        # #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
+        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+        # self.vit_mae = m.model 
+        # self.vit_mae.requires_grad_(False)
+        
         # self.vis_vit = m.vis_vit
-        del m
+        # del m
         # self.vit_mae = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
         # self.vit_mae = vit_mae
         
@@ -67,7 +68,7 @@ class ByT5Model(pl.LightningModule):
         # self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
         # self.clip_model = CLIPVisionModel.from_pretrained(args.clipmodel, output_hidden_states=True)
         # self.clip_model.requires_grad_(False)
-
+        self.vit_mae = vit_mae
         if self.vit_mae is not None:
             self.vis_model = self.vit_mae
             self.vis_model.config.mask_ratio = 0.

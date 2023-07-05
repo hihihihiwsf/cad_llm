@@ -35,12 +35,12 @@ class VisRecon(pl.LightningModule):
 
     
         # if args.untrained_model:
-        # config = ViTMAEConfig(patch_size=32)
-        # model = ViTMAEForPreTraining(config)
-        # model._init_weights(model)  # maybe redundant
-        # self.model = model
+        config = ViTMAEConfig(patch_size=32)
+        model = ViTMAEForPreTraining(config)
+        model._init_weights(model)  # maybe redundant
+        self.model = model
         # else:
-        self.model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
+        #self.model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
         # self.model.requires_grad_(False)
         # self.m = torch.load('checkpoints/vitmae_deepmind/best.ckpt')
         
