@@ -21,6 +21,8 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 import os
 from pytorch_lightning.strategies import DDPStrategy
 
+from transformers import AutoTokenizer
+
 def main():
     """Entry point for our training script"""
     args = get_training_args()
@@ -48,19 +50,15 @@ def main():
 
     print("Loading model...")
 
-    from transformers import ViTMAEForPreTraining 
-    vitmae_model = VisRecon(args=args)
-    #vitmae_model.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-    #vitmae_model.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-    vitmae_model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt')
-    # del vitmae_model
-    # vit_mae = vitmae_model.model
-    model = ByT5Model(args=args, vit_mae=None)
-    #model.tokenizer=AutoTokenizer.from_pretrained(args.model_name)
+    if args.train_mae:
+        model = VisRecon(args=args)
+    else:
+        model = ByT5Model(args=args, vit_mae=None)
+    tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="val", shuffle=False)
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
+    val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -86,11 +84,11 @@ def main():
         # limit_val_batches=0.1,
     )
     if not args.eval: 
-        trainer.fit(vitmae_model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        trainer.validate(vitmae_model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
+        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
 
 if __name__ == "__main__":

@@ -29,16 +29,16 @@ from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae=None):
+    def __init__(self, args, vit_mae):
         super().__init__()
         self.save_hyperparameters()
 
-        if args.untrained_model:
-            config = T5Config.from_pretrained(args.model_name)
-            model = T5ForConditionalGeneration(config)
-            model._init_weights(model)  # maybe redundant
-        else:
-            model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        # if args.untrained_model:
+        #     config = T5Config.from_pretrained(args.model_name)
+        #     model = T5ForConditionalGeneration(config)
+        #     model._init_weights(model)  # maybe redundant
+        # else:
+        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
@@ -65,9 +65,9 @@ class ByT5Model(pl.LightningModule):
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
-            #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt')
+            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
             self.vit_mae = m.model 
+        
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
         self.vis_model.requires_grad_(False)
@@ -79,8 +79,8 @@ class ByT5Model(pl.LightningModule):
         # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
 
-        self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
-        self.layer_norm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
+        #self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
+        self.layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
@@ -144,7 +144,7 @@ class ByT5Model(pl.LightningModule):
         '''owl vit'''
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
-        image_embeds = self.post_layernorm(last_hidden_state)
+        image_embeds = self.layernorm(last_hidden_state)
         
         # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
         # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
@@ -164,7 +164,7 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
+        image_for_llm = self.layernorm(image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1]))
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
@@ -205,7 +205,7 @@ class ByT5Model(pl.LightningModule):
         '''owl vit'''
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
-        image_embeds = self.post_layernorm(last_hidden_state)
+        image_embeds = self.layernorm(last_hidden_state)
         
         # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
         # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
@@ -222,10 +222,10 @@ class ByT5Model(pl.LightningModule):
             image_embeds.shape[-1],
         )
         image_embeds = image_embeds.permute(0,2,1)
-        image_embeds = self.layer_norm(self.embed_patch(image_embeds).permute(0,2,1))
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
 
-        image_for_llm = self.layer_norm(self.mapper(image_embeds.float()))
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         #image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
 
         txt_embedder = self.model.get_input_embeddings()
