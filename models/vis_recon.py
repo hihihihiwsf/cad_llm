@@ -130,10 +130,12 @@ class VisRecon(pl.LightningModule):
 
         outputs = self.model(**batch['images'])
         loss = outputs.loss
-        
-        # px = batch['images']
-        # px = px['pixel_values']
-        # self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
+        # if self.current_epoch == 0:
+            # print("epoch 0 begin draw image")
+            # px = batch['images']
+            # px = px['pixel_values']
+            # self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
+        #self.vis_vit.visualize(px.to(self.model.device))
         
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
