@@ -84,6 +84,7 @@ class ByT5Model(pl.LightningModule):
         self.layer_norm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
+        self.gelu = torch.nn.GELU()
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -153,16 +154,16 @@ class ByT5Model(pl.LightningModule):
         # image_embeds = self.layer_norm(image_embeds)
 
         # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        new_size = (
-            image_embeds.shape[0],
-            int(np.sqrt(image_embeds.shape[1])),
-            int(np.sqrt(image_embeds.shape[1])),
-            image_embeds.shape[-1],
-        )
+        # new_size = (
+        #     image_embeds.shape[0],
+        #     int(np.sqrt(image_embeds.shape[1])),
+        #     int(np.sqrt(image_embeds.shape[1])),
+        #     image_embeds.shape[-1],
+        # )
         image_embeds = image_embeds.permute(0,2,1)
-        image_embeds = self.layer_norm(self.embed_patch(image_embeds).permute(0,2,1))
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        image_for_llm = self.mapper(image_embeds.float())
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
 
         txt_embedder = self.model.get_input_embeddings()
