@@ -59,22 +59,20 @@ class ByT5Model(pl.LightningModule):
         # self.vit_mae = m.model 
         # self.vit_mae.requires_grad_(False)
         
-        # self.vis_vit = m.vis_vit
-        # del m
-        # self.vit_mae = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
-        # self.vit_mae = vit_mae
-        
-        # self.clip_model, _ = clip.load(args.clipmodel)
-        # self.clip_model = CLIPVisionModelWithProjection.from_pretrained(args.clipmodel)
-        # self.clip_model = CLIPVisionModel.from_pretrained(args.clipmodel, output_hidden_states=True)
-        # self.clip_model.requires_grad_(False)
-        self.vit_mae = vit_mae
-        if self.vit_mae is not None:
-            self.vis_model = self.vit_mae
-            self.vis_model.config.mask_ratio = 0.
-            self.vis_model.requires_grad_(False)
-            self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
+        self.vit_mae = vit_mae
+        if vit_mae is not None:
+            self.vit_mae = vit_mae
+        else:
+            m = VisRecon(args=args)
+            #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
+            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt')
+            self.vit_mae = m.model 
+        self.vis_model = self.vit_mae
+        self.vis_model.config.mask_ratio = 0.
+        self.vis_model.requires_grad_(False)
+        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
+       
         
         # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
         # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
@@ -83,6 +81,7 @@ class ByT5Model(pl.LightningModule):
 
         self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
         self.layer_norm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
+
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
         self.gelu = torch.nn.GELU()

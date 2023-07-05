@@ -52,11 +52,11 @@ def main():
     vitmae_model = VisRecon(args=args)
     #vitmae_model.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
     #vitmae_model.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-    #vitmae_model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt')
+    vitmae_model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt')
     # del vitmae_model
-    vit_mae = vitmae_model.model
-    model = ByT5Model(args=args, vit_mae=vit_mae)
-    #model.tokenizer = None
+    # vit_mae = vitmae_model.model
+    model = ByT5Model(args=args, vit_mae=None)
+    #model.tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
@@ -79,7 +79,7 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        resume_from_checkpoint='s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
+        #resume_from_checkpoint='/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt',    # 's3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
         # precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
         # limit_train_batches=0.01,
