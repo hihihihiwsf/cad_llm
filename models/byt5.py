@@ -79,8 +79,11 @@ class ByT5Model(pl.LightningModule):
         # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
         # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
+
         self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
         self.layer_norm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
+        self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
+        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -156,7 +159,8 @@ class ByT5Model(pl.LightningModule):
             int(np.sqrt(image_embeds.shape[1])),
             image_embeds.shape[-1],
         )
-        image_embeds = image_embeds.reshape(new_size)
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.layer_norm(self.embed_patch(image_embeds).permute(0,2,1))
 
         image_for_llm = self.mapper(image_embeds.float())
         image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
@@ -164,13 +168,6 @@ class ByT5Model(pl.LightningModule):
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
-        # code = torch.tensor(self.tokenizer.encode('code')).to(self.device)
-        # code = txt_embedder(code).unsqueeze(0)
-        # code = torch.repeat_interleave(code, image_features.shape[0], dim=0)
-
-        # imm = torch.tensor(self.tokenizer.encode('image')).to(self.device)
-        # imm = txt_embedder(imm).unsqueeze(0)
-        # imm = torch.repeat_interleave(imm, image_features.shape[0], dim=0)
         
         input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
@@ -223,10 +220,12 @@ class ByT5Model(pl.LightningModule):
             int(np.sqrt(image_embeds.shape[1])),
             image_embeds.shape[-1],
         )
-        image_embeds = image_embeds.reshape(new_size)
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.layer_norm(self.embed_patch(image_embeds).permute(0,2,1))
+
 
         image_for_llm = self.layer_norm(self.mapper(image_embeds.float()))
-        image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
+        #image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
