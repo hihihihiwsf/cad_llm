@@ -161,8 +161,8 @@ class ByT5Model(pl.LightningModule):
         #     int(np.sqrt(image_embeds.shape[1])),
         #     image_embeds.shape[-1],
         # )
-        image_embeds = image_embeds.permute(0,2,1)
-        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
+        # image_embeds = image_embeds.permute(0,2,1)
+        # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         image_for_llm = self.layernorm(image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1]))
@@ -223,8 +223,8 @@ class ByT5Model(pl.LightningModule):
             image_embeds.shape[-1],
         )
         '''do patch embedding for visual tokens'''
-        image_embeds = image_embeds.permute(0,2,1)
-        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
+        # image_embeds = image_embeds.permute(0,2,1)
+        # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
 
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
