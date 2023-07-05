@@ -16,6 +16,8 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         cls.load_data(cls, Path("tests/test_data/dm_sketch_1.json"), 1)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_2.json"), 2)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_3.json"), 3)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_4.json"), 4)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_5.json"), 5)
     
     def load_data(self, dm_sketch_file, index):
         with open(dm_sketch_file) as f:
@@ -170,3 +172,47 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         self.assertIsInstance(fg_cst_dict, dict)
         self.assertEqual(fg_cst_dict["type"], "MidPointConstraint")
         # TODO: Handle this case that has endpoints
+
+    def test_equal_constraint(self):
+        cst = self.dm_constraints4[8]
+        fg_cst = FusionGalleryConstraint(cst, self.points4, self.curves4, self.entity_map4)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_dict)
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "EqualConstraint")
+        self.assertIn("curve_one", fg_cst_dict)
+        self.assertIn("curve_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["curve_one"], self.curves4)
+        self.assertIn(fg_cst_dict["curve_two"], self.curves4)
+
+    def test_equal_constraint_multiple(self):
+        # Handle multiple entity equal constraints
+        # e.g.
+        # 
+        # "equalConstraint": {
+        #     "entities": [
+        #         0,
+        #         2,
+        #         4,
+        #         6,
+        #         14,
+        #         12,
+        #         10,
+        #         8
+        #     ]
+        # }
+        cst = self.dm_constraints5[5]
+        fg_cst = FusionGalleryConstraint(cst, self.points5, self.curves5, self.entity_map5)
+        fg_cst_list = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_list)
+        # This constraint is applied to multiple line pairs
+        # so we need to return multiple constraints
+        self.assertIsInstance(fg_cst_list, list)
+        # There should be a constraint between each entities
+        self.assertEqual(len(fg_cst_list), len(cst['equalConstraint']['entities']) - 1)
+        for fg_cst in fg_cst_list:
+            self.assertEqual(fg_cst["type"], "EqualConstraint")
+            self.assertIn("curve_one", fg_cst)
+            self.assertIn("curve_two", fg_cst)
+            self.assertIn(fg_cst["curve_one"], self.curves5)
+            self.assertIn(fg_cst["curve_two"], self.curves5)

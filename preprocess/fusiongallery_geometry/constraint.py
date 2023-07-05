@@ -377,3 +377,47 @@ class FusionGalleryConstraint:
             assert False, "Unknown midpoint constraint entities"
         else:
             assert False, "Unknown midpoint constraint entities"
+
+    def make_equal_constraint_dict(self):
+        """
+        {
+            "curve_one": "3551e838-e0c6-11ea-a5b3-c85b76a75ed8",
+            "curve_two": "3551c13b-e0c6-11ea-bfd3-c85b76a75ed8",
+            "type": "EqualConstraint"
+        }
+        """
+        assert self.is_entity_curve(0)
+        assert self.is_entity_curve(1)
+
+        if self.entity_count == 2:
+            return {
+                "curve_one": self.entities[0]["uuid"],
+                "curve_two": self.entities[1]["uuid"],
+                "type": "EqualConstraint"
+            }
+
+        elif self.entity_count > 2:
+            # Loop to handle multiple entity equal constraints
+            # e.g.
+            # 
+            # "equalConstraint": {
+            #     "entities": [
+            #         0,
+            #         2,
+            #         4,
+            #         6,
+            #         14,
+            #         12,
+            #         10,
+            #         8
+            #     ]
+            # }
+            multi_cst = []
+            for index in range(self.entity_count - 1):
+                multi_cst.append({
+                    "curve_one": self.entities[index]["uuid"],
+                    "curve_two": self.entities[index + 1]["uuid"],
+                    "type": "EqualConstraint"
+                })
+            return multi_cst
+
