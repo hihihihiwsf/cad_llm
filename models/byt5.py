@@ -225,7 +225,7 @@ class ByT5Model(pl.LightningModule):
         )
         image_embeds = image_embeds.reshape(new_size)
 
-        image_for_llm = self.mapper(image_embeds.float())
+        image_for_llm = self.layer_norm(self.mapper(image_embeds.float()))
         image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
 
         txt_embedder = self.model.get_input_embeddings()
