@@ -55,7 +55,7 @@ class ByT5Model(pl.LightningModule):
         
         m = VisRecon(args=args)
         #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-        m.load_from_checkpoint('/home/ec2-user/results/vitmae_deepmind/checkpoints/best.ckpt')
+        m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
         self.vit_mae = m.model 
         self.vit_mae.requires_grad_(False)
         # self.vis_vit = m.vis_vit
