@@ -34,7 +34,7 @@ class VisRecon(pl.LightningModule):
         self.save_hyperparameters()
 
     
-        if args.untrained_model:
+        if args.train_mae:
             config = ViTMAEConfig(patch_size=32)
             model = ViTMAEForPreTraining(config)
             model._init_weights(model)  # maybe redundant
@@ -73,40 +73,6 @@ class VisRecon(pl.LightningModule):
 
         if args.lora:
             self.add_lora()
-
-    def add_lora(self):
-        lora_config = LoraConfig(
-            r=16,
-            lora_alpha=64,
-            target_modules=["q", "v", "SelfAttention.k", "EncDecAttention.k", "SelfAttention.o", "EncDecAttention.o"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type=TaskType.SEQ_2_SEQ_LM
-        )
-        # prepare int-8 model for training
-        self.model = prepare_model_for_int8_training(self.model)
-        # add LoRA adaptor
-        self.model = get_peft_model(self.model, lora_config)
-        # unfreeze embeddings
-        self.model.get_input_embeddings().weight.requires_grad = True
-        # unfreeze last layer
-        for name, param in self.model.named_parameters():
-            if "decoder.block.5" in name or name in ["decoder.final_layer_norm.weight", "lm_head.weight"]:
-                param.requires_grad = True
-
-        self.model.print_trainable_parameters()
-
-    def adjust_to_use_new_tokens(self):
-        # Add new tokens to the tokenizer
-        new_tokens = [f"<{i}>" for i in self.quantized_range]
-        self.tokenizer.add_tokens(new_tokens)
-
-        # Add new token embeddings and initialize using learned embeddings
-        self.model.resize_token_embeddings(len(self.tokenizer))
-        embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(1, len(new_tokens)+1):
-            # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
 
