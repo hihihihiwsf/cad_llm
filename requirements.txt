@@ -10,3 +10,4 @@ datasets
 transformers
 tensorboardX
 peft
+opencv-python-headless

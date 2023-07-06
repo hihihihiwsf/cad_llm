@@ -7,7 +7,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="data/deepmind_strings_v1", help="Dataset path")
+    parser.add_argument("--dataset", type=str, default="deepmind_strings_v1", help="Dataset path")
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
@@ -32,7 +32,7 @@ def get_parser():
     parser.add_argument("--seed", type=int, default=0, help="Random seed to use")
     parser.add_argument("--limit_data", type=float, default=1.0, help="Percentage of data to train on")
     # parser.add_argument("--val_every_n_epoch", type=int, default=1, help="Check validation after n training epochs")
-    parser.add_argument("--val_check_interval", type=int, default=10000, help="Check validation after n training steps")
+    parser.add_argument("--val_check_interval", type=float, default=1., help="Check validation after fraction of epoch")
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")
     parser.add_argument("--cosinedecay", type=int, default=1, help="Apply Cosine Learning rate decay if true")
 

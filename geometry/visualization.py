@@ -1,4 +1,7 @@
 import matplotlib.pyplot as plt
+import numpy as np
+
+from geometry.parse import get_curves
 
 
 def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
@@ -36,3 +39,16 @@ def draw_curves(curves, ax, box_lim, color, draw_points=False):
     for curve in curves:
         if curve and curve.good:
             curve.draw(ax=ax,  color=color, draw_points=draw_points)
+
+
+def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
+    np_image = np.ones((size, size, 3), np.uint8) * 255
+    cell_size = size // quantize_bins
+
+    curves = get_curves(point_entities)
+    assert all(curve for curve in curves)
+
+    for curve in curves:
+        curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)
+
+    return np_image

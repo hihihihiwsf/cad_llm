@@ -85,12 +85,13 @@ def launch_sagemaker():
         # checkpoint_s3_uri=checkpoint_s3_uri,
         use_spot_instances=launch_args.use_spot_instances,
         max_wait=max_wait,
-        debugger_hook_config=False  # Disable debugger
+        debugger_hook_config=False,  # Disable debugger
+        # keep_alive_period_in_seconds=1800,
     )
 
     # We currently just use a single folder for train/valid/test, lets call it train
     dataset_path = {
-        "train": f"s3://{launch_args.s3_bucket}/dataset/{launch_args.s3_dataset}"
+        "train": f"s3://{launch_args.s3_bucket}/dataset/{main_args.dataset}"
     }
     estimator.fit(
         dataset_path,

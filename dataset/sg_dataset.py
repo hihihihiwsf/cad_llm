@@ -1,8 +1,12 @@
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import random
 import json
+import random
 from pathlib import Path
+import subprocess
+import time
+
+import numpy as np
+import pytorch_lightning as pl
+from torch.utils.data import Dataset, DataLoader
 
 
 class SketchGraphsDataset(Dataset):
@@ -101,3 +105,40 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+
+class SketchGraphsDataModule(pl.LightningDataModule):
+    def __init__(self, tokenizer, args, ray_args):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.args = args
+        self.ray_args = ray_args
+
+    def setup(self, stage):
+        self.aws_s3_sync(f"s3://{self.ray_args.input_s3_bucket}", self.args.dataset)
+
+    def train_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="train",
+                shuffle=True
+        )
+
+    def val_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="val",
+                shuffle=False
+        )
+    
+    @staticmethod
+    def aws_s3_sync(source, destination):
+        cmd = ["aws", "s3", "sync", "--quiet", source, destination]
+        print(f"Syncing files from {source} to {destination}")
+        start_time = time.time()
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p.wait()
+        end_time = time.time()
+        print("Time Taken to Sync: ", (end_time - start_time))
+        return

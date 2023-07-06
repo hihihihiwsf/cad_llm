@@ -35,7 +35,7 @@ class SketchSG(SketchBase):
 
         curves = []
         # [ Line, Arc, Circle ]
-        curve_type_counts = np.zeros(3, dtype=np.long)
+        curve_count = 0
         construction_count = 0
         for ent in self.sketch.entities.values():
             # Ignore construction lines
@@ -45,16 +45,16 @@ class SketchSG(SketchBase):
             curve = None
             if isinstance(ent, Line):
                 curve = self.convert_line(ent)
-                curve_type_counts[0] += 1
+                curve_count += 1
             elif isinstance(ent, Arc):
                 curve = self.convert_arc(ent)
-                curve_type_counts[1] += 1
+                curve_count += 1
             elif isinstance(ent, Circle):
                 curve = self.convert_circle(ent)
-                curve_type_counts[2] += 1
+                curve_count += 1
             if curve:
                 curves.append(curve)
-        curve_count = np.sum(curve_type_counts)
+
         # Return if the sketch doesn't have any curves
         if curve_count == 0 or len(self.point_map) == 0:
             # If we have construction geometry in an empty sketch

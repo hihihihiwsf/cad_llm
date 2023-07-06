@@ -1,0 +1,10 @@
+# Pytorch and Lightning are pre-installed on the Ray cluster container
+
+torchmetrics==0.11.3
+comet_ml
+datasets
+transformers
+tensorboardX
+peft
+matplotlib
+opencv-python

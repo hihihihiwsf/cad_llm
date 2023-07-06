@@ -1,8 +1,12 @@
-import numpy as np
+import cv2
+import matplotlib.lines as lines
 import matplotlib.patches as patches
+import numpy as np
 
 import geometry.geom_utils as geom_utils
 from geometry.curve import Curve
+from geometry.opencv_colors import CV2_COLORS
+
 
 class Arc(Curve):
     def __init__(self, points):
@@ -11,7 +15,16 @@ class Arc(Curve):
         self.find_arc_geometry()
 
     def draw(self, ax, draw_points=True, linewidth=1, color="green"):
-        assert self.good, "The curve is not in the good state"
+        if not self.good:
+            # The points are co-linear, the arc is a line (probably due to quantization)
+            xdata, ydata = zip(self.points[0], self.points[2])
+            l1 = lines.Line2D(xdata, ydata, lw=linewidth, linestyle="-", color=color, axes=ax)
+            ax.add_line(l1)
+
+            if draw_points:
+                self.draw_points(ax)
+            return
+
         diameter = 2.0*self.radius
         start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
         end_angle = geom_utils.rads_to_degs(self.end_angle_rads)
@@ -29,6 +42,40 @@ class Arc(Curve):
         ax.add_patch(ap)
         if draw_points:
             self.draw_points(ax)
+
+    def draw_np(self, np_image, draw_points=True, linewidth=1, color="green", cell_size=4):
+        """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
+
+        shifted_points = self.get_shifted_points(cell_size=cell_size)
+
+        if not self.good:
+            # The points are co-linear, the arc is a line (probably due to quantization)
+            cv2.line(np_image, shifted_points[0], shifted_points[1], CV2_COLORS[color], thickness=linewidth)
+
+            if draw_points:
+                self.draw_points_np(np_image, cell_size)
+
+            return
+
+        # Round to integers for plotting with cv2.ellipse
+        center = np.rint(self.shift_point(self.center, cell_size=cell_size)).astype(np.int32)
+        radius = np.rint(self.radius * cell_size).astype(np.int32)
+
+        start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
+        end_angle = geom_utils.rads_to_degs(self.end_angle_rads)
+
+        # workaround for what seems like a bug in opencv
+        if end_angle < start_angle:
+            end_angle += 360
+
+        cv2.ellipse(np_image, center=center, axes=(radius, radius), angle=0, startAngle=start_angle, endAngle=end_angle,
+                    color=CV2_COLORS[color], thickness=linewidth)
+
+        if draw_points:
+            self.draw_points_np(np_image, cell_size)
+
+        return np_image
+
 
     def find_arc_geometry(self):
         #     Subject 1.04: How do I generate a circle through three points?
@@ -73,7 +120,7 @@ class Arc(Curve):
         tiny_tol = 1e-7
 
         if np.abs(G) < tiny_tol:
-            self.invalid_reason = "Arc has zero length"
+            self.invalid_reason = "Arc is a line or has zero length"
             return
     
         p_0 = (D*E - B*F) / G
