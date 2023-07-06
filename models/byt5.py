@@ -79,8 +79,8 @@ class ByT5Model(pl.LightningModule):
         # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
 
-        #self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
-        self.layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
+        self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
+        self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
 
@@ -145,7 +145,7 @@ class ByT5Model(pl.LightningModule):
         '''owl vit'''
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
-        image_embeds = self.layernorm(last_hidden_state)
+        image_embeds = self.post_layernorm(last_hidden_state)
         
         # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
         # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
@@ -161,11 +161,11 @@ class ByT5Model(pl.LightningModule):
         #     int(np.sqrt(image_embeds.shape[1])),
         #     image_embeds.shape[-1],
         # )
-        # image_embeds = image_embeds.permute(0,2,1)
-        # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        image_for_llm = self.layernorm(image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1]))
+        image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
@@ -206,7 +206,7 @@ class ByT5Model(pl.LightningModule):
         '''owl vit'''
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
-        image_embeds = self.layernorm(last_hidden_state)
+        image_embeds = self.post_layernorm(last_hidden_state)
         
         # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
         # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
@@ -216,30 +216,21 @@ class ByT5Model(pl.LightningModule):
         # image_embeds = self.layer_norm(image_embeds)
 
         # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        new_size = (
-            image_embeds.shape[0],
-            int(np.sqrt(image_embeds.shape[1])),
-            int(np.sqrt(image_embeds.shape[1])),
-            image_embeds.shape[-1],
-        )
-        '''do patch embedding for visual tokens'''
-        # image_embeds = image_embeds.permute(0,2,1)
-        # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
-
+        # new_size = (
+        #     image_embeds.shape[0],
+        #     int(np.sqrt(image_embeds.shape[1])),
+        #     int(np.sqrt(image_embeds.shape[1])),
+        #     image_embeds.shape[-1],
+        # )
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        #image_for_llm =  image_for_llm.reshape(image_for_llm.shape[0],-1, image_for_llm.shape[-1])
+        image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
-        # code = torch.tensor(self.tokenizer.encode('code')).to(self.device)
-        # code = txt_embedder(code).unsqueeze(0)
-        # code = torch.repeat_interleave(code, image_features.shape[0], dim=0)
-
-        # imm = torch.tensor(self.tokenizer.encode('image')).to(self.device)
-        # imm = txt_embedder(imm).unsqueeze(0)
-        # imm = torch.repeat_interleave(imm, image_features.shape[0], dim=0)
         
         input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
