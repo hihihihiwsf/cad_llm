@@ -18,6 +18,8 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         cls.load_data(cls, Path("tests/test_data/dm_sketch_3.json"), 3)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_4.json"), 4)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_5.json"), 5)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_6.json"), 6)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_7.json"), 7)
     
     def load_data(self, dm_sketch_file, index):
         with open(dm_sketch_file) as f:
@@ -216,3 +218,30 @@ class TestFusionGalleryConstraint(unittest.TestCase):
             self.assertIn("curve_two", fg_cst)
             self.assertIn(fg_cst["curve_one"], self.curves5)
             self.assertIn(fg_cst["curve_two"], self.curves5)
+
+    def test_concentric_constraint(self):
+        # Test concentric with two curves
+        cst = self.dm_constraints6[23]
+        fg_cst = FusionGalleryConstraint(cst, self.points6, self.curves6, self.entity_map6)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_dict)
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "ConcentricConstraint")
+        self.assertIn("curve_one", fg_cst_dict)
+        self.assertIn("curve_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["curve_one"], self.curves6)
+        self.assertIn(fg_cst_dict["curve_two"], self.curves6)
+
+    def test_concentric_constraint_points(self):
+        # Test concentric with two points
+        cst = self.dm_constraints7[9]
+        fg_cst = FusionGalleryConstraint(cst, self.points7, self.curves7, self.entity_map7)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_dict)
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "ConcentricConstraint")
+        self.assertIn("curve_one", fg_cst_dict)
+        self.assertIn("curve_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["curve_one"], self.curves7)
+        self.assertIn(fg_cst_dict["curve_two"], self.curves7)
+

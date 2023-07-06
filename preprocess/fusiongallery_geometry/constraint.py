@@ -4,9 +4,10 @@ FusionGalleryConstraint represents a sketch constraint in the Fusion 360 Gallery
 
 """
 
-import uuid
+from preprocess.fusiongallery_geometry.base_constraint import FusionGalleryBaseConstraint
 
-class FusionGalleryConstraint:
+
+class FusionGalleryConstraint(FusionGalleryBaseConstraint):
     def __init__(self, constraint, points, curves, entity_map):
         """
         Intialize a FusionGalleryConstraint
@@ -33,42 +34,7 @@ class FusionGalleryConstraint:
                             allows us to connect the deepmind indices to the 
                             unique uuids used in the FG dicts
         """        
-        self.points = points
-        self.curves = curves
-        self.entity_map = entity_map
-        # UUID of the constraint
-        self.uuid = str(uuid.uuid1())
-        # Type of constraint in deepmind terms
-        self.type = list(constraint.keys())[0]
-        # The entities referenced in the deepmind data
-        # stored in order of their index, in FG dict format
-        # with the addition of a uuid key
-        self.entities = []
-        # Count the number of valid entities
-        self.entity_count = 0
-        # Standardize the list of entity indices
-        dm_entities = self.prepare_entity_indices(constraint)
-
-        for cst_ent_index in dm_entities:
-            # Check that the referenced entity actually exists
-            if cst_ent_index not in entity_map:
-                self.entities.append(None)
-                continue
-            # Type is either point or curve
-            cst_type = entity_map[cst_ent_index]["type"]
-            # UUID into either the points or curves dicts
-            cst_uuid = entity_map[cst_ent_index]["uuid"]
-            if cst_type == "point":
-                ent = points[cst_uuid]
-            elif cst_type == "curve":
-                ent = curves[cst_uuid]
-            # New dictionary with the additional uuid value
-            ent_data = {
-                **ent,
-                "uuid": cst_uuid
-            }
-            self.entities.append(ent_data)
-            self.entity_count += 1
+        super().__init__(constraint, points, curves, entity_map)
     
     def to_dict(self):
         """Make a Fusion 360 Gallery format dict for the constraint"""
@@ -91,75 +57,9 @@ class FusionGalleryConstraint:
             constraint_dict = self.make_equal_constraint_dict()
         elif self.type == "concentricConstraint":
             constraint_dict = self.make_concentric_constraint_dict()
-
         return constraint_dict
 
-    def prepare_entity_indices(self, constraint):
-        """Standardize the list of entity indices from the deepmind constraint data"""
-        entities = None
-        if self.type == "tangentConstraint" or self.type == "perpendicularConstraint":
-            entities = [
-                constraint[self.type]["first"],
-                constraint[self.type]["second"]
-            ]
-        elif self.type == "midpointConstraint":
-            entities = [
-                constraint[self.type]["midpoint"]
-            ]
-            if "entity" in constraint[self.type]:
-                entities.append(constraint[self.type]["entity"])
-            elif "endpoints" in constraint[self.type]:
-                entities.append(constraint[self.type]["endpoints"]["first"])
-                entities.append(constraint[self.type]["endpoints"]["second"])
-        else:
-            entities = constraint[self.type]["entities"]
-        return entities
-
-    def type_for_entity(self, index):
-        ent_type = self.entities[index]["type"]
-        if ent_type == "Point3D":
-            return "SketchPoint"
-        return ent_type
-
-    def is_entity_type(self, index, entity_type):
-        if self.entities[index]["type"] == entity_type:
-            return True
-        return False
-    
-    def is_entity_point(self, index):
-        return self.is_entity_type(index, "Point3D")
-
-    def entity_points_identical(self):
-        first_uuid = self.entities[0]["uuid"]
-        for ent in self.entities:
-            if ent["type"] != "Point3D":
-                return False
-            if ent["uuid"] != first_uuid:
-                return False
-        return True
-
-    def are_entities_lines(self):
-        for ent in self.entities:
-            if ent["type"] != "SketchLine":
-                return False
-        return True
-
-    def is_entity_line(self, index):
-        return self.is_entity_type(index, "SketchLine")
-
-    def is_entity_arc(self, index):
-        return self.is_entity_type(index, "SketchArc")
-
-    def is_entity_circle(self, index):
-        return self.is_entity_type(index, "SketchCircle")
-    
-    def is_entity_curve(self, index):
-        ent_type = self.entities[index]["type"]
-        return ent_type == "SketchLine" or ent_type == "SketchArc" or ent_type == "SketchCircle"
-
     def make_coincident_constraint_cases(self):
-
-        # assert self.entity_count == 2
         if self.is_entity_line(0) and self.is_entity_line(1):
             return self.make_collinear_constraint_dict()
         if self.is_entity_point(0) or self.is_entity_point(1):
@@ -421,3 +321,25 @@ class FusionGalleryConstraint:
                 })
             return multi_cst
 
+    def make_concentric_constraint_dict(self):
+        """
+        {
+            "curve_one": "35d940b2-e0c6-11ea-a286-c85b76a75ed8",
+            "curve_two": "35d940b0-e0c6-11ea-b276-c85b76a75ed8",
+            "type": "ConcentricConstraint"
+        }
+        """
+        curve_one = self.entities[0]["uuid"]
+        curve_two = self.entities[1]["uuid"]
+
+        # Find the parent curves for points
+        if self.is_entity_point(0):
+            curve_one = self.entities[0]["parent"]
+        if self.is_entity_point(1):
+            curve_two = self.entities[1]["parent"]
+
+        return {
+            "curve_one": curve_one,
+            "curve_two": curve_two,
+            "type": "ConcentricConstraint"
+        }

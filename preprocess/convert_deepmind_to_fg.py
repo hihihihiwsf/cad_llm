@@ -18,31 +18,30 @@ from preprocess.preprocess_utils import get_files, get_output_dir
 
 
 def convert_data(dm_data):
-    for i, dm_sketch in enumerate(tqdm(dm_data)):
-        fg_sketch = convert_sketch(dm_sketch)
+    for index, dm_sketch in enumerate(tqdm(dm_data)):
+        fg_sketch = convert_sketch(dm_sketch, index)
         if fg_sketch is None:
-            print(f"Skipping sketch {i}")
+            print(f"Skipping sketch {index}")
         else:
             # TODO: Do something with the FG sketch
             pass
 
 
-def convert_sketch(dm_sketch):
+def convert_sketch(dm_sketch, index):
     dm_entities = dm_sketch["entitySequence"]["entities"]
     dm_constraints = dm_sketch["constraintSequence"]["constraints"]
     points, point_map = create_sketch_points(dm_entities)
     curves, constraint_entity_map = create_sketch_curves(dm_entities, point_map)
     if curves is None or len(curves) == 0:
         return None
-    constraints = create_constraints(dm_constraints, points, curves, constraint_entity_map)
-    # dimensions = create_dimensions()
+    constraints, dimensions = create_constraints_and_dimensions(dm_constraints, points, curves, constraint_entity_map)
     fusion_gallery_sketch = {
-        "name": "Sketch1",
+        "name": f"Sketch{index}",
         "type": "Sketch",
         "points": points,
         "curves": curves,
-        "constraints": {},
-        "dimensions": {}
+        "constraints": constraints,
+        "dimensions": dimensions
     }
     return fusion_gallery_sketch
 
@@ -149,7 +148,8 @@ def update_constraint_entity_map(entity_map, fg_obj, fg_dict, index):
         # center
         entity_map[updated_index] = {
             "type": "point",
-            "uuid": fg_dict["center_point"]
+            "uuid": fg_dict["center_point"],
+            "parent": fg_obj.uuid
         }
         updated_index += 1
 
@@ -163,19 +163,22 @@ def update_constraint_entity_map(entity_map, fg_obj, fg_dict, index):
         # center
         entity_map[updated_index] = {
             "type": "point",
-            "uuid": fg_dict["center_point"]
+            "uuid": fg_dict["center_point"],
+            "parent": fg_obj.uuid
         }
         updated_index += 1
         # start_point
         entity_map[updated_index] = {
             "type": "point",
-            "uuid": fg_dict["start_point"]
+            "uuid": fg_dict["start_point"],
+            "parent": fg_obj.uuid
         }
         updated_index += 1
         # end_point
         entity_map[updated_index] = {
             "type": "point",
-            "uuid": fg_dict["end_point"]
+            "uuid": fg_dict["end_point"],
+            "parent": fg_obj.uuid
         }
         updated_index += 1
     
@@ -189,13 +192,15 @@ def update_constraint_entity_map(entity_map, fg_obj, fg_dict, index):
         # start_point
         entity_map[updated_index] = {
             "type": "point",
-            "uuid": fg_dict["start_point"]
+            "uuid": fg_dict["start_point"],
+            "parent": fg_obj.uuid
         }
         updated_index += 1
         # end_point
         entity_map[updated_index] = {
             "type": "point",
-            "uuid": fg_dict["end_point"]
+            "uuid": fg_dict["end_point"],
+            "parent": fg_obj.uuid
         }
         updated_index += 1
     
@@ -218,22 +223,39 @@ def create_sketch_points(dm_entities):
     return point_data, point_map    
 
 
-def create_constraints(dm_constraints, points, curves, constraint_entity_map):
-    """Create the constraints data structure"""
+def create_constraints_and_dimensions(dm_constraints, points, curves, constraint_entity_map):
+    """Create the constraints and dimensions data structure"""
     constraints_data = {}
-    for dm_cst in dm_constraints:
-        constraint = FusionGalleryConstraint(dm_cst, points, curves, constraint_entity_map)
-        cst_dict_or_list = constraint.to_dict()
-        if cst_dict_or_list is not None:
-            # Single constraint
-            if isinstance(cst_dict_or_list, dict):
-                constraints_data[constraint.uuid] = cst_dict_or_list
-            # Multiple constraint case
-            elif isinstance(cst_dict_or_list, list):
-                for cst_dict in cst_dict_or_list:
+    dimensions_data = {}
+    for constraint in dm_constraints:
+        if FusionGalleryDimension.is_dimension(constraint):
+            create_dimension(constraint, points, curves, constraint_entity_map, dimensions_data)
+        else:
+            create_constraint(constraint, points, curves, constraint_entity_map, constraints_data)
+    return constraints_data, dimensions_data
+
+
+def create_constraint(constraint, points, curves, constraint_entity_map, constraints_data):
+    """Create a constraint and add it to the provided constraints_data dictionary"""
+    constraint = FusionGalleryConstraint(constraint, points, curves, constraint_entity_map)
+    cst_dict_or_list = constraint.to_dict()
+    if cst_dict_or_list is not None:
+        # Single constraint
+        if isinstance(cst_dict_or_list, dict):
+            constraints_data[constraint.uuid] = cst_dict_or_list
+        # Multiple constraint case
+        elif isinstance(cst_dict_or_list, list):
+            for cst_dict in cst_dict_or_list:
+                if cst_dict is not None:
                     cst_uuid = str(uuid.uuid1())
                     constraints_data[cst_uuid] = cst_dict
-    return constraints_data
+
+
+def create_dimension(dimension, points, curves, constraint_entity_map, dimensions_data):
+    """Create a constraint and add it to the provided constraints_data dictionary"""
+    dimension_dict = FusionGalleryDimension(dimension, points, curves, constraint_entity_map)
+    dimensions_data[dimension.uuid] = dimension_dict
+
 
 def main(args):
 
