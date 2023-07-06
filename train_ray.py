@@ -43,7 +43,7 @@ def train_on_ray_cluster():
     datamodule.setup("fit")
     num_train_batches = len(datamodule.train_dataloader())
 
-    ByT5Model.set_total_train_steps(
+    ByT5Model.set_total_train_steps_ray(
         num_train_batches=num_train_batches,
         n_gpus=ray_args.num_gpus,
         epochs=main_args.epochs
