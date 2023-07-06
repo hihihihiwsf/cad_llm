@@ -25,6 +25,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 class ByT5Model(pl.LightningModule):
+    total_train_steps = None
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters()
@@ -158,7 +159,14 @@ class ByT5Model(pl.LightningModule):
         # Assumes running on gpus, one node and no accumulate_grad_batches
         n_gpus = torch.cuda.device_count()
         train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
-        self.total_train_steps = train_batches * self.args.epochs
+        ByT5Model.total_train_steps = train_batches * self.args.epochs
+    
+    @staticmethod
+    def set_total_train_steps(num_train_batches, n_gpus, epochs):
+        # Assumes running on gpus, one node and no accumulate_grad_batches
+        n_gpus = torch.cuda.device_count()
+        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
+        ByT5Model.total_train_steps = train_batches * epochs
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
@@ -167,6 +175,7 @@ class ByT5Model(pl.LightningModule):
 
         scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+        self.scheduler = scheduler
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -175,3 +184,15 @@ class ByT5Model(pl.LightningModule):
                 "frequency": 1,
             }
         }
+
+    def lr_scheduler_step(
+        self,
+        scheduler,
+        optimizer_idx,
+        metric
+    ) :
+        # Override the lr_scheduler_step hook with your own logic
+        # Implement your custom behavior here
+        # For example, you can update the LR scheduler or adjust the learning rate
+        # self.scheduler.step() 
+        pass
