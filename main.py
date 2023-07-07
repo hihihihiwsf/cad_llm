@@ -88,9 +88,11 @@ def main():
         limit_val_batches=0.1,
     )
     if not args.eval: 
+        print("Start training")
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     else:
         # loading the model from exp_name/best.ckpt
+        print("Start evaluating")
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
