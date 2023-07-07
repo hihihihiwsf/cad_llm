@@ -167,9 +167,13 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         self.assertIn(fg_cst_dict["mid_point_curve"], self.curves2)
 
     def test_midpoint_constraint_endpoints(self):
+        # Here we actually create a construction line and add it to the curves
         cst = self.dm_constraints0[13]
+        prev_curve_count = len(self.curves0)
         fg_cst = FusionGalleryConstraint(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
+        new_curve_count = len(self.curves0)
+        self.assertEqual(prev_curve_count, new_curve_count - 1)
         self.assertIsNotNone(fg_cst_dict)
         self.assertIsInstance(fg_cst_dict, dict)
         self.assertEqual(fg_cst_dict["type"], "MidPointConstraint")
