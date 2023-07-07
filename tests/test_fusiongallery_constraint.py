@@ -20,6 +20,8 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         cls.load_data(cls, Path("tests/test_data/dm_sketch_5.json"), 5)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_6.json"), 6)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_7.json"), 7)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_8.json"), 8)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_9.json"), 9)
     
     def load_data(self, dm_sketch_file, index):
         with open(dm_sketch_file) as f:
@@ -129,6 +131,20 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         self.assertEqual(fg_cst_dict["type"], "VerticalConstraint")
         self.assertIn("line", fg_cst_dict)
         self.assertIn(fg_cst_dict["line"], self.curves1)
+
+    def test_vertical_constraint_multiple_lines(self):
+        cst = self.dm_constraints9[8]
+        fg_cst = FusionGalleryConstraint(cst, self.points9, self.curves9, self.entity_map9)
+        fg_cst_list = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_list)
+        # This constraint is applied to multiple lines
+        # so we need to return multiple constraints
+        self.assertIsInstance(fg_cst_list, list)
+        for fg_cst in fg_cst_list:
+            self.assertEqual(fg_cst["type"], "VerticalConstraint")
+            self.assertIn("line", fg_cst)
+            self.assertIn(fg_cst["line"], self.curves9)
+
 
     def test_tangent_constraint(self):
         cst = self.dm_constraints2[6]

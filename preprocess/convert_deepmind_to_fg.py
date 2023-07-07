@@ -100,7 +100,6 @@ def create_sketch_curves(dm_entities, point_map):
     """Create the sketch curves data structure"""
     # Curve dictionary as stored in FG json format
     curve_data = {}
-    add_curve = False
     # Mapping from the constraint entities index array to uuids in either the points or curves dict
     constraint_entity_map = {}
     constraint_entity_index = 0
@@ -108,6 +107,7 @@ def create_sketch_curves(dm_entities, point_map):
         assert len(dm_ent) == 1, "Expected on entry in the dict"
         entity_type = list(dm_ent.keys())[0]
         entity_data = dm_ent[entity_type]
+        add_curve = False
 
         if entity_type == "pointEntity":
             dm_obj = DeepmindPoint(entity_data)

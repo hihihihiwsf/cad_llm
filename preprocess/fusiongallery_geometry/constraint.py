@@ -189,22 +189,32 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "type": "VerticalConstraint"
         }
         """
-        if self.entity_count == 2:
-            if self.is_entity_point(0) and self.is_entity_point(1):
-                return {
-                    "point_one": self.entities[0]["uuid"],
-                    "point_two": self.entities[1]["uuid"],
-                    "type": "VerticalPointsConstraint"
-                }
-        elif self.is_entity_line(0):
+        if self.entity_count == 2 and self.is_entity_point(0) and self.is_entity_point(1):
+            return {
+                "point_one": self.entities[0]["uuid"],
+                "point_two": self.entities[1]["uuid"],
+                "type": "VerticalPointsConstraint"
+            }
+        elif self.entity_count == 1 and self.is_entity_line(0):
             return {
                 "line": self.entities[0]["uuid"],
                 "type": "VerticalConstraint"
             }
+        elif self.entity_count > 1 and self.are_entities_lines():
+            # Handle multiple separate constraints
+            multi_cst = []
+            for ent in self.entities:
+                multi_cst.append({
+                    "line": ent["uuid"],
+                    "type": "VerticalConstraint"
+                })
+            return multi_cst
+        elif self.entity_count > 1 and self.are_entities_points():
+            # TODO: Handle this case where we have 2+ points
+            assert False, "Multiple vertical constraint point entities not implemented"
         else:
             assert False, "Unknown vertical constraint entities"
-        return None
-    
+   
     def make_tangent_constraint_dict(self):
         """
         {

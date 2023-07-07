@@ -95,7 +95,7 @@ class FusionGalleryBaseConstraint:
 
     def prepare_entity_indices(self):
         """Standardize the list of entity indices from the deepmind constraint data"""
-        entities = None
+        entities = []
         # Note we have to default to the 0 index entity in case it is missing
         # due to the protobuf BS
 
@@ -128,7 +128,8 @@ class FusionGalleryBaseConstraint:
             ]
         
         else:
-            entities = self.constraint[self.type]["entities"]
+            if "entities" in self.constraint[self.type]:
+                entities = self.constraint[self.type]["entities"]
         return entities
 
     def type_for_entity(self, index):
@@ -157,6 +158,12 @@ class FusionGalleryBaseConstraint:
     def are_entities_lines(self):
         for ent in self.entities:
             if ent["type"] != "SketchLine":
+                return False
+        return True
+
+    def are_entities_points(self):
+        for ent in self.entities:
+            if ent["type"] != "Point3D":
                 return False
         return True
 
