@@ -26,6 +26,8 @@ from PIL import Image
 import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
 from models.modeling_vlt5 import T5ForConditionalGeneration
+from transformers.optimization import Adafactor, AdafactorSchedule
+
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, vit_mae=None):
@@ -54,6 +56,7 @@ class ByT5Model(pl.LightningModule):
         
         m = VisRecon(args=args)
         m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+        # m.load_from_checkpoint('~/Projects/cad_llm/checkpoints/vitmae_deepmind/best.ckpt')
         self.vit_mae = m.model
         del m
         # self.vit_mae = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
@@ -269,7 +272,10 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         params = list(self.model.parameters()) + list(self.mapper.parameters())
-        optimizer = optim.AdamW(params, lr=self.lr)
+        # optimizer = optim.AdamW(params, lr=self.lr) 
+        
+        optimizer = Adafactor(params, scale_parameter=False, relative_step=False, warmup_init=False, lr=self.lr)
+
         if not self.args.cosinedecay:
             return optimizer
             
