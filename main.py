@@ -10,6 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
+from models.vl_t5 import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
@@ -51,10 +52,11 @@ def main():
     print("Loading model...")
 
     if not args.untrained_model:
-        model = ByT5Model(args=args, vit_mae=None)
+        model = VLT5Model(args=args, vit_mae=None)
     else:
         print("train_mae", args.untrained_model)
         model = VisRecon(args=args)
+        model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt')
         
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
@@ -79,11 +81,11 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        #resume_from_checkpoint='/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt',    # 's3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
+        # resume_from_checkpoint='/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt',    # 's3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
         # precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
-        # limit_train_batches=0.01,
-        # limit_val_batches=0.1,
+        limit_train_batches=0.01,
+        limit_val_batches=0.1,
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
