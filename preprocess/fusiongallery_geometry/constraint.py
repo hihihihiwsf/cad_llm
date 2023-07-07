@@ -4,7 +4,10 @@ FusionGalleryConstraint represents a sketch constraint in the Fusion 360 Gallery
 
 """
 
+import uuid
+
 from preprocess.fusiongallery_geometry.base_constraint import FusionGalleryBaseConstraint
+from preprocess.fusiongallery_geometry.line import FusionGalleryLine
 
 
 class FusionGalleryConstraint(FusionGalleryBaseConstraint):
@@ -262,9 +265,8 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 "mid_point_curve": self.entities[1]["uuid"] # entity
             }
         elif self.entity_count == 3:
-            # TODO: Three entity case we need to handle in a special way...
-            # e.g. We could create a sketch line, set it as construction geometry, 
-            # then make the mid point the middle of the line
+            # Three entity case we need to handle in a special way...
+            # 
             # {
             #     "midpointConstraint": {
             #         "midpoint": 12,
@@ -274,7 +276,20 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             #         }
             #     }
             # }
-            assert False, "Unknown midpoint constraint entities"
+            # 
+            # We create a sketch line, set it as construction geometry, 
+            # then make the mid point the middle of the line
+            start_point = self.entities[1]["uuid"]
+            end_point = self.entities[2]["uuid"]
+            fg_line = FusionGalleryLine.create_manual_line_dict(start_point, end_point, True)
+            fg_line_uuid = str(uuid.uuid1())
+            self.curves[fg_line_uuid] = fg_line
+
+            return {
+                "type": "MidPointConstraint",
+                "point": self.entities[0]["uuid"],  # midpoint
+                "mid_point_curve": fg_line_uuid     # endpoints line
+            }
         else:
             assert False, "Unknown midpoint constraint entities"
 

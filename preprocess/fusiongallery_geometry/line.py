@@ -45,3 +45,16 @@ class FusionGalleryLine(FusionGalleryBase):
         line_dict.update(self.create_ent_points())
         line_dict["type"] = "SketchLine"
         return line_dict
+
+    @staticmethod
+    def create_manual_line_dict(start_point, end_point, is_construction=False):
+        return {
+            "type": "SketchLine",
+            "construction_geom": is_construction,
+            "fixed": False,
+            "fully_constrained": False,
+            "reference": False,
+            "visible": True,
+            "start_point": start_point,
+            "end_point": end_point
+        }

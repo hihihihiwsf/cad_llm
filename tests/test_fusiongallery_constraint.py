@@ -173,7 +173,10 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         self.assertIsNotNone(fg_cst_dict)
         self.assertIsInstance(fg_cst_dict, dict)
         self.assertEqual(fg_cst_dict["type"], "MidPointConstraint")
-        # TODO: Handle this case that has endpoints
+        self.assertIn("point", fg_cst_dict)
+        self.assertIn("mid_point_curve", fg_cst_dict)
+        self.assertIn(fg_cst_dict["point"], self.points0)
+        self.assertIn(fg_cst_dict["mid_point_curve"], self.curves0)
 
     def test_equal_constraint(self):
         cst = self.dm_constraints4[8]
