@@ -40,7 +40,7 @@ class FusionGalleryPointMap():
                 fg_point = FusionGalleryPoint(dm_point)
                 if not fg_point.key in self.map:
                     self.map[fg_point.key] = fg_point
-        print(f"Created vertex dictionary with {len(self.map)} of {point_count} total vertices")
+        # print(f"Created vertex dictionary with {len(self.map)} of {point_count} total vertices")
         for key, value in self.map.items():
             self.uuid_map[value.uuid] = value
 
@@ -49,14 +49,14 @@ class FusionGalleryPointMap():
     def find_all_geom_points(dm_ent):
         """Given an OnShape entity, return all of its points"""
         assert len(dm_ent) == 1, "Expected on entry in the dict"
-        entity_name = FusionGalleryPointMap.get_dm_ent_name(dm_ent)
-        entity_data = dm_ent[entity_name]
+        entity_type = FusionGalleryPointMap.get_dm_ent_name(dm_ent)
+        entity_data = dm_ent[entity_type]
 
-        if entity_name == "pointEntity":
+        if entity_type == "pointEntity":
             return [entity_data["point"]]
-        if entity_name == "lineEntity":
+        if entity_type == "lineEntity":
             return [entity_data["start"], entity_data["end"]]
-        if entity_name == "circleArcEntity":
+        if entity_type == "circleArcEntity":
             if "arcParams" in entity_data:
                 return [
                     entity_data["center"],

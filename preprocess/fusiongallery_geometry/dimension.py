@@ -151,7 +151,10 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
             return None
         dimension_dict["entity_one"] = self.entities[0]["uuid"] # first
         dimension_dict["entity_two"] = self.entities[1]["uuid"] # second
-        dimension_dict["orientation"]= self.make_orientation_enum(self.constraint[self.type]["direction"])
+        # Assume the default is HORIZONTAL, i.e. the 0 enum value here:
+        # https://github.com/deepmind/deepmind-research/blob/master/cadl/constraints.proto#L69C5-L69C15
+        direction = self.constraint[self.type].get("direction", "HORIZONTAL")
+        dimension_dict["orientation"]= self.make_orientation_enum(direction)
         dimension_dict["type"] = "SketchLinearDimension"
         return dimension_dict
     

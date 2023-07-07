@@ -154,7 +154,7 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 "line": self.entities[0]["uuid"],
                 "type": "HorizontalConstraint"
             }
-        elif self.entity_count > 2 and self.are_entities_lines():
+        elif self.entity_count > 1 and self.are_entities_lines():
             # Handle multiple separate constraints
             multi_cst = []
             for ent in self.entities:
