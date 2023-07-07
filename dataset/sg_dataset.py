@@ -53,7 +53,7 @@ class SketchGraphsDataset(Dataset):
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
-        sketch_dict['input_text'] = input_text
+        sketch_dict['input_text'] = '</s>'+input_text
         sketch_dict['output_text'] = output_text
         return sketch_dict
 
