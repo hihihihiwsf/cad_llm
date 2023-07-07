@@ -7,18 +7,19 @@ import time
 import numpy as np
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
+from datasets import load_dataset
 
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
-        path = Path(args.dataset) / f"{split}.json"
-        with open(path, "r") as f:
-            self.data = json.load(f)
+        # Load dataset from json or json.zip file
+        data_files = {split: str(Path(args.dataset) / f"{split}.json*")}
+        self.data = load_dataset("json", data_files=data_files)[split]
 
-        if split == "train":
+        if split == "train" and args.limit_data != 1:
             n = int(args.limit_data * len(self.data))
-            random.shuffle(self.data)
-            self.data = self.data[:n]
+            self.data = self.data.shuffle(seed=args.seed)
+            self.data = self.data.select(range(n))
 
         self.order = args.train_order if split == "train" else "sorted"
         assert self.order in ["sorted", "user", "random"]
