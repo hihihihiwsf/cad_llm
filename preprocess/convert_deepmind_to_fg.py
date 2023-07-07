@@ -184,9 +184,12 @@ def update_constraint_entity_map(entity_map, fg_obj, fg_dict, index):
     
     elif fg_dict["type"] == "SketchLine":
         # entity
+        # Store references to the start and end points
         entity_map[updated_index] = {
             "type": "curve",
-            "uuid": fg_obj.uuid
+            "uuid": fg_obj.uuid,
+            "start_point": fg_dict["start_point"],
+            "end_point": fg_dict["end_point"],
         }
         updated_index += 1
         # start_point

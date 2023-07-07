@@ -43,44 +43,55 @@ class FusionGalleryBaseConstraint:
         self.uuid = str(uuid.uuid1())
         # Type of constraint in deepmind terms
         self.type = list(self.constraint.keys())[0]
+
+        # Standardize the list of entity indices
+        dm_entities = self.prepare_entity_indices()
         # The entities referenced in the deepmind data
         # stored in order of their index, in FG dict format
         # with the addition of a uuid key
-        self.entities = []
-        # Count the number of valid entities
-        self.entity_count = 0
-        # Standardize the list of entity indices
-        dm_entities = self.prepare_entity_indices()
+        self.entities, self.entity_count = self.prepare_entity_list(dm_entities)
+    
+    def to_dict(self):
+        """Make a Fusion 360 Gallery format dict for the constraint/dimension"""
+        # To be implemented by the child class
+        pass
+
+    def prepare_entity_list(self, dm_entities):
+        """Prepare a list of entities that matches the indices in the deepmind data"""
+        entities = []
+        entity_count = 0
 
         for cst_ent_index in dm_entities:
             # Check that the referenced entity actually exists
-            if cst_ent_index not in entity_map:
-                self.entities.append(None)
+            if cst_ent_index not in self.entity_map:
+                entities.append(None)
                 continue
             # Type is either point or curve
-            cst_type = entity_map[cst_ent_index]["type"]
+            cst_type = self.entity_map[cst_ent_index]["type"]
             # UUID into either the points or curves dicts
-            cst_uuid = entity_map[cst_ent_index]["uuid"]
+            cst_uuid = self.entity_map[cst_ent_index]["uuid"]
             if cst_type == "point":
-                ent = points[cst_uuid]
+                ent = self.points[cst_uuid]
             elif cst_type == "curve":
-                ent = curves[cst_uuid]
+                ent = self.curves[cst_uuid]
             # New dictionary with the additional uuid value
             ent_data = {
                 **ent,
                 "uuid": cst_uuid
             }
             # Add the parent reference for lines/arcs/circles
-            if "parent" in entity_map[cst_ent_index]:
-                ent_data["parent"] = entity_map[cst_ent_index]["parent"]
+            if "parent" in self.entity_map[cst_ent_index]:
+                ent_data["parent"] = self.entity_map[cst_ent_index]["parent"]
+            # Add the start and end point references
+            if "start_point" in self.entity_map[cst_ent_index]:
+                ent_data["start_point"] = self.entity_map[cst_ent_index]["start_point"]
+            if "end_point" in self.entity_map[cst_ent_index]:
+                ent_data["end_point"] = self.entity_map[cst_ent_index]["end_point"]                
             
-            self.entities.append(ent_data)
-            self.entity_count += 1
-    
-    def to_dict(self):
-        """Make a Fusion 360 Gallery format dict for the constraint/dimension"""
-        # To be implemented by the child class
-        pass
+            entities.append(ent_data)
+            entity_count += 1
+        
+        return entities, entity_count
 
     def prepare_entity_indices(self):
         """Standardize the list of entity indices from the deepmind constraint data"""
@@ -164,3 +175,6 @@ class FusionGalleryBaseConstraint:
 
     def is_entity_point_or_line(self, index):
         return self.is_entity_line(index) or self.is_entity_point(index)
+    
+    def is_entity_arc_or_circle(self, index):
+        return self.is_entity_arc(index) or self.is_entity_circle(index)
