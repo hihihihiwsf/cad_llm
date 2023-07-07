@@ -84,8 +84,8 @@ def main():
         # resume_from_checkpoint='/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt',    # 's3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
         # precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
-        limit_train_batches=0.01,
-        limit_val_batches=0.1,
+        limit_train_batches=0.2,
+        limit_val_batches=0.4,
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
