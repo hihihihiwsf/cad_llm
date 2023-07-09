@@ -52,7 +52,7 @@ def main():
     print("Loading model...")
 
     if not args.untrained_model:
-        model = VLT5Model(args=args, vit_mae=None)
+        model = ByT5Model(args=args, vit_mae=None)
     else:
         print("train_mae", args.untrained_model)
         model = VisRecon(args=args)
@@ -81,11 +81,11 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        resume_from_checkpoint='s3://cad-llm-katzm/jobs/sifan-vlt5-07-07-23-1038/checkpoints/model/vlt5/best.ckpt',  #'s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
-        # precision='16',
+        #resume_from_checkpoint='s3://cad-llm-katzm/jobs/sifan-vlt5-07-07-23-1038/checkpoints/model/vlt5/best.ckpt',  #'s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
+        precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
-        limit_train_batches=0.01,
-        limit_val_batches=0.1,
+        # limit_train_batches=0.01,
+        # limit_val_batches=0.1,
     )
     if not args.eval: 
         print("Start training")
