@@ -23,7 +23,7 @@ from preprocess.preprocess_utils import get_files, get_output_dir
 from tests.test_fusiongallery_sketch import TestFusionGallerySketch
 
 
-def convert_data(dm_data, output_path, input_file, count):
+def convert_data(dm_data, output_path, input_file, limit, count, converted_count):
     """Convert all the sketches in a data file and save them as individual json files"""
     for index, dm_sketch in enumerate(tqdm(dm_data)):
         fg_sketch = convert_sketch(dm_sketch, count)
@@ -35,8 +35,12 @@ def convert_data(dm_data, output_path, input_file, count):
             json_file = output_path / f"{input_file.stem}_{index:06d}.json"
             with open(json_file, "w") as f:
                 json.dump(fg_sketch, f, indent=4)
+            if json_file.exists():
+                converted_count += 1
         count += 1
-    return count
+        if converted_count >= limit:
+            break        
+    return count, converted_count
 
 
 def convert_sketch(dm_sketch, count):
@@ -46,17 +50,21 @@ def convert_sketch(dm_sketch, count):
     # First check that the sketch is good to convert
     if not is_sketch_good(dm_entities):
         return None
-    points, point_map = create_sketch_points(dm_entities)
-    curves, constraint_entity_map = create_sketch_curves(dm_entities, point_map)
-    constraints, dimensions = create_constraints_and_dimensions(dm_constraints, points, curves, constraint_entity_map)
-    fusion_gallery_sketch = {
-        "name": f"Sketch{count}", # Save the sketch with the overall index in the dataset
-        "type": "Sketch",
-        "points": points,
-        "curves": curves,
-        "constraints": constraints,
-        "dimensions": dimensions
-    }
+    try:
+        points, point_map = create_sketch_points(dm_entities)
+        curves, constraint_entity_map = create_sketch_curves(dm_entities, point_map)
+        constraints, dimensions = create_constraints_and_dimensions(dm_constraints, points, curves, constraint_entity_map)
+        fusion_gallery_sketch = {
+            "name": f"Sketch{count}", # Save the sketch with the overall index in the dataset
+            "type": "Sketch",
+            "points": points,
+            "curves": curves,
+            "constraints": constraints,
+            "dimensions": dimensions
+        }
+    except Exception as ex:
+        print("Sketch conversion failed", ex)
+        return None
     sketch_valid = is_converted_sketch_valid(fusion_gallery_sketch)
     if not sketch_valid:
         return None
@@ -321,17 +329,23 @@ def main(args):
     # The data comes in 96 different data files
     # that we loop over here
     count = 0
+    converted_count = 0
     for i, input_file in enumerate(input_files):
         print(f"Converting {i}/{len(input_files)} data files")
         with open(input_file) as f:
             dm_data = json.load(f)
-        count += convert_data(dm_data, output_path, input_file, count)
+        count, converted_count = convert_data(dm_data, output_path, input_file, args.limit, count, converted_count)
+        if converted_count >= args.limit:
+            break
+    
+    print(f"Converted {converted_count}/{count} sketches!")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=str, required=True, help="Input file/folder of DeepMind json files")
     parser.add_argument("--output", type=str, help="Output folder to save the Fusion 360 Gallery json data [default: output]")
+    parser.add_argument("--limit", type=int, help="Limit the number of files to process")
     args = parser.parse_args()
 
     main(args)
