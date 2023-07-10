@@ -8,7 +8,7 @@ class DeepmindCircle(DeepmindBase):
         self.name = "circle"
         try:
             self.center = (dm_ent["center"].get("x", 0), dm_ent["center"].get("y", 0))
-            self.r = dm_ent["circleParams"]["radius"]
+            self.r = dm_ent["circleParams"].get("radius", 0)
         except Exception as e:
             self.exception = e
 
