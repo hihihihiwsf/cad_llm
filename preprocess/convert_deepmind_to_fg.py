@@ -287,7 +287,9 @@ def create_constraint(constraint, points, curves, constraint_entity_map, constra
 def create_dimension(dimension, points, curves, constraint_entity_map, dimensions_data):
     """Create a constraint and add it to the provided constraints_data dictionary"""
     dimension = FusionGalleryDimension(dimension, points, curves, constraint_entity_map)
-    dimensions_data[dimension.uuid] = dimension.to_dict()
+    dimension_dict = dimension.to_dict()
+    if dimension_dict is not None:
+        dimensions_data[dimension.uuid] = dimension_dict
 
 
 def main(args):
