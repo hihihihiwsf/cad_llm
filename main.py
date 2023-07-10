@@ -52,7 +52,7 @@ def main():
     print("Loading model...")
 
     if not args.untrained_model:
-        model = ByT5Model(args=args, vit_mae=None)
+        model = VLT5Model(args=args, vit_mae=None)
     else:
         print("train_mae", args.untrained_model)
         model = VisRecon(args=args)

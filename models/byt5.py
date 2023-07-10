@@ -28,6 +28,8 @@ from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEF
 from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
 
+from transformers.optimization import Adafactor, AdafactorSchedule
+
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, vit_mae):
         super().__init__()
@@ -317,16 +319,29 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         params = list(self.model.parameters()) + list(self.mapper.parameters())
-        optimizer = optim.AdamW(params, lr=self.lr)
+        optimizer = Adafactor(
+                params,
+                lr=self.lr,
+                eps=(1e-30, 1e-3),
+                clip_threshold=1.0,
+                decay_rate=-0.8,
+                beta1=None,
+                weight_decay=0.0,
+                relative_step=False,
+                scale_parameter=False,
+                warmup_init=False,
+            )
+        #optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
+        #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
+        lr_scheduler = AdafactorSchedule(optimizer)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": scheduler,
+                "scheduler": lr_scheduler,
                 "interval": "epoch",
                 "frequency": 1,
             }
