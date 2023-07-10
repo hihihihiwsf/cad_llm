@@ -11,6 +11,42 @@ from preprocess.fusiongallery_geometry.line import FusionGalleryLine
 
 
 class FusionGalleryConstraint(FusionGalleryBaseConstraint):
+
+    # Supported Fusion 360 constraint types
+    types = {
+        "CoincidentConstraint",
+        "CollinearConstraint",
+        "HorizontalConstraint",
+        "HorizontalPointsConstraint",
+        "ParallelConstraint",
+        "VerticalConstraint",
+        "VerticalPointsConstraint",
+        "TangentConstraint",
+        "PerpendicularConstraint",
+        "MidPointConstraint",
+        "EqualConstraint",
+        "ConcentricConstraint"
+    }
+    # Currently these constraint types are not supported
+    # 
+    # Offset = 13   
+    # Fix = 16
+    # Projected = 1
+    # Mirror = 2
+    # Circular_Pattern = 18
+    # Pierce = 19
+    # Linear_Pattern = 20
+    # Centerline_Dimension = 21
+    # Intersected = 22
+    # Silhoutted = 23
+    # Quadrant = 24
+    # Normal = 25
+    # Minor_Diameter = 26
+    # Major_Diameter = 27
+    # Rho = 28
+    # Unknown = 29
+    # Subnode = 101   
+
     def __init__(self, constraint, points, curves, entity_map):
         """
         Intialize a FusionGalleryConstraint
@@ -37,7 +73,7 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                             allows us to connect the deepmind indices to the 
                             unique uuids used in the FG dicts
         """        
-        super().__init__(constraint, points, curves, entity_map)
+        super().__init__(constraint, points, curves, entity_map)    
     
     def to_dict(self):
         """Make a Fusion 360 Gallery format dict for the constraint"""

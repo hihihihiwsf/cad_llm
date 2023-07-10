@@ -20,6 +20,7 @@ from tqdm import tqdm
 from preprocess.deepmind_geometry import *
 from preprocess.fusiongallery_geometry import *
 from preprocess.preprocess_utils import get_files, get_output_dir
+from tests.test_fusiongallery_sketch import TestFusionGallerySketch
 
 
 def convert_data(dm_data, output_path, input_file, count):
@@ -56,6 +57,9 @@ def convert_sketch(dm_sketch, count):
         "constraints": constraints,
         "dimensions": dimensions
     }
+    sketch_valid = is_converted_sketch_valid(fusion_gallery_sketch)
+    if not sketch_valid:
+        return None
     return fusion_gallery_sketch
 
 
@@ -81,6 +85,17 @@ def is_sketch_good(dm_entities):
         print("Warning - sketch doesn't have any curves")
         return False
     return True
+
+
+def is_converted_sketch_valid(sketch):
+    """Test the converted sketch for self-consistency"""
+    try:
+        sketch_test = TestFusionGallerySketch()
+        sketch_test.run_sketch_test(sketch)
+        return True
+    except Exception as ex:
+        print("Converted sketch failed tests", ex)
+        return False
 
 
 def create_sketch_points(dm_entities):

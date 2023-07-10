@@ -8,6 +8,15 @@ from preprocess.fusiongallery_geometry.base_constraint import FusionGalleryBaseC
 
 
 class FusionGalleryDimension(FusionGalleryBaseConstraint):
+
+    # Supported Fusion 360 constraint types
+    types = {
+        "SketchLinearDimension",
+        "SketchDiameterDimension",
+        "SketchRadialDimension",
+        "SketchAngularDimension"
+    }     
+
     def __init__(self, constraint, points, curves, entity_map):
         """
         Intialize a FusionGalleryDimension
