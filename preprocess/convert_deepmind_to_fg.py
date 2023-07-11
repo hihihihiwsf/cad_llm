@@ -34,8 +34,22 @@ class DeepmindToFusionGalleryConverter():
 
         # Count of how many sketch conversions have been attempted
         self.count = 0
-        # Count of how many successful conversions
+        # Count of how many successful (non fatal) conversions
         self.converted_count = 0
+
+        # Count of the total sketch constraints
+        self.constraint_count = 0
+        # Count of the converted sketch constraints
+        self.constraint_converted_count = 0
+
+        # Count of the total sketch dimensions
+        self.dimension_count = 0
+        # Count of the converted sketch dimensions
+        self.dimension_converted_count = 0
+
+        # Count of the number of perfect sketch conversions without dropping constraints
+        self.perfect_sketch_converted_count = 0
+
         # Log of the failures
         self.failures = {}
     
@@ -55,8 +69,8 @@ class DeepmindToFusionGalleryConverter():
                 "fatal": fatal
             }
     
-    def print_failures(self):
-        """Print log output of the failures"""
+    def print_log_results(self):
+        """Print log result output"""
         print("---------------------")
         print("Fatal Failure Log")
         sorted_failures = dict(sorted(self.failures.items(), key=lambda item: item[1]["count"], reverse=True))
@@ -68,7 +82,15 @@ class DeepmindToFusionGalleryConverter():
         for failure, failure_dict in sorted_failures.items():
             if not failure_dict["fatal"]:
                 print(f" - {failure}: {failure_dict['count']}")
-        print("---------------------")        
+        print("---------------------")  
+        print("Conversion Stats")
+        constraint_converted_percentage = (self.constraint_converted_count / self.constraint_count) * 100
+        print(f" - {self.constraint_converted_count}/{self.constraint_count} ({constraint_converted_percentage:.2f}%) constraints converted")
+        dimension_converted_percentage = (self.dimension_converted_count / self.dimension_count) * 100
+        print(f" - {self.dimension_converted_count}/{self.dimension_count} ({dimension_converted_percentage:.2f}%) dimensions converted")
+        perfect_sketch_percentage = (self.perfect_sketch_converted_count / self.converted_count) * 100
+        print(f" - {self.perfect_sketch_converted_count}/{self.converted_count} ({perfect_sketch_percentage:.2f}%) sketches converted without removing constraints")
+        print("---------------------")
 
     def convert(self):
         """Convert all of the input files"""
@@ -321,35 +343,50 @@ class DeepmindToFusionGalleryConverter():
         """Create the constraints and dimensions data structure"""
         constraints_data = {}
         dimensions_data = {}
+        # Whether all constraints converted sucessfully
+        all_convert_success = True
         for constraint in dm_constraints:
             if FusionGalleryDimension.is_dimension(constraint):
-                self.create_dimension(constraint, points, curves, constraint_entity_map, dimensions_data)
+                convert_success = self.create_dimension(constraint, points, curves, constraint_entity_map, dimensions_data)
             else:
-                self.create_constraint(constraint, points, curves, constraint_entity_map, constraints_data)
+                convert_success = self.create_constraint(constraint, points, curves, constraint_entity_map, constraints_data)
+            if not convert_success:
+                all_convert_success = False
+        # If all constraints converted, log it
+        if all_convert_success:
+            self.perfect_sketch_converted_count += 1
         return constraints_data, dimensions_data
 
     def create_constraint(self, constraint, points, curves, constraint_entity_map, constraints_data):
         """Create a constraint and add it to the provided constraints_data dictionary"""
         constraint = FusionGalleryConstraint(self, constraint, points, curves, constraint_entity_map)
         cst_dict_or_list = constraint.to_dict()
-        if cst_dict_or_list is not None:
-            # Single constraint
-            if isinstance(cst_dict_or_list, dict):
-                constraints_data[constraint.uuid] = cst_dict_or_list
-            # Multiple constraint case
-            elif isinstance(cst_dict_or_list, list):
-                for cst_dict in cst_dict_or_list:
-                    if cst_dict is not None:
-                        cst_uuid = str(uuid.uuid1())
-                        constraints_data[cst_uuid] = cst_dict
+        # Don't count merged points as conversion failures
+        if cst_dict_or_list != "Merge":
+            self.constraint_count += 1
+            if cst_dict_or_list is not None:
+                # Ignore multiple constraint counts
+                self.constraint_converted_count += 1
+                # Single constraint
+                if isinstance(cst_dict_or_list, dict):
+                    constraints_data[constraint.uuid] = cst_dict_or_list
+                # Multiple constraint case
+                elif isinstance(cst_dict_or_list, list):
+                    for cst_dict in cst_dict_or_list:
+                        if cst_dict is not None:
+                            cst_uuid = str(uuid.uuid1())
+                            constraints_data[cst_uuid] = cst_dict
+        return cst_dict_or_list is not None
 
     def create_dimension(self, dimension, points, curves, constraint_entity_map, dimensions_data):
         """Create a constraint and add it to the provided constraints_data dictionary"""
+        self.dimension_count += 1
         dimension = FusionGalleryDimension(self, dimension, points, curves, constraint_entity_map)
         dimension_dict = dimension.to_dict()
         if dimension_dict is not None:
             dimensions_data[dimension.uuid] = dimension_dict
-
+            self.dimension_converted_count += 1
+        return dimension_dict is not None
 
 def main(args):
     input_path = Path(args.input)
@@ -362,7 +399,7 @@ def main(args):
     output_path = get_output_dir(args.output)
     converter = DeepmindToFusionGalleryConverter(input_files, output_path, args.limit)
     converter.convert()
-    converter.print_failures()
+    converter.print_log_results()
 
 
 if __name__ == "__main__":

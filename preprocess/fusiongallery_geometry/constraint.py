@@ -68,6 +68,9 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             constraint_dict = self.make_equal_constraint_dict()
         elif self.type == "concentricConstraint":
             constraint_dict = self.make_concentric_constraint_dict()
+        else:
+            self.converter.log_failure(f"{self.type} constraint not supported")
+            return None
         return constraint_dict
 
     def make_coincident_constraint_cases(self):
@@ -89,7 +92,8 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             # Check if both entities refer to the same merged point to skip 
             # if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
             if self.entity_points_identical():
-                return None
+                # Return a special flag to indicate the points have been merged
+                return "Merge"
             return self.make_coincident_constraint_dict()
         if self.is_entity_arc(0) or self.is_entity_arc(1):
             self.converter.log_failure("SketchArc, SketchArc coincident constraint not supported")
