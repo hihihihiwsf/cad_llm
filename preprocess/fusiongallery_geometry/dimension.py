@@ -16,35 +16,7 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         "SketchRadialDimension",
         "SketchAngularDimension"
     }     
-
-    def __init__(self, constraint, points, curves, entity_map):
-        """
-        Intialize a FusionGalleryDimension
-
-        Args
-            constraint (dict): Constraint in the deepmind format, 
-                            i.e. sketch["constraintSequence"]["constraints"][n]
-                            which contains for example:
-                            {
-                                "coincidentConstraint": {
-                                    "entities": [
-                                        1,
-                                        7
-                                    ]
-                                }
-                            }
-            points(dict): Dictionary of FG points, where keys are uuids and values
-                            are FG point dicts
-            curves (dict): Dictionary of FG curves, where keys are uuids and values
-                            are FG curve dicts
-            entity_map (dict): Dictionary where the keys are the original numeric
-                            index of the entity in the deepmind data, and the
-                            values contain a dict with a type and uuid. This map
-                            allows us to connect the deepmind indices to the 
-                            unique uuids used in the FG dicts
-        """        
-        super().__init__(constraint, points, curves, entity_map)
-    
+   
     @staticmethod
     def is_dimension(dm_cst):
         """Determine if an OnShape constraint is a Fusion 360 dimension"""
@@ -128,7 +100,8 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         elif direction == "VERTICAL":
             return "VerticalDimensionOrientation"
         else:
-            assert False, "Unknown direction"
+            return None            
+
 
     def make_distance_dimension_dict(self):
         """ 
@@ -153,17 +126,19 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         }
         """
         if not self.is_entity_point_or_line(0) and not self.is_entity_point_or_line(1):
-            print("Warning! - SketchGym only supports point-point, point-line or line-line distance constraints")
+            self.converter.log_failure("SketchGym only supports point-point, point-line or line-line distance dimensions")
             return None
         dimension_dict = self.make_common_dimension_dict()
-        if dimension_dict is None:
-            return None
         dimension_dict["entity_one"] = self.entities[0]["uuid"] # first
         dimension_dict["entity_two"] = self.entities[1]["uuid"] # second
         # Assume the default is HORIZONTAL, i.e. the 0 enum value here:
         # https://github.com/deepmind/deepmind-research/blob/master/cadl/constraints.proto#L69C5-L69C15
         direction = self.constraint[self.type].get("direction", "HORIZONTAL")
-        dimension_dict["orientation"]= self.make_orientation_enum(direction)
+        orientation = self.make_orientation_enum(direction)
+        if orientation is None:
+            self.converter.log_failure("Unknown direction for distance dimension")
+            return None
+        dimension_dict["orientation"]= orientation
         dimension_dict["type"] = "SketchLinearDimension"
         return dimension_dict
     
@@ -191,14 +166,12 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
 
         """
         if not self.is_entity_line(0):
-            print("Warning - Length dimension not used on line")
+            self.converter.log_failure("Length dimension entity is not a line")
             return None
         # We need to find the end points
         start_point = self.entities[0]["start_point"]
         end_point = self.entities[0]["end_point"]
         dimension_dict = self.make_common_dimension_dict()
-        if dimension_dict is None:
-            return None
         dimension_dict["entity_one"] = start_point
         dimension_dict["entity_two"] = end_point
         # Direction is not provided in the deep mind data
@@ -226,10 +199,10 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
             "type": "SketchDiameterDimension"
         }
         """
-        assert self.is_entity_arc_or_circle(0)
-        diameter_dimension_dict = self.make_common_dimension_dict()
-        if diameter_dimension_dict is None:
+        if not self.is_entity_arc_or_circle(0):
+            self.converter.log_failure("Diameter dimension entity is not an arc or circle")
             return None
+        diameter_dimension_dict = self.make_common_dimension_dict()
         diameter_dimension_dict["type"] = "SketchDiameterDimension"
         diameter_dimension_dict["curve"] = self.entities[0]["uuid"]
         return diameter_dimension_dict
@@ -254,10 +227,10 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
             "type": "SketchRadialDimension"
         }
         """
-        assert self.is_entity_arc_or_circle(0)
+        if not self.is_entity_arc_or_circle(0):
+            self.converter.log_failure("Radius dimension entity is not an arc or circle")
+            return None            
         radius_dimension_dict = self.make_common_dimension_dict()
-        if radius_dimension_dict is None:
-            return None
         radius_dimension_dict["type"] = "SketchRadialDimension"
         radius_dimension_dict["curve"] = self.entities[0]["uuid"]
         return radius_dimension_dict
@@ -275,11 +248,10 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
             "line_two": "2566d1c8-b723-11ea-8520-180373af3277"
         }
         """
-        assert self.is_entity_line(0)
-        assert self.is_entity_line(1)
-        angular_dimension_dict = self.make_common_dimension_dict("angle")
-        if angular_dimension_dict is None:
+        if not self.is_entity_line(0) and not self.is_entity_line(1):
+            self.converter.log_failure("Angle dimension entities are not lines")
             return None
+        angular_dimension_dict = self.make_common_dimension_dict("angle")
         angular_dimension_dict["type"] = "SketchAngularDimension"
         angular_dimension_dict["line_one"] = self.entities[0]["uuid"]
         angular_dimension_dict["line_two"] = self.entities[1]["uuid"]

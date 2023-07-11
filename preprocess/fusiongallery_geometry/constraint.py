@@ -47,34 +47,6 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
     # Unknown = 29
     # Subnode = 101   
 
-    def __init__(self, constraint, points, curves, entity_map):
-        """
-        Intialize a FusionGalleryConstraint
-
-        Args
-            constraint (dict): Constraint in the deepmind format, 
-                            i.e. sketch["constraintSequence"]["constraints"][n]
-                            which contains for example:
-                            {
-                                "coincidentConstraint": {
-                                    "entities": [
-                                        1,
-                                        7
-                                    ]
-                                }
-                            }
-            points(dict): Dictionary of FG points, where keys are uuids and values
-                            are FG point dicts
-            curves (dict): Dictionary of FG curves, where keys are uuids and values
-                            are FG curve dicts
-            entity_map (dict): Dictionary where the keys are the original numeric
-                            index of the entity in the deepmind data, and the
-                            values contain a dict with a type and uuid. This map
-                            allows us to connect the deepmind indices to the 
-                            unique uuids used in the FG dicts
-        """        
-        super().__init__(constraint, points, curves, entity_map)    
-    
     def to_dict(self):
         """Make a Fusion 360 Gallery format dict for the constraint"""
         constraint_dict = None
@@ -120,12 +92,13 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 return None
             return self.make_coincident_constraint_dict()
         if self.is_entity_arc(0) or self.is_entity_arc(1):
-            print("Warning - SketchArc, SketchArc coincident constraint not supported")
+            self.converter.log_failure("SketchArc, SketchArc coincident constraint not supported")
             return None
         if self.is_entity_circle(0) or self.is_entity_circle(1):
-            print("Warning - SketchCircle, SketchCircle coincident constraint not supported")
+            self.converter.log_failure("SketchCircle, SketchCircle coincident constraint not supported")
             return None
-        assert False, "Unknown case"
+        self.converter.log_failure("Unknown constraint case")
+        return None
 
     def make_coincident_constraint_dict(self):
         """
@@ -150,7 +123,7 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             # "line_one": "d7852898-b74c-11ea-b79f-180373af3277",
             # "line_two": "d7854f9e-b74c-11ea-9502-180373af3277"
             # }
-            assert False, "Implement collinear"
+            self.converter.log_failure("Collinear constraint not implemented")
             return
         return {
             "type": "CoincidentConstraint",
@@ -200,7 +173,8 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 })
             return multi_cst
         else:
-            assert False, "Unknown horizontal contraint entities"
+            self.converter.log_failure("Unknown horizontal constraint entities")
+            return None
     
     def make_parallel_constraint_dict(self):
         """
@@ -210,8 +184,9 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "line_two": "44fc8ff4-b820-11ea-a78c-180373af3277"
         }
         """
-        assert self.is_entity_line(0)
-        assert self.is_entity_line(1)
+        if not self.is_entity_line(0) and not self.is_entity_line(1):
+            self.converter.log_failure("Parallel constraint curves are not lines")
+            return None
         return {
             "type": "ParallelConstraint",
             "line_one": self.entities[0]["uuid"],
@@ -247,9 +222,11 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             return multi_cst
         elif self.entity_count > 1 and self.are_entities_points():
             # TODO: Handle this case where we have 2+ points
-            assert False, "Multiple vertical constraint point entities not implemented"
+            self.converter.log_failure("Multiple vertical constraint point entities not implemented")
+            return None
         else:
-            assert False, "Unknown vertical constraint entities"
+            self.converter.log_failure("Unknown vertical constraint entities")
+            return None
    
     def make_tangent_constraint_dict(self):
         """
@@ -259,8 +236,9 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "type": "TangentConstraint"
         }
         """
-        assert self.is_entity_curve(0)
-        assert self.is_entity_curve(0)
+        if not self.is_entity_curve(0) and not self.is_entity_curve(1):
+            self.converter.log_failure("Tangent constraint entities are not curves")
+            return None
         return {
             "curve_one": self.entities[0]["uuid"], # first
             "curve_two": self.entities[1]["uuid"], # second
@@ -275,8 +253,9 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "type": "PerpendicularConstraint"
         
         """
-        assert self.is_entity_line(0)
-        assert self.is_entity_line(1)
+        if not self.is_entity_line(0) and not self.is_entity_line(1):
+            self.converter.log_failure("Perpendicular constraint entities not lines")
+            return None
         return {
             "line_one": self.entities[0]["uuid"], # first
             "line_two": self.entities[1]["uuid"], # second
@@ -301,10 +280,10 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             #         "midpoint": 14,
             #         "entity": 4
             #     }
-            # }            
-            assert self.is_entity_point(0)
-            assert self.is_entity_curve(1)
-
+            # }
+            if not self.is_entity_point(0) and not self.is_entity_curve(1):
+                self.converter.log_failure("Midpoint constraint entities not a point and curve")
+                return None
             return {
                 "type": "MidPointConstraint",
                 "point": self.entities[0]["uuid"],          # midpoint
@@ -337,7 +316,8 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 "mid_point_curve": fg_line_uuid     # endpoints line
             }
         else:
-            assert False, "Unknown midpoint constraint entities"
+            self.converter.log_failure("Unknown midpoint constraint entities")
+            return None            
 
     def make_equal_constraint_dict(self):
         """
@@ -347,9 +327,9 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "type": "EqualConstraint"
         }
         """
-        assert self.is_entity_curve(0)
-        assert self.is_entity_curve(1)
-
+        if not self.is_entity_curve(0) and not self.is_entity_curve(1):
+            self.converter.log_failure("Equal constraint entities are not curves")
+            return None
         if self.entity_count == 2:
             return {
                 "curve_one": self.entities[0]["uuid"],
@@ -381,6 +361,10 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                     "type": "EqualConstraint"
                 })
             return multi_cst
+        else:
+            self.converter.log_failure("Unknown equal constraint entities")
+            return None            
+
 
     def make_concentric_constraint_dict(self):
         """
@@ -395,9 +379,17 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
 
         # Find the parent curves for points
         if self.is_entity_point(0):
-            curve_one = self.entities[0]["parent"]
+            if "parent" in self.entities[0]:
+                curve_one = self.entities[0]["parent"]
+            else:
+                self.converter.log_failure("Concentric constraint entity is not a curve")
+                return None 
         if self.is_entity_point(1):
-            curve_two = self.entities[1]["parent"]
+            if "parent" in self.entities[1]:
+                curve_two = self.entities[1]["parent"]
+            else:
+                self.converter.log_failure("Concentric constraint entity is not a curve")
+                return None 
 
         return {
             "curve_one": curve_one,
