@@ -38,7 +38,7 @@ def convert_data(dm_data, output_path, input_file, limit, count, converted_count
             if json_file.exists():
                 converted_count += 1
         count += 1
-        if converted_count >= limit:
+        if limit is not None and converted_count >= limit:
             break        
     return count, converted_count
 
@@ -335,7 +335,7 @@ def main(args):
         with open(input_file) as f:
             dm_data = json.load(f)
         count, converted_count = convert_data(dm_data, output_path, input_file, args.limit, count, converted_count)
-        if converted_count >= args.limit:
+        if args.limit is not None and converted_count >= args.limit:
             break
     
     print(f"Converted {converted_count}/{count} sketches!")
