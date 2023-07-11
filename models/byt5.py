@@ -299,7 +299,7 @@ class ByT5Model(pl.LightningModule):
                                          do_sample=False, max_new_tokens=self.args.max_length+10)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
-        batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
+        batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
 
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
         batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
@@ -321,15 +321,15 @@ class ByT5Model(pl.LightningModule):
         params = list(self.model.parameters()) + list(self.mapper.parameters())
         optimizer = Adafactor(
                 params,
-                lr=self.lr,
+                lr=None,
                 eps=(1e-30, 1e-3),
                 clip_threshold=1.0,
                 decay_rate=-0.8,
                 beta1=None,
                 weight_decay=0.0,
-                relative_step=False,
-                scale_parameter=False,
-                warmup_init=False,
+                relative_step=True, #
+                scale_parameter=True, #
+                warmup_init=True, #
             )
         #optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
