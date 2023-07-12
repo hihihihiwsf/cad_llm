@@ -1,3 +1,4 @@
+
 class DeepmindBase:
     def __init__(self, dm_ent):
         self.is_construction = dm_ent.get("isConstruction", False)

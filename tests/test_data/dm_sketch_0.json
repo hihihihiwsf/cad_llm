@@ -1,0 +1,273 @@
+{
+    "entitySequence": {
+        "entities": [
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.7369908213086327,
+                        "y": -0.9999989999860548
+                    },
+                    "end": {
+                        "x": -0.7575337965956618,
+                        "y": -0.9999989999860548
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.736990821308632,
+                        "y": 0.3450731561278098
+                    },
+                    "end": {
+                        "x": -0.7575337965956619,
+                        "y": 0.3450731561278097
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.7369908213086326,
+                        "y": -0.9999989999860546
+                    },
+                    "end": {
+                        "x": 0.7369908213086324,
+                        "y": 0.3450731561278098
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": -0.7575337965956618,
+                        "y": -0.9999989999860548
+                    },
+                    "end": {
+                        "x": -0.7575337965956618,
+                        "y": 0.3450731561278097
+                    }
+                }
+            },
+            {
+                "pointEntity": {
+                    "isConstruction": true,
+                    "point": {
+                        "x": -0.010271487643514812,
+                        "y": -0.32746292192912246
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": -0.757533796595662,
+                        "y": 0.3450731561278096
+                    },
+                    "end": {
+                        "x": -0.010271487643514807,
+                        "y": 0.9999989999860548
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": -0.7575337965956619,
+                        "y": 0.3450731561278097
+                    },
+                    "end": {
+                        "x": -0.9094278687091689,
+                        "y": 0.2119480778731615
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.736990821308632,
+                        "y": 0.3450731561278097
+                    },
+                    "end": {
+                        "x": -0.010271487643514961,
+                        "y": 0.9999989999860546
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.7369908213086319,
+                        "y": 0.3450731561278097
+                    },
+                    "end": {
+                        "x": 0.909427868709169,
+                        "y": 0.23602285678619953
+                    }
+                }
+            }
+        ]
+    },
+    "constraintSequence": {
+        "constraints": [
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        1,
+                        7
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        2,
+                        10
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        4,
+                        8,
+                        23
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        5,
+                        11
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        14,
+                        5
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        17,
+                        5
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        20,
+                        4
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        21,
+                        15
+                    ]
+                }
+            },
+            {
+                "parallelConstraint": {
+                    "entities": [
+                        0,
+                        3
+                    ]
+                }
+            },
+            {
+                "parallelConstraint": {
+                    "entities": [
+                        6,
+                        9
+                    ]
+                }
+            },
+            {
+                "parallelConstraint": {
+                    "entities": [
+                        16,
+                        13
+                    ]
+                }
+            },
+            {
+                "horizontalConstraint": {
+                    "entities": [
+                        3
+                    ]
+                }
+            },
+            {
+                "verticalConstraint": {
+                    "entities": [
+                        15,
+                        12
+                    ]
+                }
+            },
+            {
+                "midpointConstraint": {
+                    "midpoint": 12,
+                    "endpoints": {
+                        "first": 4,
+                        "second": 2
+                    }
+                }
+            },
+            {
+                "midpointConstraint": {
+                    "midpoint": 12,
+                    "endpoints": {
+                        "first": 5,
+                        "second": 1
+                    }
+                }
+            },
+            {
+                "perpendicularConstraint": {
+                    "first": 3,
+                    "second": 6
+                }
+            },
+            {
+                "distanceConstraint": {
+                    "first": 18,
+                    "second": 15,
+                    "direction": "MINIMUM",
+                    "length": 1.1956196943234354,
+                    "halfSpaceParams": {}
+                }
+            },
+            {
+                "distanceConstraint": {
+                    "first": 24,
+                    "second": 15,
+                    "direction": "MINIMUM",
+                    "length": 1.1956196943234358,
+                    "halfSpaceParams": {}
+                }
+            },
+            {
+                "lengthConstraint": {
+                    "entity": 3,
+                    "length": 1.4945246179042941
+                }
+            },
+            {
+                "lengthConstraint": {
+                    "entity": 6,
+                    "length": 1.3450721561138645
+                }
+            }
+        ]
+    }
+}

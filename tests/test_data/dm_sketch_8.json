@@ -1,0 +1,124 @@
+{
+    "entitySequence": {
+        "entities": [
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": -0.7858535562751431,
+                        "y": -0.9999989999339177
+                    },
+                    "end": {
+                        "x": 0.785853556275144,
+                        "y": -0.9999989999339177
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.785853556275144,
+                        "y": -0.9999989999339233
+                    },
+                    "end": {
+                        "x": 0.8731753547645119,
+                        "y": 0.9999989999339224
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": 0.8731753547645119,
+                        "y": 0.9999989999339233
+                    },
+                    "end": {
+                        "x": -0.873175354764511,
+                        "y": 0.999998999933923
+                    }
+                }
+            },
+            {
+                "lineEntity": {
+                    "start": {
+                        "x": -0.8731753547645119,
+                        "y": 0.9999989999339224
+                    },
+                    "end": {
+                        "x": -0.785853556275144,
+                        "y": -0.9999989999339177
+                    }
+                }
+            }
+        ]
+    },
+    "constraintSequence": {
+        "constraints": [
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        4,
+                        2
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        7,
+                        5
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        10,
+                        8
+                    ]
+                }
+            },
+            {
+                "coincidentConstraint": {
+                    "entities": [
+                        11,
+                        1
+                    ]
+                }
+            },
+            {
+                "horizontalConstraint": {
+                    "entities": [
+                        0,
+                        6
+                    ]
+                }
+            },
+            {
+                "distanceConstraint": {
+                    "first": 1,
+                    "second": 2,
+                    "length": 1.5717071125502875,
+                    "alignment": "ALIGNED"
+                }
+            },
+            {
+                "angleConstraint": {
+                    "second": 9,
+                    "angle": 4.756022211684548
+                }
+            },
+            {
+                "angleConstraint": {
+                    "first": 3,
+                    "angle": 4.756022211684548
+                }
+            },
+            {
+                "lengthConstraint": {
+                    "entity": 9,
+                    "length": 2.001903368288984
+                }
+            }
+        ]
+    }
+}
