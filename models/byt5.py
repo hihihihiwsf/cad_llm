@@ -136,19 +136,17 @@ class ByT5Model(pl.LightningModule):
         batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
                                          do_sample=False, max_new_tokens=self.args.max_length+10)
 
-        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
-        batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
-
-        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
-        batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
+        string_samples = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in string_samples]
+        batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["output_text"]]
 
         batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
 
     def log_samples(self, batch, batch_idx):
         label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]
 
-        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in batch["sketches"]]
-        input_curves = [get_curves(point_input) for point_input in point_inputs]
+        batch["point_inputs"] = [get_point_entities(string_label) for string_label in batch["input_text"]]
+        input_curves = [get_curves(point_input) for point_input in batch["point_inputs"]]
 
         fig = visualize_batch(input_curves=input_curves, label_curves=label_curves,
                               sample_curves=batch["sample_curves"], box_lim=self.box_lim + 3)

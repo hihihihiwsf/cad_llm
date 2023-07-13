@@ -14,3 +14,10 @@ def get_random_mask(n, min_ratio, max_ratio):
     mask[:mask_size] = 1
     np.random.shuffle(mask)
     return mask
+
+
+def split_list(items, min_ratio, max_ratio):
+    mask = get_random_mask(len(items), min_ratio, max_ratio)
+    input_items = [item for i, item in enumerate(items) if mask[i]]
+    output_items = [item for i, item in enumerate(items) if not mask[i]]
+    return input_items, output_items

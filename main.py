@@ -17,8 +17,9 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
 from models.segformer import SegformerModel
-from dataset.vertex_grid_dataset import get_vertex_grid_dataset
 from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
+from dataset.sketch_strings_dataset import get_sketch_strings_dataset
+from dataset.sketch_strings_collator import SketchStringsCollator
 
 
 def get_model(args):
@@ -31,9 +32,22 @@ def get_model(args):
 def get_dataloader(args, split, shuffle, model):
     if "segformer" in args.model_name:
         datasets = get_rendered_sketch_dataset(path=args.dataset)
-        train_dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
-                                      num_workers=args.num_workers)
-        return train_dataloader
+        dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
+                                num_workers=args.num_workers)
+        return dataloader
+
+    if "entities" in args.dataset:  # Hack to select dataset loader based on dataset name
+        datasets = get_sketch_strings_dataset(path=args.dataset, min_split_ratio=args.min_input_percent,
+                                             max_split_ratio=args.max_input_percent)
+
+        collator = SketchStringsCollator(tokenizer=model.tokenizer, max_length=args.max_length)
+
+        if args.limit_data != 1 and split == "train":
+            n = int(args.limit_data * len(datasets["train"]))
+            datasets["train"] = datasets["train"].shuffle().select(range(n))
+
+        return DataLoader(datasets[split], batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
+                          num_workers=args.num_workers)
 
     return get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split=split, shuffle=shuffle)
 

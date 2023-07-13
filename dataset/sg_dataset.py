@@ -1,13 +1,14 @@
-import json
-import random
-from pathlib import Path
 import subprocess
 import time
+from pathlib import Path
 
 import numpy as np
 import pytorch_lightning as pl
-from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
+from torch.utils.data import Dataset, DataLoader
+
+from dataset.dataset_utils import split_list
+from dataset.sketch_strings_collator import SketchStringsCollator
 
 
 class SketchGraphsDataset(Dataset):
@@ -49,63 +50,23 @@ class SketchGraphsDataset(Dataset):
         entities = sketch_dict[self.entities_col]
         if self.order == "random":
             np.random.shuffle(entities)
-        mask = self.get_mask(len(entities))
-        sketch_dict["mask"] = mask
-        input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
-        output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
-        sketch_dict['input_text'] = input_text
-        sketch_dict['output_text'] = output_text
+
+        input_entities, output_entities = split_list(entities, self.min_input_percent, self.max_input_percent)
+        sketch_dict['input_text'] = "".join(input_entities)
+        sketch_dict['output_text'] = "".join(output_entities)
+
         return sketch_dict
-
-    def get_mask(self, n):
-        """
-        Sample a random size for mask and a random mask of size n
-        """
-        mask_percent = random.uniform(self.min_input_percent, self.max_input_percent)
-        mask_size = round(mask_percent * n)
-        mask_size = min(max(1, mask_size), n - 1)
-
-        mask = np.zeros(n, dtype=bool)
-        mask[:mask_size] = 1
-        np.random.shuffle(mask)
-        return mask
 
     def __len__(self):
         return len(self.data)
 
 
-class SketchGraphsCollator:
-    def __init__(self, tokenizer, max_length=None):
-        self.tokenizer = tokenizer
-        self.max_length = max_length
-
-    def tokenize(self, strings):
-        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
-
-    def __call__(self, sketch_dicts):
-        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
-        output_strings = [sketch['output_text'] for sketch in sketch_dicts]
-        tokenized_input = self.tokenize(input_strings)
-        tokenized_output = self.tokenize(output_strings)
-
-        labels = tokenized_output.input_ids
-        # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
-        labels[labels == self.tokenizer.pad_token_id] = -100
-
-        batch = {
-            "input_ids": tokenized_input.input_ids,
-            "attention_mask": tokenized_input.attention_mask,
-            "labels": labels,
-            "sketches": sketch_dicts
-        }
-        return batch
-
-
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
-    collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length)
+    collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+
 
 class SketchGraphsDataModule(pl.LightningDataModule):
     def __init__(self, tokenizer, args, ray_args):
