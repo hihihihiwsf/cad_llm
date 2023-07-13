@@ -51,4 +51,5 @@ def get_entities_string(entities):
 
 def get_entity_string(entity):
     point_strings = [f"<{x}><{y}>" for x, y in entity]
+    print("hahaha")
     return "".join(point_strings) + ";"
