@@ -24,7 +24,8 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from PIL import Image
 # import clip
 import numpy as np
-from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel, ViTMAEForPreTraining, ViTMAEConfig
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel
+from models.modeling_vit_mae import ViTMAEForPreTraining, ViTMAEConfig
 from geometry.visualize_vit import Visualize_VIT
 
 
