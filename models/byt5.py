@@ -319,29 +319,29 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         params = list(self.model.parameters()) + list(self.mapper.parameters())
-        optimizer = Adafactor(
-                params,
-                lr=None,
-                eps=(1e-30, 1e-3),
-                clip_threshold=1.0,
-                decay_rate=-0.8,
-                beta1=None,
-                weight_decay=0.0,
-                relative_step=True, #
-                scale_parameter=True, #
-                warmup_init=True, #
-            )
-        #optimizer = optim.AdamW(params, lr=self.lr)
+        # optimizer = Adafactor(
+        #         params,
+        #         lr=None,
+        #         eps=(1e-30, 1e-3),
+        #         clip_threshold=1.0,
+        #         decay_rate=-0.8,
+        #         beta1=None,
+        #         weight_decay=0.0,
+        #         relative_step=True, #
+        #         scale_parameter=True, #
+        #         warmup_init=True, #
+        #     )
+        optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             
-        #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
-        lr_scheduler = AdafactorSchedule(optimizer)
+        #lr_scheduler = AdafactorSchedule(optimizer)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": lr_scheduler,
+                "scheduler": scheduler,
                 "interval": "epoch",
                 "frequency": 1,
             }
