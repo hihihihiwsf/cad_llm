@@ -55,8 +55,8 @@ class ByT5Model(pl.LightningModule):
         
         
         m = VisRecon(args=args)
-        m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        # m.load_from_checkpoint('~/Projects/cad_llm/checkpoints/vitmae_deepmind/best.ckpt')
+        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+        m.load_from_checkpoint('~/Projects/cad_llm/checkpoints/vitmae_deepmind/best.ckpt')
         self.vit_mae = m.model
         del m
         # self.vit_mae = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
