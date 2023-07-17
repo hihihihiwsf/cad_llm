@@ -89,6 +89,8 @@ class BiVLT5Model(pl.LightningModule):
 
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
         self.gelu = torch.nn.GELU()
+        
+        self.image_embed = torch.nn.Linear(self.model.get_input_embeddings().weight.shape[1], self.vis_model.config.hidden_size)
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -146,22 +148,7 @@ class BiVLT5Model(pl.LightningModule):
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
         image_embeds = last_hidden_state
-        #image_embeds = self.post_layernorm(last_hidden_state)
-        
-        # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
-        # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
-
-        # # Merge image embedding with class tokens
-        # image_embeds = image_embeds[:, 1:, :] * class_token_out
-        # image_embeds = self.layer_norm(image_embeds)
-
-        # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        # new_size = (
-        #     image_embeds.shape[0],
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     image_embeds.shape[-1],
-        # )
+ 
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
@@ -177,18 +164,7 @@ class BiVLT5Model(pl.LightningModule):
                 hidden_states=None,
                 attentions=None,
             )
-        # input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
-        # # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
-        # model_batch['inputs_embeds'] = input_embed
-
-
-        # # adding ones to attention_mask
-        # att = model_batch['attention_mask']
-        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
-        # # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
-
-        # batch['attention_mask'] = model_batch['attention_mask']
-        # batch['inputs_embeds'] = model_batch['inputs_embeds']
+        
         decoder_batch = {}
         decoder_batch['encoder_outputs'] = encoder_outputs
         att = batch['attention_mask']
@@ -200,11 +176,13 @@ class BiVLT5Model(pl.LightningModule):
         loss_lm = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
         output_last_hidden_state = outputs.decoder_hidden_states[-1] 
+        hidden_state = self.post_layernorm(self.gelu(self.image_embed(output_last_hidden_state)))
+        
         noise = torch.zeros(att.shape[0], self.patch_num*self.patch_num)
         ids_shuffle = torch.argsort(noise, dim=1)
-        ids_restore = torch.argsort(ids_shuffle, dim=1).to(output_last_hidden_state.device)
+        ids_restore = torch.argsort(ids_shuffle, dim=1).to(hidden_state.device)
         
-        vis_decoder_output = self.vis_model.decoder(output_last_hidden_state ,ids_restore=ids_restore)
+        vis_decoder_output = self.vis_model.decoder(hidden_state ,ids_restore=ids_restore)
         image_logits = vis_decoder_output.logits
         loss_restruction = self.vis_model.forward_loss(batch['pixel_values'], image_logits, mask=None)
         loss_restruction = loss_restruction.mean()
@@ -234,20 +212,7 @@ class BiVLT5Model(pl.LightningModule):
         #pooled_output= last_hidden_state[:, 0, :]
         #image_embeds = self.post_layernorm(last_hidden_state)
         image_embeds = last_hidden_state
-        # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
-        # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
 
-        # # Merge image embedding with class tokens
-        # image_embeds = image_embeds[:, 1:, :] * class_token_out
-        # image_embeds = self.layer_norm(image_embeds)
-
-        # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        # new_size = (
-        #     image_embeds.shape[0],
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     image_embeds.shape[-1],
-        # )
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
@@ -266,18 +231,7 @@ class BiVLT5Model(pl.LightningModule):
                 hidden_states=None,
                 attentions=None,
             )
-        # input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
-        # # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
-        # model_batch['inputs_embeds'] = input_embed
 
-
-        # # adding ones to attention_mask
-        # att = model_batch['attention_mask']
-        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
-        # # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
-
-        # batch['attention_mask'] = model_batch['attention_mask']
-        # batch['inputs_embeds'] = model_batch['inputs_embeds']
 
         decoder_batch['encoder_outputs'] = encoder_outputs
         att = model_batch['attention_mask']
@@ -289,11 +243,13 @@ class BiVLT5Model(pl.LightningModule):
         loss_lm = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
         output_last_hidden_state = outputs.decoder_hidden_states[-1] 
+        hidden_state = self.post_layernorm(self.gelu(self.image_embed(output_last_hidden_state)))
+        
         noise = torch.zeros(att.shape[0], self.patch_num*self.patch_num)
         ids_shuffle = torch.argsort(noise, dim=1)
-        ids_restore = torch.argsort(ids_shuffle, dim=1).to(output_last_hidden_state.device)
+        ids_restore = torch.argsort(ids_shuffle, dim=1).to(hidden_state.device)
         
-        vis_decoder_output = self.vis_model.decoder(output_last_hidden_state ,ids_restore=ids_restore)
+        vis_decoder_output = self.vis_model.decoder(hidden_state ,ids_restore=ids_restore)
         image_logits = vis_decoder_output.logits
         loss_restruction = self.vis_model.forward_loss(batch['pixel_values'], image_logits, mask=None)
         loss_restruction = loss_restruction.mean()
