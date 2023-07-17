@@ -956,7 +956,7 @@ class ViTMAEForPreTraining(ViTMAEPreTrainedModel):
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
 
-        loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
+        #loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
     @add_start_docstrings_to_model_forward(VIT_MAE_INPUTS_DOCSTRING)

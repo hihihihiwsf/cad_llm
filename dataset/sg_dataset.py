@@ -53,8 +53,10 @@ class SketchGraphsDataset(Dataset):
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+        full_text = "".join([ent for i, ent in enumerate(entities)])
         sketch_dict['input_text'] = input_text  #'<s>'+ 
         sketch_dict['output_text'] = output_text #+ '</s>'
+        sketch_dict['full_text'] = full_text
         return sketch_dict
 
     def get_mask(self, n):
@@ -97,12 +99,15 @@ class SketchGraphsCollator:
         labels[labels == self.tokenizer.pad_token_id] = -100
 
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        points_full = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts]
         # input_curves = [get_curves(point_input) for point_input in point_inputs]
         # list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
         list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
+        list_of_img_label = visualize_sample_cv(point_entities=points_full, box_lim=64 + 3)
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        batch_label_images = self.vitmae_preprocess(list_of_img_label, return_tensors="pt")
         # batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
         # images = []
         # for img in list_of_img:
@@ -119,6 +124,7 @@ class SketchGraphsCollator:
             "labels": labels,
             "sketches": sketch_dicts,
             "images": batch_images,
+            "pixel_values":batch_label_images.pixel_values,
         }
         return batch
 
