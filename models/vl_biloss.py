@@ -137,8 +137,6 @@ class BiVLT5Model(pl.LightningModule):
         cols = ["attention_mask","input_ids"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
-
-
         #convert to PIL image for CLIP
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         with torch.no_grad():
