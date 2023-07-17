@@ -90,7 +90,7 @@ class BiVLT5Model(pl.LightningModule):
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
         self.gelu = torch.nn.GELU()
         
-        self.image_embed = torch.nn.Linear(self.model.get_input_embeddings().weight.shape[1], self.vis_model.config.hidden_size)
+        self.image_input_embedding = torch.nn.Linear(self.model.get_input_embeddings().weight.shape[1], self.vis_model.config.hidden_size)
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -172,11 +172,11 @@ class BiVLT5Model(pl.LightningModule):
         decoder_batch['labels'] = batch['labels']
         
         
-        outputs = self.model(**decoder_batch)
+        outputs = self.model(**decoder_batch, output_hidden_states=True, output_attentions=True)
         loss_lm = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
         output_last_hidden_state = outputs.decoder_hidden_states[-1] 
-        hidden_state = self.post_layernorm(self.gelu(self.image_embed(output_last_hidden_state)))
+        hidden_state = self.post_layernorm(self.gelu(self.image_input_embedding(output_last_hidden_state)))
         
         noise = torch.zeros(att.shape[0], self.patch_num*self.patch_num)
         ids_shuffle = torch.argsort(noise, dim=1)
@@ -243,7 +243,7 @@ class BiVLT5Model(pl.LightningModule):
         loss_lm = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
         output_last_hidden_state = outputs.decoder_hidden_states[-1] 
-        hidden_state = self.post_layernorm(self.gelu(self.image_embed(output_last_hidden_state)))
+        hidden_state = self.post_layernorm(self.gelu(self.image_input_embedding(output_last_hidden_state)))
         
         noise = torch.zeros(att.shape[0], self.patch_num*self.patch_num)
         ids_shuffle = torch.argsort(noise, dim=1)
