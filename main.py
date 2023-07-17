@@ -75,7 +75,7 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
-        # precision='16',
+        precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
         # limit_train_batches=0.01,
         # limit_val_batches=0.1,
