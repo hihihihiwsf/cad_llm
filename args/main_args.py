@@ -18,13 +18,13 @@ def get_parser():
     parser.add_argument("--model_name", type=str, default="Salesforce/codet5p-770m", help="Huggingface model name") #Salesforce/codet5p-220m
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
-    parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")
-    parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs.")
+    parser.add_argument("--batch_size", type=int, default=16, help="Number of sketches in a batch")
+    parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs.")
     parser.add_argument("--min_input_percent", type=float, default=0.2,
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=0.8,
                         help="Maximal percentage of sketch entities to choose as input")
-    parser.add_argument("--max_length", type=int, default=96,
+    parser.add_argument("--max_length", type=int, default=196,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")
@@ -33,9 +33,9 @@ def get_parser():
     parser.add_argument("--limit_data", type=float, default=1.0, help="Percentage of data to train on")
     parser.add_argument("--val_every_n_epoch", type=int, default=1, help="Check validation after n training epochs")
     parser.add_argument("--lora", type=int, default=0, help="Apply LoRA if true")
-    parser.add_argument("--cosinedecay", type=int, default=0, help="Apply Cosine Learning rate decay if true")
+    parser.add_argument("--cosinedecay", type=int, default=1, help="Apply Cosine Learning rate decay if true")
     parser.add_argument("--clipmodel", type=str, default="ViT-B/32", choices=['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'ViT-L/14@336px', 'openai/clip-vit-base-patch32', 'openai/clip-vit-large-patch14', 'openai/clip-vit-base-patch16'], help="Which clip model to use")
-    parser.add_argument("--val_mask_rate", type=float,help="Masking rate for validation dataset.")
+    parser.add_argument("--val_mask_rate", type=float, default=0.6, help="Masking rate for validation dataset.")
     return parser
 
 

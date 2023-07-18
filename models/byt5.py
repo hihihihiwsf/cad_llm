@@ -318,6 +318,19 @@ class ByT5Model(pl.LightningModule):
                               sample_curves=batch["sample_curves"], box_lim=self.box_lim + 3)
         fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
         fig.savefig(fig_path)
+        
+    def set_total_train_steps(self, num_train_batches):
+        # Assumes running on gpus, one node and no accumulate_grad_batches
+        n_gpus = torch.cuda.device_count()
+        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
+        self.total_train_steps = train_batches * self.args.epochs
+    
+    @staticmethod
+    def set_total_train_steps_ray(num_train_batches, n_gpus, epochs):
+        # Assumes running on gpus, one node and no accumulate_grad_batches
+        n_gpus = torch.cuda.device_count()
+        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
+        ByT5Model.total_train_steps = train_batches * epochs
 
     def configure_optimizers(self):
         params = list(self.model.parameters()) + list(self.mapper.parameters())

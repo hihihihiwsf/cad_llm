@@ -17,4 +17,5 @@ regex
 tqdm
 matplotlib==3.7.1
 opencv-python-headless
+s3fs
 git+https://github.com/openai/CLIP.git
