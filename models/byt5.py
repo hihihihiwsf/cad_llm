@@ -27,7 +27,7 @@ import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
 from models.modeling_vlt5 import T5ForConditionalGeneration
 from transformers.optimization import Adafactor, AdafactorSchedule
-
+from kmeans_pytorch import kmeans
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, vit_mae=None):
@@ -55,8 +55,8 @@ class ByT5Model(pl.LightningModule):
         
         
         m = VisRecon(args=args)
-        m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        # m.load_from_checkpoint('~/Projects/cad_llm/checkpoints/vitmae_deepmind/best.ckpt')
+        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+        m.load_from_checkpoint('~/Projects/cad_llm/checkpoints/vitmae_deepmind/best.ckpt')
         self.vit_mae = m.model
         del m
         # self.vit_mae = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
@@ -158,6 +158,18 @@ class ByT5Model(pl.LightningModule):
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         input_embed = self.layernorm(image_for_llm)
 
+        # kmeans_input = []
+        # ###KMEANS
+        # model_batch['attention_mask'] = torch.zeros(image_for_llm.shape[0], image_for_llm.shape[1]).to(self.device)
+        # for i, x in enumerate(input_embed):
+        #     s = batch['sketches'][i]
+        #     num_clusters = len(s['entities'])
+        #     _, cluster_centers = kmeans(X=x, num_clusters=num_clusters, distance='euclidean', device=torch.device('cuda:0'), iter_limit=200)
+        #     input_embed[i, :num_clusters, :] = cluster_centers
+        #     model_batch['attention_mask'][i][num_clusters] = 1.
+            
+        
+        
         # txt_embedder = self.model.get_input_embeddings()
         # txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         

@@ -7,7 +7,7 @@ import gc
 import requests
 import numpy as np
 from geometry.parse import get_curves
-
+from PIL import Image, ImageDraw
 
 def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
     batch_size = len(input_curves)
@@ -82,10 +82,19 @@ def visualize_sample_cv(point_entities, box_lim):
     out = []
     
     for entities in point_entities:
-        np_image = render_sketch_opencv(entities, size=256, quantize_bins=64)
+        np_image = render_sketch_opencv(entities, size=224, quantize_bins=64)
         pil_image = np_image[:, :, ::-1]  # BGR to RGB
         img = Image.fromarray(pil_image, mode='RGB')
         out.append(img)
+
+    return out
+
+def visualize_sample_pil(point_entities, box_lim):
+    out = []
+    
+    for entities in point_entities:
+        pil_image = render_sketch_pil(entities, figure_size_pixels=224, pad_in_pixels=10, linewidth=2)
+        out.append(pil_image)
 
     return out
 
@@ -114,3 +123,31 @@ def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
         curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)
 
     return np_image
+
+
+def render_sketch_pil(point_entities, figure_size_pixels=512, pad_in_pixels=10, min_val=0, max_val=63, linewidth=2):
+    """
+    Raises exception on bad sketches
+    """
+    img = Image.new("RGB", size=(figure_size_pixels, figure_size_pixels), color=(255, 255, 255))
+    img_draw = ImageDraw.Draw(img)
+
+    curves = get_curves(point_entities)
+    assert all(curve for curve in curves)
+
+    scale_by = figure_size_pixels - pad_in_pixels
+    shift_by = 0.5 * figure_size_pixels
+    val_range = max_val + 1 - min_val
+
+    def rescale(x):
+        x = (x / val_range) - 0.5  # normalize between -0.5 and 0.5
+        x = scale_by * x + shift_by  # scale to canvas
+        return x
+
+    for curve in curves:
+        curve.draw_pil(img_draw, draw_points=True, linewidth=linewidth, transform=rescale)
+
+    # Origin is at top-left in image space, so flip
+    img = img.transpose(method=Image.FLIP_TOP_BOTTOM)
+
+    return img

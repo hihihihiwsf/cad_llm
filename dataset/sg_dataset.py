@@ -4,7 +4,7 @@ import random
 import json
 from pathlib import Path
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv
+from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv, visualize_sample_pil
 # import clip
 import torch 
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
@@ -99,7 +99,7 @@ class SketchGraphsCollator:
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
         # input_curves = [get_curves(point_input) for point_input in point_inputs]
         # list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
-        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
+        list_of_img = visualize_sample_pil(point_entities=point_inputs, box_lim=64 + 3)
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
