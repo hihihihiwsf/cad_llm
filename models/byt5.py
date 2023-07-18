@@ -56,20 +56,14 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
         
         
-        # m = VisRecon(args=args)
-        # #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        # self.vit_mae = m.model 
-        # self.vit_mae.requires_grad_(False)
-        
 
         self.vit_mae = vit_mae
         if vit_mae is not None:
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
-            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt') #patch_size 16
-            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt') #patch size 32
+            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt') #patch_size 16
+            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt') #patch size 32
             self.vit_mae = m.model 
         
         self.vis_model = self.vit_mae

@@ -11,7 +11,7 @@ from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, args, split):
+    def __init__(self, args, split, mask_rate=None):
         path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
@@ -22,6 +22,7 @@ class SketchGraphsDataset(Dataset):
             self.data = self.data[:n]
 
         self.train = True if split =="train" else False
+        self.mask_rate = mask_rate
         self.order = args.train_order if split == "train" else "sorted"
         assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
@@ -61,7 +62,14 @@ class SketchGraphsDataset(Dataset):
             sketch_dict['output_text'] = output_text #+ '</s>'
             sketch_dict['full_text'] = full_text
         else:
-            mask = self.get_mask(len(entities, 0.4))
+            mask = self.get_mask(len(entities), self.mask_rate)
+            sketch_dict["mask"] = mask
+            input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
+            output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+            full_text = "".join([ent for i, ent in enumerate(entities)])
+            sketch_dict['input_text'] = input_text  #'<s>'+ 
+            sketch_dict['output_text'] = output_text #+ '</s>'
+            sketch_dict['full_text'] = full_text
         return sketch_dict
 
     def get_mask(self, n, mask_percent=None):
@@ -135,8 +143,8 @@ class SketchGraphsCollator:
         return batch
 
 
-def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
-    dataset = SketchGraphsDataset(split=split, args=args)
+def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle, mask_rate):
+    dataset = SketchGraphsDataset(split=split, args=args, mask_rate=mask_rate)
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)

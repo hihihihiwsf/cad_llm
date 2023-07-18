@@ -7,8 +7,8 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-# from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
-from dataset.sg_dataset import get_sketchgraphs_dataloader
+from dataset.sg_dataset_val_mat import get_sketchgraphs_dataloader
+#from dataset.sg_dataset import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
 from models.vl_t5 import VLT5Model
 from models.vision_only import VisionT5Model
@@ -57,9 +57,9 @@ def main():
     print("Loading model...")
 
     if not args.untrained_model:
-        #model = ByT5Model(args=args, vit_mae=None)
-        model = VisionT5Model(args=args, vit_mae=None)
-        # model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt') # ('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')   
+        model = ByT5Model(args=args, vit_mae=None)
+        #model = VisionT5Model(args=args, vit_mae=None)
+        #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt') # ('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')   
     else:
         print("train_mae...", args.untrained_model)
         model = VisRecon(args=args)
@@ -68,9 +68,9 @@ def main():
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
-
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True,mask_rate=None)
+    val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False, mask_rate=args.val_mask_rate)
+    print(f"validation mask rate {args.val_mask_rate}")
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
 
