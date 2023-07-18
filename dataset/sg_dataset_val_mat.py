@@ -50,21 +50,26 @@ class SketchGraphsDataset(Dataset):
         entities = sketch_dict[self.entities_col]
         if self.order == "random":
             np.random.shuffle(entities)
-        mask = self.get_mask(len(entities))
-        sketch_dict["mask"] = mask
-        input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
-        output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
-        full_text = "".join([ent for i, ent in enumerate(entities)])
-        sketch_dict['input_text'] = input_text  #'<s>'+ 
-        sketch_dict['output_text'] = output_text #+ '</s>'
-        sketch_dict['full_text'] = full_text
+        
+        if self.train:
+            mask = self.get_mask(len(entities))
+            sketch_dict["mask"] = mask
+            input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
+            output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+            full_text = "".join([ent for i, ent in enumerate(entities)])
+            sketch_dict['input_text'] = input_text  #'<s>'+ 
+            sketch_dict['output_text'] = output_text #+ '</s>'
+            sketch_dict['full_text'] = full_text
+        else:
+            mask = self.get_mask(len(entities, 0.4))
         return sketch_dict
 
-    def get_mask(self, n):
+    def get_mask(self, n, mask_percent=None):
         """
         Sample a random size for mask and a random mask of size n
         """
-        mask_percent = random.uniform(self.min_input_percent, self.max_input_percent)
+        if not mask_percent:
+            mask_percent = random.uniform(self.min_input_percent, self.max_input_percent)
         mask_size = round(mask_percent * n)
         mask_size = min(max(1, mask_size), n - 1)
 

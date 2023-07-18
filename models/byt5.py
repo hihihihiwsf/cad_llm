@@ -27,7 +27,7 @@ import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
 from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
-from geometry.attention_map import draw_attention_map
+#from geometry.attention_map import draw_attention_map
 
 from transformers.optimization import Adafactor, AdafactorSchedule
 
@@ -68,8 +68,8 @@ class ByT5Model(pl.LightningModule):
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
-            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt') #patch_size 16
-            # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt') #patch size 32
+            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt') #patch_size 16
+            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt') #patch size 32
             self.vit_mae = m.model 
         
         self.vis_model = self.vit_mae
@@ -256,10 +256,10 @@ class ByT5Model(pl.LightningModule):
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
-        '''draw attention maps'''
-        cross_attn = outputs.cross_attentions[-1] # shape: [bsz, num_heads, output_seq_len, input_seq_len] ]last layer, num_layers:12; num_heads:16; 
-        image_out_attn = cross_attn[:,:,:,:self.patch_num]
-        draw_attention_map(cross_attn[0].cpu().detach())
+        # '''draw attention maps'''
+        # cross_attn = outputs.cross_attentions[-1] # shape: [bsz, num_heads, output_seq_len, input_seq_len] ]last layer, num_layers:12; num_heads:16; 
+        # image_out_attn = cross_attn[:,:,:,:self.patch_num]
+        # draw_attention_map(cross_attn[0].cpu().detach())
         
         # Generate and process samples
         self.generate_samples(batch)
