@@ -82,10 +82,19 @@ def visualize_sample_cv(point_entities, box_lim):
     out = []
     
     for entities in point_entities:
-        np_image = render_sketch_opencv(entities, size=256, quantize_bins=64)
+        np_image = render_sketch_opencv(entities, size=224, quantize_bins=64)
         pil_image = np_image[:, :, ::-1]  # BGR to RGB
         img = Image.fromarray(pil_image, mode='RGB')
         out.append(img)
+
+    return out
+
+def visualize_sample_pil(point_entities, box_lim):
+    out = []
+    
+    for entities in point_entities:
+        pil_image = render_sketch_pil(entities, figure_size_pixels=224, pad_in_pixels=10, linewidth=2)
+        out.append(pil_image)
 
     return out
 

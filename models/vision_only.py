@@ -233,7 +233,6 @@ class VisionT5Model(pl.LightningModule):
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
-        
         input_embed = image_for_llm #torch.concatenate((image_for_llm), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
