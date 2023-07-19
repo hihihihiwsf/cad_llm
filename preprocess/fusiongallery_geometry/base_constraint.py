@@ -9,12 +9,11 @@ import uuid
 
 
 class FusionGalleryBaseConstraint:
-    def __init__(self, converter, constraint, points, curves, entity_map):
+    def __init__(self, constraint, points, curves, entity_map, converter=None):
         """
         Intialize a FusionGalleryBaseConstraint
 
         Args
-            converter (DeepmindToFusionGalleryConverter): Parent converter class
             constraint (dict): Constraint in the deepmind format, 
                             i.e. sketch["constraintSequence"]["constraints"][n]
                             which contains for example:
@@ -35,12 +34,13 @@ class FusionGalleryBaseConstraint:
                             values contain a dict with a type and uuid. This map
                             allows us to connect the deepmind indices to the 
                             unique uuids used in the FG dicts
+            converter (DeepmindToFusionGalleryConverter): Parent converter class
         """
-        self.converter = converter
         self.constraint = constraint
         self.points = points
         self.curves = curves
         self.entity_map = entity_map
+        self.converter = converter
         # UUID of the constraint
         self.uuid = str(uuid.uuid1())
         # Type of constraint in deepmind terms

@@ -110,7 +110,8 @@ class DeepmindToFusionGalleryConverter(ConverterBase):
         if curve_count == 0:
             raise Exception("Sketch doesn't have any curves")
 
-    def create_sketch_points(self, dm_entities):
+    @staticmethod
+    def create_sketch_points(dm_entities):
         """Create the sketch points data structure"""
         # point_map.map containts a dict of unique points
         # key: string of the form point.x_point.y
@@ -122,7 +123,8 @@ class DeepmindToFusionGalleryConverter(ConverterBase):
             point_data[fg_point.uuid] = fg_point.to_dict()
         return point_data, point_map  
 
-    def create_sketch_curves(self, dm_entities, point_map):
+    @staticmethod
+    def create_sketch_curves(dm_entities, point_map):
         """Create the sketch curves data structure"""
         # Curve dictionary as stored in FG json format
         curve_data = {}
@@ -163,7 +165,7 @@ class DeepmindToFusionGalleryConverter(ConverterBase):
             fg_dict = fg_obj.to_dict()
             # Register the entity so we can map between the entity indices given in the deepmind
             # data and the FG curve and point dicts
-            constraint_entity_map, constraint_entity_index = self.update_constraint_entity_map(
+            constraint_entity_map, constraint_entity_index = DeepmindToFusionGalleryConverter.update_constraint_entity_map(
                 constraint_entity_map,
                 fg_obj,
                 fg_dict,
@@ -175,7 +177,8 @@ class DeepmindToFusionGalleryConverter(ConverterBase):
 
         return curve_data, constraint_entity_map
 
-    def update_constraint_entity_map(self, entity_map, fg_obj, fg_dict, index):
+    @staticmethod
+    def update_constraint_entity_map(entity_map, fg_obj, fg_dict, index):
         """
         Update the given entity in the constraint entity map
 
@@ -300,7 +303,7 @@ class DeepmindToFusionGalleryConverter(ConverterBase):
 
     def create_constraint(self, constraint, points, curves, constraint_entity_map, constraints_data):
         """Create a constraint and add it to the provided constraints_data dictionary"""
-        constraint = FusionGalleryConstraint(self, constraint, points, curves, constraint_entity_map)
+        constraint = FusionGalleryConstraint(constraint, points, curves, constraint_entity_map, converter=self)
         cst_dict_or_list = constraint.to_dict()
         # Don't count merged points as conversion failures
         if cst_dict_or_list != "Merge":
@@ -322,7 +325,7 @@ class DeepmindToFusionGalleryConverter(ConverterBase):
     def create_dimension(self, dimension, points, curves, constraint_entity_map, dimensions_data):
         """Create a constraint and add it to the provided constraints_data dictionary"""
         self.dimension_count += 1
-        dimension = FusionGalleryDimension(self, dimension, points, curves, constraint_entity_map)
+        dimension = FusionGalleryDimension(dimension, points, curves, constraint_entity_map, converter=self)
         dimension_dict = dimension.to_dict()
         if dimension_dict is not None:
             dimensions_data[dimension.uuid] = dimension_dict

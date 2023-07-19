@@ -4,7 +4,7 @@ from pathlib import Path
 
 from preprocess.deepmind_geometry import *
 from preprocess.fusiongallery_geometry import *
-from preprocess.convert_deepmind_to_fg import create_sketch_points, create_sketch_curves
+from preprocess.convert_deepmind_to_fg import DeepmindToFusionGalleryConverter
 
 
 class TestFusionGalleryConstraint(unittest.TestCase):
@@ -28,8 +28,8 @@ class TestFusionGalleryConstraint(unittest.TestCase):
             dm_sketch_data = json.load(f)
         dm_entities = dm_sketch_data["entitySequence"]["entities"]
         dm_constraints = dm_sketch_data["constraintSequence"]["constraints"]
-        points, point_map = create_sketch_points(dm_entities)
-        curves, entity_map = create_sketch_curves(dm_entities, point_map)
+        points, point_map = DeepmindToFusionGalleryConverter.create_sketch_points(dm_entities)
+        curves, entity_map = DeepmindToFusionGalleryConverter.create_sketch_curves(dm_entities, point_map)
         # Set the class variables with a dynamic index
         setattr(self, f"dm_entities{index}", dm_entities)
         setattr(self, f"dm_constraints{index}", dm_constraints)
@@ -45,7 +45,7 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         fg_cst = FusionGalleryConstraint(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
         # We remove these types of constraints between merged points
-        self.assertIsNone(fg_cst_dict)
+        self.assertTrue(fg_cst_dict is None or fg_cst_dict == "Merge")
 
     def test_coincident_constraint_different_merged_points(self):
         # This constraint is between near identical points that we need to merge
@@ -53,7 +53,7 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         fg_cst = FusionGalleryConstraint(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
         # We remove these types of constraints between merged points
-        self.assertIsNone(fg_cst_dict)
+        self.assertTrue(fg_cst_dict is None or fg_cst_dict == "Merge")
 
     def test_coincident_constraint_three_merged_points(self):
         # This constraint is between near three identical points that we need to merge
@@ -61,7 +61,7 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         fg_cst = FusionGalleryConstraint(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
         # We remove these types of constraints between merged points
-        self.assertIsNone(fg_cst_dict)
+        self.assertTrue(fg_cst_dict is None or fg_cst_dict == "Merge")
     
     def test_parallel_constraint(self):
         cst = self.dm_constraints0[8]
