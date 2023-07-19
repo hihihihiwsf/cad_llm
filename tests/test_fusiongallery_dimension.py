@@ -4,7 +4,7 @@ from pathlib import Path
 
 from preprocess.deepmind_geometry import *
 from preprocess.fusiongallery_geometry import *
-from preprocess.convert_deepmind_to_fg import create_sketch_points, create_sketch_curves
+from preprocess.convert_deepmind_to_fg import DeepmindToFusionGalleryConverter
 
 
 class TestFusionGalleryDimension(unittest.TestCase):
@@ -27,8 +27,8 @@ class TestFusionGalleryDimension(unittest.TestCase):
             dm_sketch_data = json.load(f)
         dm_entities = dm_sketch_data["entitySequence"]["entities"]
         dm_constraints = dm_sketch_data["constraintSequence"]["constraints"]
-        points, point_map = create_sketch_points(dm_entities)
-        curves, entity_map = create_sketch_curves(dm_entities, point_map)
+        points, point_map = DeepmindToFusionGalleryConverter.create_sketch_points(dm_entities)
+        curves, entity_map = DeepmindToFusionGalleryConverter.create_sketch_curves(dm_entities, point_map)
         # Set the class variables with a dynamic index
         setattr(self, f"dm_entities{index}", dm_entities)
         setattr(self, f"dm_constraints{index}", dm_constraints)
