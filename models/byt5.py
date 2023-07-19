@@ -32,7 +32,7 @@ from geometry.visualize_vit import Visualize_VIT
 from transformers.optimization import Adafactor, AdafactorSchedule
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae):
+    def __init__(self, args, vit_mae, tokenizer, total_train_steps):
         super().__init__()
         self.save_hyperparameters()
 
@@ -44,18 +44,16 @@ class ByT5Model(pl.LightningModule):
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        # self.tokenizer.add_special_tokens(["<IMAGE>"])
-
+        self.tokenizer = tokenizer
         self.args = args
 
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
+        self.total_train_steps = total_train_steps  # should be set later for lr scheduler
+
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-        
-        
 
         self.vit_mae = vit_mae
         if vit_mae is not None:
@@ -319,18 +317,17 @@ class ByT5Model(pl.LightningModule):
         fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
         fig.savefig(fig_path)
         
-    def set_total_train_steps(self, num_train_batches):
-        # Assumes running on gpus, one node and no accumulate_grad_batches
-        n_gpus = torch.cuda.device_count()
-        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
-        self.total_train_steps = train_batches * self.args.epochs
-    
     @staticmethod
-    def set_total_train_steps_ray(num_train_batches, n_gpus, epochs):
+    def get_total_train_steps(num_train_batches, num_gpus, epochs):
         # Assumes running on gpus, one node and no accumulate_grad_batches
-        n_gpus = torch.cuda.device_count()
-        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
-        ByT5Model.total_train_steps = train_batches * epochs
+        train_batches = num_train_batches // num_gpus if num_gpus else num_train_batches
+        total_train_steps = train_batches * epochs
+        
+        return total_train_steps
+
+    @staticmethod
+    def get_tokenizer(model_name):
+        return AutoTokenizer.from_pretrained(model_name)
 
     def configure_optimizers(self):
         params = list(self.model.parameters()) + list(self.mapper.parameters())
