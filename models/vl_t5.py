@@ -344,7 +344,7 @@ class VLT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters())
+        params = list(self.trainer.model.parameters()) + list(self.mapper.parameters())
         optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer

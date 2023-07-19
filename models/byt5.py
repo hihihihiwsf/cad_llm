@@ -60,8 +60,8 @@ class ByT5Model(pl.LightningModule):
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
-            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt') #patch_size 16
-            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt') #patch size 32
+            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt') #patch_size 16
+            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt') #patch size 32
             self.vit_mae = m.model 
         
         self.vis_model = self.vit_mae
@@ -330,7 +330,7 @@ class ByT5Model(pl.LightningModule):
         return AutoTokenizer.from_pretrained(model_name)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters())
+        params = list(self.trainer.model.parameters()) + list(self.mapper.parameters())
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
