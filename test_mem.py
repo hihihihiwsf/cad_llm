@@ -9,8 +9,8 @@ except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
-#from models.mem_byt5 import ByModel
+#from models.byt5 import ByT5Model
+from models.mem_byt5 import ByModel
 
 from models.vl_t5 import VLT5Model
 from models.vision_only import VisionT5Model
@@ -85,7 +85,7 @@ def main():
     # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
-        callbacks=call_backs, #[call_backs,embedding_callback],
+        callbacks=[call_backs,embedding_callback],
         accelerator=args.accelerator,
         devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),

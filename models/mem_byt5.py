@@ -41,9 +41,9 @@ class ByT5Model(pl.LightningModule):
         #     model = T5ForConditionalGeneration(config)
         #     model._init_weights(model)  # maybe redundant
         # else:
-        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        # model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
-        self.model = model
+        # self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         # self.tokenizer.add_special_tokens(["<IMAGE>"])
 
@@ -171,25 +171,25 @@ class ByT5Model(pl.LightningModule):
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         image_for_llm = self.layernorm(image_for_llm)
 
-        txt_embedder = self.model.get_input_embeddings()
-        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        # txt_embedder = self.model.get_input_embeddings()
+        # txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
         
-        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
-        # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
-        model_batch['inputs_embeds'] = input_embed
+        # input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+        # # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        # model_batch['inputs_embeds'] = input_embed
+        self.embedding = image_for_llm.detach()
 
+        # # adding ones to attention_mask
+        # att = model_batch['attention_mask']
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
 
-        # adding ones to attention_mask
-        att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
-        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
-
-        batch['attention_mask'] = model_batch['attention_mask']
-        batch['inputs_embeds'] = model_batch['inputs_embeds']
+        # batch['attention_mask'] = model_batch['attention_mask']
+        # batch['inputs_embeds'] = model_batch['inputs_embeds']
         
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        # outputs = self.model(**model_batch)
+        loss = 1  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
         
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -204,8 +204,8 @@ class ByT5Model(pl.LightningModule):
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']), output_hidden_states=True) 
-        image_features = torch.sum(oi.hidden_states[0], 1)        # oi = self.clip_model(**batch['images'])
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images'])) 
+        image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
         # image_features = oi.image_embeds
         # image_features = oi['pooler_output']
 
@@ -242,18 +242,18 @@ class ByT5Model(pl.LightningModule):
 
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
+        self.embedding = image_for_llm.detach()
 
+        # # adding ones to attention_mask
+        # att = model_batch['attention_mask']
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
 
-        # adding ones to attention_mask
-        att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
-        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
+        # batch['attention_mask'] = model_batch['attention_mask']
+        # batch['inputs_embeds'] = model_batch['inputs_embeds']
 
-        batch['attention_mask'] = model_batch['attention_mask']
-        batch['inputs_embeds'] = model_batch['inputs_embeds']
-
-        outputs = self.model(**model_batch, output_attentions=True)
-        loss = outputs.loss
+        # outputs = self.model(**model_batch, output_attentions=True)
+        loss = 1 #outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         

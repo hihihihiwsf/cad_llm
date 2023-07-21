@@ -48,3 +48,14 @@ def get_checkpoint_callbacks(log_dir, all_checkpoint_dir, using_sagemaker):
 
 def get_quantized_range(quantize_n_bits):
     return range(-2 ** (quantize_n_bits - 1), 2 ** (quantize_n_bits - 1))
+
+
+import pytorch_lightning as pl
+
+class EmbeddingCallback(pl.Callback):
+    def __init__(self):
+        super().__init__()
+        self.embeddings = []
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+        self.embeddings.append(pl_module.embeddings.detach().cpu().numpy())
