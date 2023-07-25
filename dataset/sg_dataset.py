@@ -103,7 +103,7 @@ class SketchGraphsCollator:
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
-        batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
+        #batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
         # images = []
         # for img in list_of_img:
         #     images.append(self.clip_preprocess(img))

@@ -59,4 +59,4 @@ class Visualize_VIT():
         self.show_image(im_paste[0], "reconstruction + visible")
 
         plt.show()
-        plt.savefig('maemask.png')
+        plt.savefig('test_ret.png')

@@ -48,3 +48,16 @@ def get_checkpoint_callbacks(log_dir, all_checkpoint_dir, using_sagemaker):
 
 def get_quantized_range(quantize_n_bits):
     return range(-2 ** (quantize_n_bits - 1), 2 ** (quantize_n_bits - 1))
+
+import numpy as np
+class EmbeddingCallback(pl.Callback):
+    def __init__(self):
+        super().__init__()
+        self.embeddings = []
+        self.pixel = []
+        self.name = []
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+        self.embeddings.append(pl_module.embeddings.detach().cpu().numpy())
+        self.pixel.append(pl_module.px.detach().cpu().numpy())
+        self.name.append(pl_module.name.detach().cpu().numpy())

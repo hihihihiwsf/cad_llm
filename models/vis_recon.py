@@ -108,6 +108,7 @@ class VisRecon(pl.LightningModule):
         outputs = self.model(**batch['images'])
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
+        
         # px = batch['images']
         # px = px['pixel_values']
         # self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
@@ -122,6 +123,14 @@ class VisRecon(pl.LightningModule):
 
         outputs = self.model(**batch['images'])
         loss = outputs.loss
+        
+        oi = self.model.vit.encoder(self.model.patchify(**batch['images']))
+        
+        sequence_output = oi[0]
+        self.embeddings = sequence_output #self.model.vit.layernorm(sequence_output)
+        self.px = batch['images'].pixel_values
+        self.name = batch['sketch'].output_text
+        #self.inputs = batch['input_ids']
         
         # px = batch['images']
         # px = px['pixel_values']
