@@ -11,7 +11,7 @@ from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, args, split):
+    def __init__(self, args, split, rate):
         path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
@@ -37,6 +37,7 @@ class SketchGraphsDataset(Dataset):
             assert entity_string[0] == "<", error_message
             assert "," not in self.data[0][self.entities_col][0], error_message
 
+        self.mask_rate = rate
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
@@ -64,7 +65,10 @@ class SketchGraphsDataset(Dataset):
         """
         Sample a random size for mask and a random mask of size n
         """
-        mask_percent = random.uniform(self.min_input_percent, self.max_input_percent)
+        if self.mask_rate==None:
+            mask_percent = random.uniform(self.min_input_percent, self.max_input_percent)
+        else:
+            mask_percent = self.mask_rate
         mask_size = round(mask_percent * n)
         mask_size = min(max(1, mask_size), n - 1)
 
@@ -130,8 +134,8 @@ class SketchGraphsCollator:
         return batch
 
 
-def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
-    dataset = SketchGraphsDataset(split=split, args=args)
+def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle, rate):
+    dataset = SketchGraphsDataset(split=split, args=args, rate=rate)
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
