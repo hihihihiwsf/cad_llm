@@ -23,6 +23,82 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
+import math
+import torch
+from torch import nn, Tensor
+from torch.nn import TransformerEncoder, TransformerEncoderLayer, TransformerDecoder, TransformerDecoderLayer
+
+from models.modeling_t5 import T5ForConditionalGeneration
+import numpy as np
+
+class TransformerModel(nn.Module):
+
+    def __init__(self, d_model: int, nhead: int, d_hid: int,
+                 nlayers: int, dropout: float = 0.5):
+        super().__init__()
+        self.model_type = 'Transformer'
+        self.pos_encoder = PositionalEncoding(d_model, dropout)
+        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        decode_layers = TransformerDecoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=1024, dropout=dropout, batch_first=True)
+        self.transformer_decoder = TransformerDecoder(decode_layers, nlayers)
+        self.lmhead = nn.Linear(d_model, 64+6, bias=False)
+        # self.embedding = nn.Embedding(ntoken, d_model)
+        self.d_model = d_model
+        self.linear = nn.Linear(d_model, d_model)
+
+        self.init_weights()
+
+    def init_weights(self) -> None:
+        initrange = 0.1
+        # self.embedding.weight.data.uniform_(-initrange, initrange)
+        self.linear.bias.data.zero_()
+        self.linear.weight.data.uniform_(-initrange, initrange)
+
+    def encode(self, src: Tensor, mask: Tensor = None) -> Tensor:
+        """
+        Arguments:
+            src: Tensor, shape ``[seq_len, batch_size]``
+            src_mask: Tensor, shape ``[seq_len, seq_len]``
+
+        Returns:
+            output Tensor of shape ``[seq_len, batch_size, ntoken]``
+        """
+        src = src * math.sqrt(self.d_model)
+        src = self.pos_encoder(src)
+        output = self.transformer_encoder(src, src_key_padding_mask=mask)
+        output = self.linear(output)
+        return output
+    
+    def decode(self, tgt, memory):
+        
+        output = self.transformer_decoder(tgt, memory)
+        return output
+    
+    def generate_square_subsequent_mask(self, sz, device='cuda'):
+        return torch.triu(torch.full((sz, sz), float('-inf'), device=device), diagonal=1)
+    
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Arguments:
+            x: Tensor, shape ``[seq_len, batch_size, embedding_dim]``
+        """
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+
 
 class ByT5Model(pl.LightningModule):
     total_train_steps = None
@@ -40,7 +116,9 @@ class ByT5Model(pl.LightningModule):
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
-
+        
+        self.local_model = TransformerModel(d_model=self.model.config.d_model, nhead=2, d_hid=256, nlayers=4)
+        self.initial_embedder = self.model.get_input_embeddings()
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
         self.total_train_steps = None  # should be set later for lr scheduler
@@ -48,7 +126,16 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
+        # self.lhead = nn.Linear(self.model.config.d_model, 64+3, bias=False)
 
+        mapper_to_possible_outputs = {self.tokenizer.encode(str(i))[1]: i for i in range(1, 65)}
+        mapper_to_possible_outputs[self.tokenizer.encode(',')[1]] = 64+1
+        mapper_to_possible_outputs[self.tokenizer.encode(';')[1]] = 64+2
+        mapper_to_possible_outputs[self.tokenizer.pad_token_id] = 64+3
+        mapper_to_possible_outputs[self.tokenizer.bos_token_id] = 64+4
+        mapper_to_possible_outputs[self.tokenizer.eos_token_id] = 64+5
+        self.token_mapper = mapper_to_possible_outputs
+        
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
@@ -93,13 +180,148 @@ class ByT5Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
+        #torch attention masking is oppostie of huggingface
+        mask = (-(batch['input_entities'].attention_mask) + 1).float()
+        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        # txt_embeddings = torch.sum(txt_embeddings, 1)
+        txt_embeddings = txt_embeddings[:, 0, :]
+        pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
+        
+        
+        ########### INPUT CHUNKS
+        # Find the maximum chunk size
+        chunks = batch['input_ent_length']
+        # Create an empty tensor with zero padding
+        input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        idx = 0
+        for i, size in enumerate(chunks):
+            input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+            idx += size
+
+        ########### OUTPUT CHUNKS
+        with torch.no_grad():
+            txt_embeddings = self.initial_embedder(batch['output_entities'].input_ids)
+            mask = (-(batch['output_entities'].attention_mask) + 1).float()
+            txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+            txt_embeddings = txt_embeddings[:, 0, :]
+            chunks = batch['output_ent_length']
+            output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+            idx = 0
+            decoder_inputs_embeds = []
+            for i, size in enumerate(chunks):
+                output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+                ## adding a pad token to the begining because decoder_input_token should be shifted right
+                decoder_inputs_embeds.append(torch.concatenate((pad_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
+                idx += size
+            decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
+            
+        model_batch['inputs_embeds'] = input_tensor
+        model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds
+        del model_batch['input_ids'], 
+        del model_batch['labels']
+        model_batch['attention_mask'] =  batch['batch_att_mask']
+        outputs = self.model(**model_batch, output_hidden_states=True)
+        tgt = self.initial_embedder(batch['output_entities'].input_ids)
+        
+        l = batch['output_ent_length']
+        l2 = list(np.cumsum(l))
+        tgt_tuple = torch.tensor_split(tgt, l2)[:-1]
+        list_of_tgts = []
+        max_num_ent_in_batch = max(l)
+        for t in tgt_tuple:
+            pad_attach = pad_embed.unsqueeze(0).repeat(max_num_ent_in_batch-t.shape[0], t.shape[1], 1)
+            sample = torch.concatenate((t, pad_attach), dim=0)
+            
+            list_of_tgts.append(sample.view(-1, t.shape[2]).unsqueeze(0)) #from [ent_num, seq_len, h_dim] --> [1, ent_num*seq_len, h_dim]
+            
+        target = torch.cat(list_of_tgts, dim=0)
+        outputs = self.local_model.decode(target, outputs["decoder_hidden_states"][0])
+        outputs = self.local_model.lmhead(outputs)
+        loss = 0
+        idx = 0
+
+        
+        for i, j in enumerate(outputs):
+            #ignoring first two tokens which are "<s>" and "C"
+            lbl = batch['output_entities'].input_ids[idx: idx+l[i], 2:]  #entitites of the first sample in the batch
+            lbl = lbl.reshape(1, -1).squeeze()
+            model_output = outputs[i, :lbl.shape[0], :]
+            lbl = list(map(lambda x:self.token_mapper[x.item()], lbl))
+            lbl = torch.tensor(lbl).to(self.device)
+            loss += torch.nn.functional.cross_entropy(model_output, lbl)
+            # print(loss)
+        
+        self.log("loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
+                batch_size=self.batch_size, sync_dist=True)
+        # loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
+        
+        cols = ["input_ids", "attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+        txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
+        #torch attention masking is oppostie of huggingface
+        mask = (-(batch['input_entities'].attention_mask) + 1).float()
+        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        # txt_embeddings = torch.sum(txt_embeddings, 1)
+        txt_embeddings = txt_embeddings[:, 0, :]
+        pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
+        ########### INPUT CHUNKS
+        # Find the maximum chunk size
+        chunks = batch['input_ent_length']
+        # Create an empty tensor with zero padding
+        input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        idx = 0
+        for i, size in enumerate(chunks):
+            input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+            idx += size
+
+        txt_embeddings = self.initial_embedder(batch['output_entities'].input_ids)
+        mask = (-(batch['output_entities'].attention_mask) + 1).float()
+        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        txt_embeddings = txt_embeddings[:, 0, :]
+        chunks = batch['output_ent_length']
+        l = batch['output_ent_length']
+        
+        model_batch['inputs_embeds'] = input_tensor
+        del model_batch['input_ids'], 
+        del model_batch['labels']
+        model_batch['attention_mask'] =  batch['batch_att_mask']
+        outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=20)
+
+        #decoder hidden states is a tuple of size # new_tokens * num_layers * bs, 1, h_dim
+        decoder_hidden_states = []
+        for e in outputs['decoder_hidden_states']:
+            decoder_hidden_states.append(e[-1])
+        
+        
+        src = outputs['decoder_hidden_states'][0]
+        target = pad_embed.repeat(src.shape[0], 1)
+        for i in range(self.args.max_length):
+            outputs = self.local_model.decode(target, outputs["decoder_hidden_states"][0])
+            predicted_value = outputs[:, -1, :]
+            target = torch.concatenate(target, predicted_value)
+        
+        outputs = self.local_model.lmhead(target)
+        loss = 0
+        idx = 0
+
+        
+        for i, j in enumerate(outputs):
+            #ignoring first two tokens which are "<s>" and "C"
+            lbl = batch['output_entities'].input_ids[idx: idx+l[i], 2:]  #entitites of the first sample in the batch
+            lbl = lbl.reshape(1, -1).squeeze()
+            model_output = outputs[i, :lbl.shape[0], :]
+            lbl = list(map(lambda x:self.token_mapper[x.item()], lbl))
+            lbl = torch.tensor(lbl).to(self.device)
+            loss += torch.nn.functional.cross_entropy(model_output, lbl)
+            
+            
+            
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
