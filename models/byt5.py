@@ -23,6 +23,7 @@ from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
+from transformers import BertModel, BertConfig
 
 class ByT5Model(pl.LightningModule):
     total_train_steps = None
@@ -41,6 +42,10 @@ class ByT5Model(pl.LightningModule):
         self.initial_embedder = self.model.get_input_embeddings()
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
+        
+        bertconfig = BertConfig()
+        self.globalmodel = BertModel(bertconfig)
+        self.localmodel = BertModel(bertconfig)
 
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
@@ -128,9 +133,9 @@ class ByT5Model(pl.LightningModule):
         txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
         #torch attention masking is oppostie of huggingface
         mask = (-(batch['input_entities'].attention_mask) + 1).float()
-        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        txt_embeddings = self.localmodel(inputs_embeds=txt_embeddings).pooler_output
         # txt_embeddings = torch.sum(txt_embeddings, 1)
-        txt_embeddings = txt_embeddings[:, 0, :]
+        #txt_embeddings = txt_embeddings[:, 0, :]
         pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
         
         
@@ -144,7 +149,7 @@ class ByT5Model(pl.LightningModule):
             input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
             idx += size
             
-            
+        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor)
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
