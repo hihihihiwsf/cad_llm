@@ -20,7 +20,7 @@ from models.segformer import SegformerModel
 from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
 from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
-
+from pytorch_lightning.strategies import DDPStrategy
 
 def get_model(args):
     if "segformer" in args.model_name:
@@ -91,18 +91,19 @@ def main():
 
     print("Training the model...")
     log_every_n_steps = 10000
+    strategy=DDPStrategy(find_unused_parameters=True)
     trainer = pl.Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
-        strategy=args.strategy,
+        strategy=strategy,
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
-        # limit_train_batches=0.001,
+        limit_train_batches=0.001,
         # limit_val_batches=0.01,
     )
     if not args.eval: 

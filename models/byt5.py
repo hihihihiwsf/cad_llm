@@ -136,6 +136,10 @@ class ByT5Model(pl.LightningModule):
         mapper_to_possible_outputs[self.tokenizer.eos_token_id] = 64+5
         self.token_mapper = mapper_to_possible_outputs
         
+        self.back_to_llm_token_mapper = {}
+        for k, v in self.token_mapper.items():
+            self.back_to_llm_token_mapper[v] = k
+        
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
             self.adjust_to_use_new_tokens()
@@ -236,7 +240,7 @@ class ByT5Model(pl.LightningModule):
             list_of_tgts.append(sample.view(-1, t.shape[2]).unsqueeze(0)) #from [ent_num, seq_len, h_dim] --> [1, ent_num*seq_len, h_dim]
             
         target = torch.cat(list_of_tgts, dim=0)
-        outputs = self.local_model.decode(target, outputs["decoder_hidden_states"][0])
+        outputs = self.local_model.decode(target, outputs["decoder_hidden_states"][-1])
         outputs = self.local_model.lmhead(outputs)
         loss = 0
         idx = 0
@@ -299,14 +303,23 @@ class ByT5Model(pl.LightningModule):
             decoder_hidden_states.append(e[-1])
         
         
-        src = outputs['decoder_hidden_states'][0]
-        target = pad_embed.repeat(src.shape[0], 1)
+        src = torch.cat(decoder_hidden_states, dim=1)
+        target = pad_embed.repeat(src.shape[0], 1, 1)
         for i in range(self.args.max_length):
-            outputs = self.local_model.decode(target, outputs["decoder_hidden_states"][0])
-            predicted_value = outputs[:, -1, :]
-            target = torch.concatenate(target, predicted_value)
+            outputs = self.local_model.decode(target, src)
+            predicted_value = outputs[:, -1, :].unsqueeze(1)
+            target = torch.concatenate((target, predicted_value),dim=1)
         
         outputs = self.local_model.lmhead(target)
+        final_seq = torch.argmax(outputs, 2)
+        
+        seq_samples = []
+        for i in final_seq:
+            sample = list(map(lambda x:self.back_to_llm_token_mapper[x.item()], i))
+            sample = torch.tensor(sample).to(self.device).unsqueeze(0)
+            seq_samples.append(sample)
+            
+        batch['samples'] = torch.cat(seq_samples, dim=0)
         loss = 0
         idx = 0
 
@@ -318,14 +331,9 @@ class ByT5Model(pl.LightningModule):
             model_output = outputs[i, :lbl.shape[0], :]
             lbl = list(map(lambda x:self.token_mapper[x.item()], lbl))
             lbl = torch.tensor(lbl).to(self.device)
-            loss += torch.nn.functional.cross_entropy(model_output, lbl)
-            
-            
-            
-        cols = ["input_ids", "attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+            # loss += torch.nn.functional.cross_entropy(model_output, lbl)
+
+
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
@@ -354,9 +362,9 @@ class ByT5Model(pl.LightningModule):
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
-        generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                         do_sample=False, max_new_tokens=self.args.max_length+10)
+        # generate_func = unwrap_model(self.model).generate
+        # batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+        #                                  do_sample=False, max_new_tokens=self.args.max_length+10)
 
         string_samples = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in string_samples]
