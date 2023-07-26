@@ -38,6 +38,7 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
+        self.initial_embedder = self.model.get_input_embeddings()
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
 
