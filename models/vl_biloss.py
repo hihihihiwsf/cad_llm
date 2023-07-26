@@ -185,7 +185,7 @@ class BiVLT5Model(pl.LightningModule):
         loss_restruction = self.vis_model.forward_loss(batch['pixel_values'], image_logits, mask=None)
         loss_restruction = loss_restruction.mean()
         
-        loss = 0.5* loss_lm + loss_restruction
+        loss = loss_lm + loss_restruction
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss

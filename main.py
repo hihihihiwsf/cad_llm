@@ -106,7 +106,7 @@ def main():
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
         #ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        ckpt_dir =  's3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
+        ckpt_dir =  's3://cad-llm-katzm/jobs/sifan-vl-biloss-07-17-23-1618/checkpoints/model/vl_biloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
         
 
