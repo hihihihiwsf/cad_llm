@@ -93,6 +93,27 @@ class ByT5Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+        
+        txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
+        #torch attention masking is oppostie of huggingface
+        mask = (-(batch['input_entities'].attention_mask) + 1).float()
+        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        # txt_embeddings = torch.sum(txt_embeddings, 1)
+        txt_embeddings = txt_embeddings[:, 0, :]
+        pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
+        
+        
+        ########### INPUT CHUNKS
+        # Find the maximum chunk size
+        chunks = batch['input_ent_length']
+        # Create an empty tensor with zero padding
+        input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        idx = 0
+        for i, size in enumerate(chunks):
+            input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+            idx += size
+        
+        
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -102,6 +123,27 @@ class ByT5Model(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
+        
+        txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
+        #torch attention masking is oppostie of huggingface
+        mask = (-(batch['input_entities'].attention_mask) + 1).float()
+        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        # txt_embeddings = torch.sum(txt_embeddings, 1)
+        txt_embeddings = txt_embeddings[:, 0, :]
+        pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
+        
+        
+        ########### INPUT CHUNKS
+        # Find the maximum chunk size
+        chunks = batch['input_ent_length']
+        # Create an empty tensor with zero padding
+        input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        idx = 0
+        for i, size in enumerate(chunks):
+            input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+            idx += size
+            
+            
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
