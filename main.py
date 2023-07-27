@@ -89,13 +89,14 @@ def main():
 
     call_backs.append(LearningRateMonitor(logging_interval='step'))
 
+    from pytorch_lightning.strategies import DDPStrategy
     print("Training the model...")
     log_every_n_steps = 10000
     trainer = pl.Trainer(
         callbacks=call_backs,
         accelerator=args.accelerator,
         devices=args.devices,
-        strategy=args.strategy,
+        strategy=DDPStrategy(find_unused_parameters=True),  #args.strategy,
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
