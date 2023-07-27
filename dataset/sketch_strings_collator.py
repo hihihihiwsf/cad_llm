@@ -16,11 +16,11 @@ class SketchStringsCollator:
         input_entities, single_ents_length = [], []
         output_entities, single_ents_length_out = [], []
         for example in examples:
-            single_ents = ["C"+x+";" for x in example['input_text'].split(";") if x]
+            single_ents = [x+";" for x in example['input_text'].split(";") if x]
             input_entities.extend(single_ents)
             single_ents_length.append(len(single_ents)) #num_input_entities
 
-            single_ents_out = ["C"+x+";" for x in example['output_text'].split(";") if x]
+            single_ents_out = [x+";" for x in example['output_text'].split(";") if x]
             output_entities.extend(single_ents_out)
             single_ents_length_out.append(len(single_ents_out))
             
@@ -38,6 +38,7 @@ class SketchStringsCollator:
         batch_att_mask = torch.zeros(labels.shape[0], max(single_ents_length))
         for i, j in enumerate(single_ents_length):
             batch_att_mask[i, :j] = 1
+
         
         batch = {
             "input_ids": tokenized_input.input_ids,

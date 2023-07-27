@@ -168,7 +168,9 @@ class ByT5Model(pl.LightningModule):
                  batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
-        self.generate_samples(model_batch)
+        #model_batch['output_text'] = batch['output_text']
+        batch['inputs_embeds'] = model_batch['inputs_embeds']
+        self.generate_samples(batch)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
@@ -193,7 +195,7 @@ class ByT5Model(pl.LightningModule):
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_embeds=batch["inputs_embeds"], attention_mask=batch["attention_mask"],
+        batch["samples"] = generate_func(inputs_embeds=batch["inputs_embeds"], attention_mask=batch["attention_mask"],
                                          do_sample=False, max_new_tokens=self.args.max_length+10)
 
         string_samples = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
