@@ -55,7 +55,9 @@ def get_dataloader(args, split, shuffle, model):
 def main():
     """Entry point for our training script"""
     args = get_training_args()
-
+    import os
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    
     results_dir = Path(args.results_dir) / args.exp_name
     if not results_dir.exists():
         results_dir.mkdir(parents=True)
@@ -103,7 +105,7 @@ def main():
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
-        limit_train_batches=0.001,
+        # limit_train_batches=0.001,
         # limit_val_batches=0.01,
     )
     if not args.eval: 
