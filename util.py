@@ -56,8 +56,12 @@ class EmbeddingCallback(pl.Callback):
         self.embeddings = []
         self.pixel = []
         self.name = []
+        self.fulltext = []
+        self.intext = []
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         self.embeddings.append(pl_module.embeddings.detach().cpu().numpy())
         self.pixel.append(pl_module.px.detach().cpu().numpy())
         self.name.append(pl_module.name)
+        self.fulltext.append(pl_module.fulltext)
+        self.intext.append(pl_module.intext)

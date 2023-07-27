@@ -129,7 +129,10 @@ class VisRecon(pl.LightningModule):
         sequence_output = oi[0]
         self.embeddings = sequence_output #self.model.vit.layernorm(sequence_output)
         self.px = batch['images'].pixel_values
+        self.fulltext = [sketch["full_text"] for sketch in batch['sketches']]
+        self.intext = [sketch["input_text"] for sketch in batch['sketches']]
         self.name = [sketch["name"] for sketch in batch['sketches']]
+        
         #self.inputs = batch['input_ids']
         
         # px = batch['images']

@@ -22,6 +22,10 @@ import os
 from pytorch_lightning.strategies import DDPStrategy
 
 from transformers import AutoTokenizer
+import matplotlib.pyplot as plt
+
+from geometry.parse import get_curves, get_point_entities
+from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv, visualize_sample_pil
 
 def main():
     """Entry point for our training script"""
@@ -98,18 +102,22 @@ def main():
         saved_embeddings = embedding_callback.embeddings
         saved_pixels = embedding_callback.pixel
         saved_name = embedding_callback.name
+        saved_fulltext = embedding_callback.fulltext
+        saved_intext = embedding_callback.intext
         
         import numpy as np
         from sklearn.manifold import TSNE
-        import matplotlib.pyplot as plt
+        
         import umap
         import faiss
         all_embeddings = np.concatenate(saved_embeddings, axis=0)
         all_pixels = np.concatenate(saved_pixels, axis=0)
+        all_fulltext = np.concatenate(saved_fulltext, axis=0)
+        all_intext = np.concatenate(saved_intext, axis=0)
         
         #all_embeddings = all_embeddings.reshape(all_embeddings.shape[0], -1)
-        np.save('embeddings.npy', all_embeddings)
-        np.save('pixel.npy', all_pixels)
+        # np.save('embeddings.npy', all_embeddings)
+        # np.save('pixel.npy', all_pixels)
         
         # tsne = TSNE(n_components=3, random_state=42)
         # tsne_embeddings = tsne.fit_transform(all_embeddings)
@@ -164,4 +172,27 @@ def main():
         
         
 if __name__ == "__main__":
+    # import json
+    # args = get_training_args()
+    # with open(args.dataset+'/val.json') as f:
+    #     data = json.load(f)
+
+
+    
+    # samples = []
+    # for sam in data:
+    #     if sam['name'] in [23557, 40996, 22401]:
+    #         name = sam['name']
+    #         fulltext = "".join([ent for  ent in sam['entities']])
+    #         point_inputs = [get_point_entities(fulltext)]
+    #         list_of_img = visualize_sample_pil(point_entities=point_inputs, box_lim=64 + 3)
+    #         plt.imshow(list_of_img[0])
+    #         plt.savefig(f'test_re{name}.png')
+
+            
+    # print("test")    
+    
+    
+    
+    
     main()

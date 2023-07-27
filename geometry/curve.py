@@ -32,3 +32,12 @@ class Curve:
 
     def shift_point(self, point, cell_size):
         return cell_size * point + (cell_size // 2, cell_size // 2)
+    
+    def draw_points_pil(self, img_draw, color="black", transform=None):
+        r = 1
+        points = self.points
+        if transform:
+            points = [(transform(x), transform(y)) for x, y in points]
+
+        for x, y in points:
+            img_draw.ellipse(xy=(x-r, y-r, x+r, y+r), fill=color, outline=None, width=1)
