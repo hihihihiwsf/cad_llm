@@ -97,42 +97,12 @@ class ByT5Model(pl.LightningModule):
             embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
+        cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
         txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
         #torch attention masking is oppostie of huggingface
-        mask = (-(batch['input_entities'].attention_mask) + 1).float()
-        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
-        # txt_embeddings = torch.sum(txt_embeddings, 1)
-        txt_embeddings = txt_embeddings[:, 0, :]
-        pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
-        
-        
-        ########### INPUT CHUNKS
-        # Find the maximum chunk size
-        chunks = batch['input_ent_length']
-        # Create an empty tensor with zero padding
-        input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
-        idx = 0
-        for i, size in enumerate(chunks):
-            input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
-            idx += size
-        
-        
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        cols = ["input_ids", "attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
-        
-        txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
-        #torch attention masking is oppostie of huggingface
-        mask = (-(batch['input_entities'].attention_mask) + 1).float()
+        # mask = (-(batch['input_entities'].attention_mask) + 1).float()
         txt_embeddings = self.localmodel(inputs_embeds=txt_embeddings).pooler_output
         # txt_embeddings = torch.sum(txt_embeddings, 1)
         #txt_embeddings = txt_embeddings[:, 0, :]
@@ -148,15 +118,57 @@ class ByT5Model(pl.LightningModule):
         for i, size in enumerate(chunks):
             input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
             idx += size
-            
-        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor)
+        
+        token_embeddings = self.initial_embedder(batch['input_ids'])
+        
+        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
+        ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
+        ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
+        
+        model_batch['inputs_embeds'] = token_embeddings+ent_embeddings
+        outputs = self.model(**model_batch)
+        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        cols = ["attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+        
+        txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
+        #torch attention masking is oppostie of huggingface
+        # mask = (-(batch['input_entities'].attention_mask) + 1).float()
+        txt_embeddings = self.localmodel(inputs_embeds=txt_embeddings).pooler_output
+        # txt_embeddings = torch.sum(txt_embeddings, 1)
+        #txt_embeddings = txt_embeddings[:, 0, :]
+        pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
+        
+        
+        ########### INPUT CHUNKS
+        # Find the maximum chunk size
+        chunks = batch['input_ent_length']
+        # Create an empty tensor with zero padding
+        input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        idx = 0
+        for i, size in enumerate(chunks):
+            input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+            idx += size
+        
+        token_embeddings = self.initial_embedder(batch['input_ids'])
+        
+        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
+        ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
+        ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
+        
+        model_batch['inputs_embeds'] = token_embeddings+ent_embeddings
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
-        self.generate_samples(batch)
+        self.generate_samples(model_batch)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
@@ -181,7 +193,7 @@ class ByT5Model(pl.LightningModule):
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+        batch["samples"] = generate_func(input_embeds=batch["inputs_embeds"], attention_mask=batch["attention_mask"],
                                          do_sample=False, max_new_tokens=self.args.max_length+10)
 
         string_samples = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
