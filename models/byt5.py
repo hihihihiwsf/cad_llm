@@ -117,7 +117,7 @@ class ByT5Model(pl.LightningModule):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
         
-        self.local_model = TransformerModel(d_model=self.model.config.d_model, nhead=4, d_hid=512, nlayers=4)
+        self.local_model = TransformerModel(d_model=self.model.config.d_model, nhead=4, d_hid=768, nlayers=4)
         self.initial_embedder = self.model.get_input_embeddings()
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
