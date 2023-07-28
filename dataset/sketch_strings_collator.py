@@ -36,8 +36,30 @@ class SketchStringsCollator:
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
         batch_att_mask = torch.zeros(labels.shape[0], max(single_ents_length))
+        batch_att_ent_len  = torch.zeros(labels.shape[0], max(single_ents_length))
+        
+        ent_count = 0
         for i, j in enumerate(single_ents_length):
             batch_att_mask[i, :j] = 1
+            ent_sum = torch.Tensor([tokenized_single_entity.attention_mask[idx+ent_count].sum()-2 for idx in range(j)])
+            ent_count += j
+            first = torch.zeros(ent_sum.shape)
+            first[0]=1
+            if j==1:
+                first[-1] += 1
+            else:
+                first[-1]=1
+            # else:
+            #     print("entity number = 1")
+            ent_sum = ent_sum+first
+            
+            batch_att_ent_len[i, :j] = ent_sum
+            if batch_att_ent_len[i].sum() != tokenized_input.attention_mask[i].sum():
+                a=ent_sum
+                print("error ent_mask length")
+
+                
+                
 
         
         batch = {
@@ -46,6 +68,7 @@ class SketchStringsCollator:
             "labels": labels,
             "input_text": input_text,
             "output_text": output_text,
+            "batch_att_ent_len": batch_att_ent_len,
             "input_entities": tokenized_single_entity,
             "input_ent_length": single_ents_length,
             "batch_att_mask": batch_att_mask,

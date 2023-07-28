@@ -121,11 +121,25 @@ class ByT5Model(pl.LightningModule):
         
         token_embeddings = self.initial_embedder(batch['input_ids'])
         
-        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
-        ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
-        ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
+        # ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
+        # ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
+        # ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
         
-        model_batch['inputs_embeds'] = token_embeddings+ent_embeddings
+        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).last_hidden_state # (bs, n_e, dim)
+        bsz = ent_embeddings.shape[0]
+        new_ent_embeddings = torch.zeros(token_embeddings.shape).to(ent_embeddings.device)
+        
+        
+        for idx in range(bsz):
+            seq_len = batch['attention_mask'][idx].sum()
+            ent_repeat_embedding = torch.Tensor([]).to(ent_embeddings.device)
+            for i in range(batch['input_ent_length'][idx]):
+                embedding = ent_embeddings[idx, i:i+1,:].repeat(1, batch['batch_att_ent_len'][idx, i].int(), 1)
+                ent_repeat_embedding = torch.concat((ent_repeat_embedding, embedding), 1)
+            new_ent_embeddings[idx, :seq_len,:] = ent_repeat_embedding
+        
+        
+        model_batch['inputs_embeds'] = token_embeddings+new_ent_embeddings
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -157,11 +171,25 @@ class ByT5Model(pl.LightningModule):
         
         token_embeddings = self.initial_embedder(batch['input_ids'])
         
-        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
-        ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
-        ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
+        # ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
+        # ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
+        # ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
         
-        model_batch['inputs_embeds'] = token_embeddings+ent_embeddings
+        ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).last_hidden_state # (bs, n_e, dim)
+        bsz = ent_embeddings.shape[0]
+        new_ent_embeddings = torch.zeros(token_embeddings.shape).to(ent_embeddings.device)
+        
+        
+        for idx in range(bsz):
+            seq_len = batch['attention_mask'][idx].sum()
+            ent_repeat_embedding = torch.Tensor([]).to(ent_embeddings.device)
+            for i in range(batch['input_ent_length'][idx]):
+                embedding = ent_embeddings[idx, i:i+1,:].repeat(1, batch['batch_att_ent_len'][idx, i].int(), 1)
+                ent_repeat_embedding = torch.concat((ent_repeat_embedding, embedding), 1)
+            new_ent_embeddings[idx, :seq_len,:] = ent_repeat_embedding
+        
+        
+        model_batch['inputs_embeds'] = token_embeddings+new_ent_embeddings
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
