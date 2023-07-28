@@ -40,7 +40,7 @@ class TransformerModel(nn.Module):
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        decode_layers = TransformerDecoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=1024, dropout=dropout, batch_first=True)
+        decode_layers = TransformerDecoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=512, dropout=dropout, batch_first=True)
         self.transformer_decoder = TransformerDecoder(decode_layers, nlayers)
         self.lmhead = nn.Linear(d_model, 64+6, bias=False)
         # self.embedding = nn.Embedding(ntoken, d_model)
@@ -117,7 +117,7 @@ class ByT5Model(pl.LightningModule):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
         
-        self.local_model = TransformerModel(d_model=self.model.config.d_model, nhead=2, d_hid=256, nlayers=4)
+        self.local_model = TransformerModel(d_model=self.model.config.d_model, nhead=4, d_hid=512, nlayers=4)
         self.initial_embedder = self.model.get_input_embeddings()
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
