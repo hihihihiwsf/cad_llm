@@ -105,8 +105,9 @@ def main():
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
-        # limit_train_batches=0.0005,
+        # limit_train_batches=0.01,
         # limit_val_batches=0.01,
+        precision='16'
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)

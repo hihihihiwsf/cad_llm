@@ -42,7 +42,7 @@ class TransformerModel(nn.Module):
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         decode_layers = TransformerDecoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=512, dropout=dropout, batch_first=True)
         self.transformer_decoder = TransformerDecoder(decode_layers, nlayers)
-        self.lmhead = nn.Linear(d_model, 64+6, bias=False)
+        self.lmhead = nn.Linear(d_model, 64+5, bias=False)
         # self.embedding = nn.Embedding(ntoken, d_model)
         self.d_model = d_model
         self.linear = nn.Linear(d_model, d_model)
@@ -128,12 +128,12 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
         # self.lhead = nn.Linear(self.model.config.d_model, 64+3, bias=False)
 
-        mapper_to_possible_outputs = {self.tokenizer.encode(str(i))[1]: i for i in range(1, 65)}
-        mapper_to_possible_outputs[self.tokenizer.encode(',')[1]] = 64+1
-        mapper_to_possible_outputs[self.tokenizer.encode(';')[1]] = 64+2
-        mapper_to_possible_outputs[self.tokenizer.pad_token_id] = 64+3
-        mapper_to_possible_outputs[self.tokenizer.bos_token_id] = 64+4
-        mapper_to_possible_outputs[self.tokenizer.eos_token_id] = 64+5
+        mapper_to_possible_outputs = {self.tokenizer.encode(str(i))[1]: i-1 for i in range(1, 65)}
+        mapper_to_possible_outputs[self.tokenizer.encode(',')[1]] = 64
+        mapper_to_possible_outputs[self.tokenizer.encode(';')[1]] = 64+1
+        mapper_to_possible_outputs[self.tokenizer.pad_token_id] = 64+2
+        mapper_to_possible_outputs[self.tokenizer.bos_token_id] = 64+3
+        mapper_to_possible_outputs[self.tokenizer.eos_token_id] = 64+4
         self.token_mapper = mapper_to_possible_outputs
         
         self.back_to_llm_token_mapper = {}
@@ -252,7 +252,12 @@ class ByT5Model(pl.LightningModule):
         # lbl = torch.randint(0, 69, (outputs.shape[0], outputs.shape[1]))
         
         loss = torch.nn.functional.cross_entropy(outputs.permute(0, 2, 1), lbl)
-        # loss = torch.nn.functional.cross_entropy(outputs[:, 0], lbl[:, 0])
+        # loss = torch.nn.functional.cross_entropy(outputs[:, 0], lbl[:, 0])    
+        
+        # asd = torch.argmax(outputs, 2).clone()
+        # for key, value in self.back_to_llm_token_mapper.items():
+        #     asd[asd == key] = value
+        # self.tokenizer.decode(asd[0, :])
         
         # for i, j in enumerate(outputs):
         #     #ignoring first two tokens which are "<s>" and "C"
