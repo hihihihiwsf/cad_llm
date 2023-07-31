@@ -12,7 +12,7 @@ from dataset.sketch_strings_collator import SketchStringsCollator
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, args, split):
+    def __init__(self, min_input_percent, args, split,):
         # Load dataset from json or json.zip file
         data_files = {split: str(Path(args.dataset) / f"{split}.json*")}
         self.data = load_dataset("json", data_files=data_files)[split]
@@ -37,7 +37,7 @@ class SketchGraphsDataset(Dataset):
             assert entity_string[0] == "<", error_message
             assert "," not in self.data[0][self.entities_col][0], error_message
 
-        self.min_input_percent = args.min_input_percent
+        self.min_input_percent = min_input_percent
         self.max_input_percent = args.max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
 
@@ -66,6 +66,31 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+
+
+class SketchDataModule(pl.LightningDataModule):
+    def __init__(self, tokenizer, args):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.args = args
+        
+    def train_dataloader(self):
+        current_epoch = self.trainer.current_epoch //10
+        return get_sketchgraphs_dataloader(
+                min_input_percentage=0.65 - 0.15*current_epoch,
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="train",
+                shuffle=True
+        )
+
+    def val_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="val",
+                shuffle=False
+        )
 
 
 class SketchGraphsDataModule(pl.LightningDataModule):

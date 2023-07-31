@@ -7,7 +7,7 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset import get_sketchgraphs_dataloader
+from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchDataModule
 from models.byt5 import ByT5Model
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
@@ -22,6 +22,7 @@ from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
 
 
+
 def get_model(args):
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name)
@@ -29,9 +30,9 @@ def get_model(args):
     return ByT5Model(args=args)
 
 
-def get_dataloader(args, split, shuffle, model):
+def get_dataloader(min_input_percent, max_input_percent, args, split, shuffle, model):
     if "segformer" in args.model_name:
-        datasets = get_rendered_sketch_dataset(path=args.dataset)
+        datasets = get_rendered_sketch_dataset(min_input_percent, max_input_percent, path=args.dataset)
         dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
                                 num_workers=args.num_workers)
         return dataloader
@@ -79,10 +80,16 @@ def main():
     model = get_model(args)
 
     print("Loading data...")
-    train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
-    val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
+    #train_dataloader = get_dataloader(min_input_percent, max_input_ercent,args=args, split="train", shuffle=True, model=model)
+    # train_dataloader = []
+    # for i in range(4):
+    #     min_per = 0.65-i*0.15
+    #     each_dataloader = get_dataloader(min_input_percent=min_per, max_input_percent=0.8, args=args, split="train", shuffle=True, model=model)
+    #     train_dataloader.append(each_dataloader)
+        
+    #val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
 
-    model.set_total_train_steps(num_train_batches=len(train_dataloader))
+    #model.set_total_train_steps(num_train_batches=len(train_dataloader))
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -99,18 +106,23 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
+        reload_dataloaders_every_n_epochs=10,
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
         # limit_train_batches=0.001,
         # limit_val_batches=0.01,
     )
+    sketchdata = SketchDataModule(model.tokenizer, args)
     if not args.eval: 
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        # for epoch in range(0,40,10):
+        #     dataloader = train_dataloader[epoch//10]
+        #trainer.fit(model, train_dataloaders=dataloader, val_dataloaders=val_dataloader)
+        trainer.fit(model, datamodule=sketchdata)
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
-        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
+        trainer.validate(model, ckpt_path=ckpt_dir, datamodule=sketchdata)
 
 
 if __name__ == "__main__":
