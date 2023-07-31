@@ -10,6 +10,17 @@ class SketchStringsCollator:
 
     def __call__(self, examples):
         # Collate input_text and output_text columns
+        filtered_examples=[]
+        for example in examples:
+            input_seq_len = len(self.tokenize(example['input_text']).input_ids[0])
+            if input_seq_len<192:   
+                filtered_examples.append(example)
+        
+        moved = len(examples)- len(filtered_examples)
+        # if moved>1:
+        #     #print("samples moved by max_length:", moved)
+        examples = filtered_examples
+        
         input_text = [example['input_text'] for example in examples]
         output_text = [example['output_text'] for example in examples]
 
@@ -38,6 +49,9 @@ class SketchStringsCollator:
         batch_att_mask = torch.zeros(labels.shape[0], max(single_ents_length))
         batch_att_ent_len  = torch.zeros(labels.shape[0], max(single_ents_length))
         
+        # import time
+        # start_time = time.time()
+        
         ent_count = 0
         for i, j in enumerate(single_ents_length):
             batch_att_mask[i, :j] = 1
@@ -57,7 +71,6 @@ class SketchStringsCollator:
             if batch_att_ent_len[i].sum() != tokenized_input.attention_mask[i].sum():
                 a=ent_sum
                 print("error ent_mask length")
-
                 
                 
 
@@ -76,5 +89,8 @@ class SketchStringsCollator:
             "output_ent_length": single_ents_length_out,
             
         }
-
+        # for i in range(tokenized_input.input_ids.shape[0]):
+        #     if batch_att_ent_len[i].sum() == tokenized_input.attention_mask[i].sum():
+        #         filtered_batch = 
+        
         return batch

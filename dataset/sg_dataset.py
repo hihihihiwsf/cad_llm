@@ -61,6 +61,7 @@ class SketchGraphsDataset(Dataset):
         return len(self.data)
 
 
+
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
     collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)

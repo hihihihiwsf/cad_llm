@@ -24,6 +24,8 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from transformers import BertModel, BertConfig
+import time
+
 
 class ByT5Model(pl.LightningModule):
     total_train_steps = None
@@ -121,15 +123,15 @@ class ByT5Model(pl.LightningModule):
         
         token_embeddings = self.initial_embedder(batch['input_ids'])
         
-        # ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
-        # ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
-        # ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
+        # ent_pooler_out = self.globalmodel(inputs_embeds=input_tensor).pooler_output
+        # ent_pooler_out = torch.unsqueeze(ent_pooler_out, 1)
+        # old_ent_embeddings= ent_pooler_out.repeat(1,token_embeddings.shape[1], 1)
         
         ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).last_hidden_state # (bs, n_e, dim)
         bsz = ent_embeddings.shape[0]
         new_ent_embeddings = torch.zeros(token_embeddings.shape).to(ent_embeddings.device)
         
-        
+        start_time = time.time()
         for idx in range(bsz):
             seq_len = batch['attention_mask'][idx].sum()
             ent_repeat_embedding = torch.Tensor([]).to(ent_embeddings.device)
@@ -137,7 +139,7 @@ class ByT5Model(pl.LightningModule):
                 embedding = ent_embeddings[idx, i:i+1,:].repeat(1, batch['batch_att_ent_len'][idx, i].int(), 1)
                 ent_repeat_embedding = torch.concat((ent_repeat_embedding, embedding), 1)
             new_ent_embeddings[idx, :seq_len,:] = ent_repeat_embedding
-        
+        print("inside training loop time:", time.time()-start_time)
         
         model_batch['inputs_embeds'] = token_embeddings+new_ent_embeddings
         outputs = self.model(**model_batch)
@@ -171,9 +173,9 @@ class ByT5Model(pl.LightningModule):
         
         token_embeddings = self.initial_embedder(batch['input_ids'])
         
-        # ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).pooler_output
-        # ent_embeddings = torch.unsqueeze(ent_embeddings, 1)
-        # ent_embeddings = ent_embeddings.repeat(1,token_embeddings.shape[1], 1)
+        # ent_pooler_out = self.globalmodel(inputs_embeds=input_tensor).pooler_output
+        # ent_pooler_out = torch.unsqueeze(ent_pooler_out, 1)
+        # old_ent_embeddings= ent_pooler_out.repeat(1,token_embeddings.shape[1], 1)
         
         ent_embeddings = self.globalmodel(inputs_embeds=input_tensor).last_hidden_state # (bs, n_e, dim)
         bsz = ent_embeddings.shape[0]
