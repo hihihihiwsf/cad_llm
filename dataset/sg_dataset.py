@@ -61,8 +61,8 @@ class SketchGraphsDataset(Dataset):
         return len(self.data)
 
 
-def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
-    dataset = SketchGraphsDataset(split=split, args=args)
+def get_sketchgraphs_dataloader(min_input_percent, tokenizer, args, split, shuffle):
+    dataset = SketchGraphsDataset(min_input_percent=min_input_percent, split=split, args=args)
     collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
@@ -77,7 +77,7 @@ class SketchDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         current_epoch = self.trainer.current_epoch //10
         return get_sketchgraphs_dataloader(
-                min_input_percentage=0.65 - 0.15*current_epoch,
+                min_input_percent=0.65 - 0.15*current_epoch,
                 tokenizer=self.tokenizer,
                 args=self.args,
                 split="train",
@@ -86,6 +86,7 @@ class SketchDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return get_sketchgraphs_dataloader(
+                min_input_percent=self.args.min_input_percent,
                 tokenizer=self.tokenizer,
                 args=self.args,
                 split="val",
