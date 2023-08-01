@@ -7,6 +7,7 @@ from pathlib import Path
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers.csv_logs import CSVLogger
+from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 
 from adsk_ailab_ray.ray_lightning import RayLightningExperiment
 
@@ -31,23 +32,18 @@ def train_on_ray_cluster():
 
     main_args.samples_dir = main_args.results_dir
 
-    loggers = [CSVLogger("logs")]
+    loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]
 
-    model = ByT5Model(args=main_args)
+    tokenizer = ByT5Model.get_tokenizer(main_args.model_name)
     datamodule = SketchGraphsDataModule(
-        tokenizer=model.tokenizer,
+        tokenizer=tokenizer,
         args=main_args,
         ray_args=ray_args
     )
-    # Prepere dataset to get the number of train batches
-    datamodule.setup("fit")
-    num_train_batches = len(datamodule.train_dataloader())
 
-    ByT5Model.set_total_train_steps_ray(
-        num_train_batches=num_train_batches,
-        n_gpus=ray_args.num_gpus,
-        epochs=main_args.epochs
-    )
+    datamodule.prepare_data() # Prepere dataset to get the number of train batches
+    num_train_batches = len(datamodule.train_dataloader())
+    total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, ray_args.num_gpus, main_args.epochs)
 
     checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min", dirpath="checkpoints", filename=f"best",
                                           save_last=True)
@@ -67,9 +63,13 @@ def train_on_ray_cluster():
     num_workers = ray_args.num_gpus
     num_cpus_per_worker = ray_args.num_cpus_per_worker
     strategy = ray_args.strategy
-    model_class_kwargs = {"args": main_args}
+    model_class_kwargs = {
+        "args": main_args,
+        "tokenizer": tokenizer,
+        "total_train_steps": total_train_steps
+    }
     data_class_kwargs = {
-        "tokenizer": model.tokenizer,
+        "tokenizer": tokenizer,
         "args": main_args,
         "ray_args": ray_args
     }
@@ -108,7 +108,8 @@ def train_on_ray_cluster():
             input_s3_bucket,
             output_s3_bucket,
             local_data_dir,
-            local_results_dir
+            local_results_dir,
+            max_failures=10
     )
 
     # Run the experiment on the Ray cluster

@@ -29,7 +29,7 @@ def get_model(args):
     return ByT5Model(args=args)
 
 
-def get_dataloader(args, split, shuffle, model):
+def get_dataloader(args, split, shuffle, tokenizer):
     if "segformer" in args.model_name:
         datasets = get_rendered_sketch_dataset(path=args.dataset)
         dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
@@ -49,7 +49,7 @@ def get_dataloader(args, split, shuffle, model):
         return DataLoader(datasets[split], batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                           num_workers=args.num_workers)
 
-    return get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split=split, shuffle=shuffle)
+    return get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split=split, shuffle=shuffle)
 
 
 def main():
@@ -74,15 +74,18 @@ def main():
     # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
 
-    print("Loading model...")
-
-    model = get_model(args)
+    tokenizer = ByT5Model.get_tokenizer(args.model_name)
 
     print("Loading data...")
-    train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
-    val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
+    train_dataloader = get_dataloader(args=args, split="train", shuffle=True, tokenizer=tokenizer)
+    val_dataloader = get_dataloader(args=args, split="val", shuffle=False, tokenizer=tokenizer)
 
-    model.set_total_train_steps(num_train_batches=len(train_dataloader))
+    num_train_batches = len(train_dataloader)
+    num_gpus = torch.cuda.device_count()
+    total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, num_gpus, args.epochs)
+
+    print("Loading model...")
+    model = ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)

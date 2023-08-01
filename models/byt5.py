@@ -22,11 +22,11 @@ from geometry.visualization import visualize_batch
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import LambdaLR
 
 
 class ByT5Model(pl.LightningModule):
-    total_train_steps = None
-    def __init__(self, args):
+    def __init__(self, args, tokenizer, total_train_steps):
         super().__init__()
         self.save_hyperparameters()
 
@@ -38,12 +38,12 @@ class ByT5Model(pl.LightningModule):
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.tokenizer = tokenizer
         self.args = args
 
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
-        self.total_train_steps = None  # should be set later for lr scheduler
+        self.total_train_steps = total_train_steps  # should be set later for lr scheduler
 
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
@@ -153,21 +153,20 @@ class ByT5Model(pl.LightningModule):
         fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
         fig.savefig(fig_path)
 
-    def set_total_train_steps(self, num_train_batches):
-        # Assumes running on gpus, one node and no accumulate_grad_batches
-        n_gpus = torch.cuda.device_count()
-        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
-        self.total_train_steps = train_batches * self.args.epochs
-    
     @staticmethod
-    def set_total_train_steps_ray(num_train_batches, n_gpus, epochs):
+    def get_total_train_steps(num_train_batches, num_gpus, epochs):
         # Assumes running on gpus, one node and no accumulate_grad_batches
-        n_gpus = torch.cuda.device_count()
-        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
-        ByT5Model.total_train_steps = train_batches * epochs
+        train_batches = num_train_batches // num_gpus if num_gpus else num_train_batches
+        total_train_steps = train_batches * epochs
+        
+        return total_train_steps
+
+    @staticmethod
+    def get_tokenizer(model_name):
+        return AutoTokenizer.from_pretrained(model_name)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
 
@@ -181,3 +180,4 @@ class ByT5Model(pl.LightningModule):
                 "frequency": 1,
             }
         }
+
