@@ -278,7 +278,7 @@ class ByT5Model(pl.LightningModule):
 
     
     
-    def validation_step_23(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
@@ -336,7 +336,7 @@ class ByT5Model(pl.LightningModule):
             unpacked_entities.append(outputs["decoder_hidden_states"][-1][i, :j, :])
         unpacked_entities = torch.cat(unpacked_entities, dim=0).unsqueeze(1)
         
-        outputs = self.local_model.decode(tgt, unpacked_entities)
+        outputs = self.local_model.decode(tgt, unpacked_entities, tgt_mask=nn.Transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device))
         outputs = self.local_model.lmhead(outputs)
         idx = 0
 
@@ -362,7 +362,7 @@ class ByT5Model(pl.LightningModule):
     
     
     
-    def validation_step(self, batch, batch_idx):
+    def validation_step_34(self, batch, batch_idx):
         
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
