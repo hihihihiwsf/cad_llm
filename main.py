@@ -21,7 +21,6 @@ from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
 from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
 from pytorch_lightning.strategies import DDPStrategy
-from dataset.sg_dataset import SketchGraphsDataModule
 
 def get_model(args):
     if "segformer" in args.model_name:
@@ -85,7 +84,7 @@ def main():
     train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
     val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
 
-    # model.set_total_train_steps(num_train_batches=len(train_dataloader))
+    model.set_total_train_steps(num_train_batches=len(train_dataloader))
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
