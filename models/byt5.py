@@ -70,9 +70,9 @@ class TransformerModel(nn.Module):
         output = self.linear(output)
         return output
     
-    def decode(self, tgt, memory):
+    def decode(self, tgt, memory, tgt_mask=None):
         
-        output = self.transformer_decoder(tgt, memory)
+        output = self.transformer_decoder(tgt, memory, tgt_mask=tgt_mask)
         return output
     
     def generate_square_subsequent_mask(self, sz, device='cuda'):
@@ -239,9 +239,8 @@ class ByT5Model(pl.LightningModule):
             unpacked_entities.append(outputs["decoder_hidden_states"][-1][i, :j, :])
         unpacked_entities = torch.cat(unpacked_entities, dim=0).unsqueeze(1)
         
-        outputs = self.local_model.decode(tgt, unpacked_entities)
+        outputs = self.local_model.decode(tgt, unpacked_entities, tgt_mask=nn.Transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device))
         outputs = self.local_model.lmhead(outputs)
-        loss = 0
         idx = 0
 
         with torch.no_grad():
@@ -277,6 +276,92 @@ class ByT5Model(pl.LightningModule):
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
+    
+    
+    def validation_step_23(self, batch, batch_idx):
+        cols = ["input_ids", "attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+        txt_embeddings = self.initial_embedder(batch['input_entities'].input_ids)
+        #torch attention masking is oppostie of huggingface
+        mask = (-(batch['input_entities'].attention_mask) + 1).float()
+        txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        # txt_embeddings = torch.sum(txt_embeddings, 1)
+        txt_embeddings = txt_embeddings[:, 0, :]
+        pad_embed = self.initial_embedder(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
+                
+        ########### INPUT CHUNKS
+        # Find the maximum chunk size
+        chunks = batch['input_ent_length']
+        # Create an empty tensor with zero padding
+        input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        idx = 0
+        for i, size in enumerate(chunks):
+            input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+            idx += size
+        
+        # input_tensor = torch.zeros(len(chunks), max(chunks), 512).to(self.device)
+
+        ########### OUTPUT CHUNKS
+        with torch.no_grad():
+            txt_embeddings = self.initial_embedder(batch['output_entities'].input_ids)
+            mask = (-(batch['output_entities'].attention_mask) + 1).float()
+            txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+            txt_embeddings = txt_embeddings[:, 0, :]
+            chunks = batch['output_ent_length']
+            output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+            idx = 0
+            decoder_inputs_embeds = []
+            for i, size in enumerate(chunks):
+                output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+                ## adding a pad token to the begining because decoder_input_token should be shifted right
+                decoder_inputs_embeds.append(torch.concatenate((pad_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
+                idx += size
+            decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
+            decoder_inputs_embeds.requires_grad_(False)
+        
+            
+        model_batch['inputs_embeds'] = input_tensor
+        model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds
+        del model_batch['input_ids'], 
+        del model_batch['labels']
+        model_batch['attention_mask'] =  batch['batch_att_mask']
+        outputs = self.model(**model_batch, output_hidden_states=True)
+        o = batch['output_entities'].input_ids
+        o = torch.concatenate((o[:, 0].unsqueeze(1), o[:, 2:]), dim=1)
+        tgt = self.initial_embedder(o) # ignoring "C"
+        
+        l = batch['output_ent_length']
+        unpacked_entities = []
+        for i,j in enumerate(l):
+            unpacked_entities.append(outputs["decoder_hidden_states"][-1][i, :j, :])
+        unpacked_entities = torch.cat(unpacked_entities, dim=0).unsqueeze(1)
+        
+        outputs = self.local_model.decode(tgt, unpacked_entities)
+        outputs = self.local_model.lmhead(outputs)
+        idx = 0
+
+        lbl = o.clone()
+        for key, value in self.token_mapper.items():
+            lbl[lbl == key] = value
+
+            
+        # lbl = torch.randint(0, 69, (outputs.shape[0], outputs.shape[1]))
+        
+        loss = torch.nn.functional.cross_entropy(outputs.permute(0, 2, 1), lbl)
+
+        
+        self.log("val_iter_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+        
+
+            
+        return loss
+    
+    
+    
     def validation_step(self, batch, batch_idx):
         
         cols = ["input_ids", "attention_mask", "labels"]
@@ -328,6 +413,11 @@ class ByT5Model(pl.LightningModule):
         
         src = torch.cat(decoder_hidden_states, dim=1)
         src = src.view(-1, 1, src.shape[2])
+        
+        # trimmed_src = []
+        # for i, s in enumerate(src):
+        #     trimmed_src.append(s[:batch['output_ent_length'][i], :].unsqueeze(0))
+        # src = torch.cat(trimmed_src, dim=1)
         # target = pad_embed.repeat(src.shape[0],1, 1)
         target = start_embed.repeat(src.shape[0],1, 1)
         for i in range(18): #circle = "<s> + 8*2 + </s>"

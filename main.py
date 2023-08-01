@@ -21,6 +21,7 @@ from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
 from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
 from pytorch_lightning.strategies import DDPStrategy
+from dataset.sg_dataset import SketchGraphsDataModule
 
 def get_model(args):
     if "segformer" in args.model_name:
@@ -48,8 +49,8 @@ def get_dataloader(args, split, shuffle, model):
 
         return DataLoader(datasets[split], batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                           num_workers=args.num_workers)
-
-    return get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split=split, shuffle=shuffle)
+    else:
+        return get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split=split, shuffle=shuffle)
 
 
 def main():
@@ -84,7 +85,7 @@ def main():
     train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
     val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
 
-    model.set_total_train_steps(num_train_batches=len(train_dataloader))
+    # model.set_total_train_steps(num_train_batches=len(train_dataloader))
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -105,16 +106,18 @@ def main():
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
-        # limit_train_batches=0.01,
+        # limit_train_batches=0.001,
         # limit_val_batches=0.01,
         precision='16'
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        # trainer.fit(model, datamodule=SketchGraphsDataModule)
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
+        # trainer.validate(model, ckpt_path=ckpt_dir, datamodule=SketchGraphsDataModule)
 
 
 if __name__ == "__main__":
