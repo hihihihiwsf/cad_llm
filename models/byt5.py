@@ -119,6 +119,7 @@ class ByT5Model(pl.LightningModule):
         
         self.local_model = TransformerModel(d_model=self.model.config.d_model, nhead=4, d_hid=768, nlayers=4)
         self.initial_embedder = self.model.get_input_embeddings()
+        self.initial_embedder.requires_grad_(False)
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
         self.total_train_steps = None  # should be set later for lr scheduler
