@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image, ImageDraw
 
 from geometry.parse import get_curves
 
@@ -52,3 +53,31 @@ def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
         curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)
 
     return np_image
+
+
+def render_sketch_pil(point_entities, figure_size_pixels, pad_in_pixels, min_val=0, max_val=63, linewidth=2):
+    """
+    Raises exception on bad sketches
+    """
+    img = Image.new("RGB", size=(figure_size_pixels, figure_size_pixels), color=(255, 255, 255))
+    img_draw = ImageDraw.Draw(img)
+
+    curves = get_curves(point_entities)
+    assert all(curve for curve in curves)
+
+    scale_by = figure_size_pixels - pad_in_pixels
+    shift_by = 0.5 * figure_size_pixels
+    val_range = max_val + 1 - min_val
+
+    def rescale(x):
+        x = (x / val_range) - 0.5  # normalize between -0.5 and 0.5
+        x = scale_by * x + shift_by  # scale to canvas
+        return x
+
+    for curve in curves:
+        curve.draw_pil(img_draw, draw_points=True, linewidth=linewidth, transform=rescale)
+
+    # Origin is at top-left in image space, so flip
+    img = img.transpose(method=Image.FLIP_TOP_BOTTOM)
+
+    return img
