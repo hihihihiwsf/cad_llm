@@ -8,7 +8,7 @@ try:
 except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
+from models.mega_t5 import ByT5Model
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
@@ -102,12 +102,12 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
+        precision=16,
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
         # limit_train_batches=0.001,
         # limit_val_batches=0.01,
-        precision='16'
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
