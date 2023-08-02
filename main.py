@@ -105,7 +105,7 @@ def main():
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
-        # limit_train_batches=0.001,
+        # limit_train_batches=0.001, 
         # limit_val_batches=0.01,
         precision='16'
     )

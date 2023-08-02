@@ -16,11 +16,11 @@ class SketchStringsCollator:
         input_entities, single_ents_length = [], []
         output_entities, single_ents_length_out = [], []
         for example in examples:
-            single_ents = ["C"+x+";" for x in example['input_text'].split(";") if x]
+            single_ents = ["C"+x+";" for x in example['input_text'].split(";") if x][:30]
             input_entities.extend(single_ents)
             single_ents_length.append(len(single_ents))
 
-            single_ents_out = ["C"+x+";" for x in example['output_text'].split(";") if x]
+            single_ents_out = ["C"+x+";" for x in example['output_text'].split(";") if x][:30]
             output_entities.extend(single_ents_out)
             single_ents_length_out.append(len(single_ents_out))
             
