@@ -26,9 +26,11 @@ from preprocess.converter_base import ConverterBase
 
 class DeepmindToFusionGalleryConverter(ConverterBase):
     """
-    Class to log and count conversion failures
+    Class to handle conversion of Deepmind sketches
+    into the Fusion 360 Gallery dataset format
     """
     def __init__(self, input_files, output_path, limit):
+        super().__init__()
         self.input_files = input_files
         self.output_path = output_path
         self.limit = limit
@@ -41,19 +43,19 @@ class DeepmindToFusionGalleryConverter(ConverterBase):
             print(f"Converting {i}/{len(self.input_files)} data files")
             with open(input_file) as f:
                 dm_data = json.load(f)
-            self.convert_data(dm_data, self.output_path, input_file)
+            self.convert_data(dm_data, input_file)
             if args.limit is not None and self.converted_count >= args.limit:
                 break    
         print(f"Converted {self.converted_count}/{self.count} sketches!")
 
-    def convert_data(self, dm_data, output_path, input_file):
+    def convert_data(self, dm_data, input_file):
         """Convert all the sketches in a single data file and save them as multiple json files"""
         for index, dm_sketch in enumerate(tqdm(dm_data)):
             fg_sketch = self.convert_sketch(dm_sketch)
             if fg_sketch is not None:
                 # Save the file with the name of the original deepmind data file
                 # and the index into that file of the sketch
-                json_file = output_path / f"{input_file.stem}_{index:06d}.json"
+                json_file = self.output_path / f"{input_file.stem}_{index:06d}.json"
                 with open(json_file, "w") as f:
                     json.dump(fg_sketch, f, indent=4)
                 if json_file.exists():
