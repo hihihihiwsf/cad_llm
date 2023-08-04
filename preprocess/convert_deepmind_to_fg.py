@@ -14,8 +14,10 @@ suffered through this process and taken one for the team.
 import argparse
 import json
 import uuid
+import itertools
 from pathlib import Path
 from tqdm import tqdm
+from multiprocessing import Pool
 
 from preprocess.deepmind_geometry import *
 from preprocess.fusiongallery_geometry import *
@@ -27,10 +29,11 @@ class DeepmindToFusionGalleryConverter():
     """
     Class to log and count conversion failures
     """
-    def __init__(self, input_files, output_path, limit):
+    def __init__(self, input_files, output_path, limit, threads=1):
         self.input_files = input_files
         self.output_path = output_path
         self.limit = limit
+        self.threads = threads
 
         # Count of how many sketch conversions have been attempted
         self.count = 0
@@ -96,32 +99,86 @@ class DeepmindToFusionGalleryConverter():
         """Convert all of the input files"""
         # The data comes in 96 different data files
         # that we loop over here
+        if self.threads == 1:
+            self.convert_serial()
+        else:
+            if self.limit is not None:
+                print("Error: Cannot set limit when using multiple threads")
+                return
+            self.convert_parallel()            
+
+    def convert_parallel(self):
+        """Convert all of the input files in parallel"""
+        iter_data = zip(
+            self.input_files,
+            itertools.repeat(self.output_path),
+            itertools.repeat(True)
+        )
+        objs_iter = Pool(self.threads).starmap(self.convert_data, iter_data)
+        for count, converted_count in objs_iter:
+            # Add the per file counts to the global counts
+            self.count += count
+            self.converted_count += converted_count            
+        print(f"Converted {self.converted_count}/{self.count} sketches!")
+    
+    def convert_serial(self):
+        """Convert all of the input files in sequence"""
         for i, input_file in enumerate(self.input_files):
             print(f"Converting {i}/{len(self.input_files)} data files")
-            with open(input_file) as f:
-                dm_data = json.load(f)
-            self.convert_data(dm_data, self.output_path, input_file)
+            count, converted_count = self.convert_data(input_file, self.output_path)
+            # Add the per file counts to the global counts
+            self.count += count
+            self.converted_count += converted_count
             if args.limit is not None and self.converted_count >= args.limit:
                 break    
         print(f"Converted {self.converted_count}/{self.count} sketches!")
 
-    def convert_data(self, dm_data, output_path, input_file):
-        """Convert all the sketches in a single data file and save them as multiple json files"""
-        for index, dm_sketch in enumerate(tqdm(dm_data)):
-            fg_sketch = self.convert_sketch(dm_sketch)
-            if fg_sketch is not None:
-                # Save the file with the name of the original deepmind data file
-                # and the index into that file of the sketch
-                json_file = output_path / f"{input_file.stem}_{index:06d}.json"
-                with open(json_file, "w") as f:
-                    json.dump(fg_sketch, f, indent=4)
-                if json_file.exists():
-                    self.converted_count += 1
-            self.count += 1
-            if self.limit is not None and self.converted_count >= self.limit:
-                break
 
-    def convert_sketch(self, dm_sketch):
+    def convert_data(self, input_file, output_path, parallel=False):
+        """Convert all the sketches in a single data file and save them as multiple json files"""
+        with open(input_file) as f:
+            dm_data = json.load(f)
+        # Keep a local count (per file) that gets added to the global count (all files)
+        count = 0
+        converted_count = 0
+        fg_sketches = []
+        total = len(dm_data)
+        if not parallel:
+            if self.limit is not None:
+                if self.limit < total:
+                    total = self.limit
+
+        for index, dm_sketch in enumerate(tqdm(dm_data, total=total)):
+            fg_sketch = self.convert_sketch(dm_sketch, index)
+            if fg_sketch is not None:
+                # BATCH SAVING
+                fg_sketches.append(fg_sketch) 
+                converted_count += 1
+                # INDIVIDUAL FILE SAVING
+                # # Save the file with the name of the original deepmind data file
+                # # and the index into that file of the sketch
+                # json_file = output_path / f"{input_file.stem}_{index:06d}.json"
+                # with open(json_file, "w") as f:
+                #     json.dump(fg_sketch, f, indent=4)
+                # if json_file.exists():
+                #    converted_count += 1
+            count += 1
+            if not parallel:
+                if self.limit is not None:
+                    # Get the count for all converted sketches so far
+                    if self.converted_count + converted_count >= self.limit:
+                        break
+            # else:
+            #     if index > 100:
+            #         break
+
+        # BATCH SAVING
+        json_file = output_path / f"{input_file.stem}_fg.json"
+        with open(json_file, "w") as f:
+            json.dump(fg_sketches, f, indent=4)
+        return count, converted_count
+
+    def convert_sketch(self, dm_sketch, index):
         """Convert a single sketch in the deepmind sketch format into a Fusion Gallery sketch dict"""
         dm_entities = dm_sketch["entitySequence"]["entities"]
         dm_constraints = dm_sketch["constraintSequence"]["constraints"]
@@ -133,8 +190,9 @@ class DeepmindToFusionGalleryConverter():
             points, point_map = self.create_sketch_points(dm_entities)
             curves, constraint_entity_map = self.create_sketch_curves(dm_entities, point_map)
             constraints, dimensions = self.create_constraints_and_dimensions(dm_constraints, points, curves, constraint_entity_map)
+            # Give the sketch a name mapping to the index position in the original deepmind json file
             fusion_gallery_sketch = {
-                "name": f"Sketch{self.count}", # Save the sketch with the overall index in the dataset
+                "name": f"Sketch_{index:06d}",
                 "type": "Sketch",
                 "points": points,
                 "curves": curves,
@@ -397,7 +455,7 @@ def main(args):
         input_files = [input_path]
 
     output_path = get_output_dir(args.output)
-    converter = DeepmindToFusionGalleryConverter(input_files, output_path, args.limit)
+    converter = DeepmindToFusionGalleryConverter(input_files, output_path, args.limit, args.threads)
     converter.convert()
     converter.print_log_results()
 
@@ -407,5 +465,6 @@ if __name__ == "__main__":
     parser.add_argument("--input", type=str, required=True, help="Input file/folder of DeepMind json files")
     parser.add_argument("--output", type=str, help="Output folder to save the Fusion 360 Gallery json data [default: output]")
     parser.add_argument("--limit", type=int, help="Limit the number of files to process")
+    parser.add_argument("--threads", type=int, default=1, help="Number of threads to use when processing")
     args = parser.parse_args()
     main(args)
