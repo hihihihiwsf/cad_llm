@@ -6,11 +6,11 @@ from preprocess.preprocessing import center_and_scale
 from preprocess.preprocess_utils import get_files, get_output_dir
 
 
-def convert_data(dm_data):
+def convert_data(dm_data, quantize_bits):
     obj_data = []
 
     for i, dm_sketch in enumerate(dm_data):
-        obj_sketch = convert_sketch(dm_sketch)
+        obj_sketch = convert_sketch(dm_sketch, quantize_bits=quantize_bits)
         if not obj_sketch:
             continue
         obj_sketch["index"] = i
@@ -19,7 +19,7 @@ def convert_data(dm_data):
     return obj_data
 
 
-def convert_sketch(dm_sketch):
+def convert_sketch(dm_sketch, quantize_bits):
     dm_entities = dm_sketch["entitySequence"]["entities"]
 
     # Return None if sketch contains splines
@@ -47,7 +47,7 @@ def convert_sketch(dm_sketch):
 
     # Convert to obj format
     # Note: we normalize after removing construction entities so the bounding box may be smaller
-    vertices, curves = convert_point_entities_to_obj(point_entities, bits=8)
+    vertices, curves = convert_point_entities_to_obj(point_entities, quantize_bits=quantize_bits)
 
     # Remove sketches with entities with duplicate points
     for curve in curves:
@@ -57,19 +57,21 @@ def convert_sketch(dm_sketch):
     return {"vertices": vertices, "curves": curves}
 
 
-def convert_point_entities_to_obj(point_entities, bits):
+def convert_point_entities_to_obj(point_entities, quantize_bits):
     """
     Return an obj like format of (vertices, curves)
     Vertex coordinates are normalized to [-1, 1]
     Note: coordinates are quantized to [-2**bits, 2**bits] for welding
     """
-    quant_entities = [quantize_ent(ent, bits=bits) for ent in point_entities]
+    if quantize_bits:
+        point_entities = [quantize_ent(ent, bits=quantize_bits) for ent in point_entities]
+
     vertices = []
     curves = []
 
-    for quant_ent in quant_entities:
+    for ent in point_entities:
         curve = []
-        for point in quant_ent:
+        for point in ent:
             if point not in vertices:
                 vertices.append(point)
             i = vertices.index(point)
@@ -130,7 +132,7 @@ def main(args):
 
     for input_file_path in input_file_paths:
         dm_data = load_data(input_file_path)
-        obj_data = convert_data(dm_data)
+        obj_data = convert_data(dm_data, quantize_bits=args.quantize_bits)
 
         filename = input_file_path.stem
         print(f"File {filename}: Converted {len(obj_data)} of {len(dm_data)} sketches to obj format")
@@ -142,6 +144,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=str, required=True, help="Input folder containing DeepMind json files")
     parser.add_argument("--output", type=str, help="Output folder to save the obj-like json data [default: output]")
+    parser.add_argument("--quantize_bits", type=int, default=0,
+                        help="Number of bits to use for quantization or 0 for no quantization [default: 0]")
+
     args = parser.parse_args()
 
     main(args)
