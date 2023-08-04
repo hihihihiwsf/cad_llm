@@ -267,7 +267,7 @@ class ByT5Model(pl.LightningModule):
         outputs = self.model(**model_batch, output_hidden_states=True)
         o = batch['output_entities'].input_ids
         o = torch.concatenate((o[:, 0].unsqueeze(1), o[:, 2:]), dim=1)
-        tgt = self.initial_embedder(o) # ignoring "C"
+        tgt = self.initial_embedder(o[:,1:]) # ignoring "C"
         
         l = batch['output_ent_length']
         unpacked_entities = []
@@ -276,7 +276,7 @@ class ByT5Model(pl.LightningModule):
         unpacked_entities = torch.cat(unpacked_entities, dim=0).unsqueeze(1)
         
         decoder_input_ids = self._shift_right(o)
-        decoder_input_embeds = self.initial_embedder(decoder_input_ids)
+        decoder_input_embeds = self.initial_embedder(o[:,:-1])
         
         localmodel_output = self.local_model_decoder(inputs_embeds = decoder_input_embeds, encoder_hidden_states=unpacked_entities, output_hidden_states=True)
             
@@ -285,7 +285,7 @@ class ByT5Model(pl.LightningModule):
         
         lm_logits = self.model.lm_head(localmodel_output_hiddenstates)
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100)
-        loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), o.view(-1))
+        loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), o[:,1:].view(-1))
         
         self.log("loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
                 batch_size=self.batch_size, sync_dist=True)
