@@ -5,6 +5,5 @@ comet_ml
 datasets
 transformers
 tensorboardX
-peft
 matplotlib
 opencv-python
