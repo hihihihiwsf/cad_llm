@@ -22,20 +22,16 @@ class SketchGraphsDataset(Dataset):
             self.data = self.data.shuffle(seed=args.seed)
             self.data = self.data.select(range(n))
 
-        self.order = args.train_order if split == "train" else "sorted"
-        assert self.order in ["sorted", "user", "random"]
-        self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
-
         # Sanity check text format
-        entity_string = self.data[0][self.entities_col][0]
+        entity_string = self.data[0]["entities"][0]
         if args.ascii_encoding:
             error_message = f"Expected format '-31, 17' not '<-31><17>', found '{entity_string}'"
             assert entity_string[0] != "<", error_message
-            assert "," in self.data[0][self.entities_col][0], error_message
+            assert "," in self.data[0]["entities"][0], error_message
         else:
             error_message = f"Expected format '<-31><17>' not '-31, 17', found '{entity_string}'"
             assert entity_string[0] == "<", error_message
-            assert "," not in self.data[0][self.entities_col][0], error_message
+            assert "," not in self.data[0]["entities"][0], error_message
 
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
@@ -47,9 +43,7 @@ class SketchGraphsDataset(Dataset):
         Returns (input_text, output_text)
         """
         sketch_dict = self.data[index]
-        entities = sketch_dict[self.entities_col]
-        if self.order == "random":
-            np.random.shuffle(entities)
+        entities = sketch_dict["entities"]
 
         input_entities, output_entities = split_list(entities, self.min_input_percent, self.max_input_percent)
         sketch_dict['input_text'] = "".join(input_entities)
