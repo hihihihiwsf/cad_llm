@@ -17,7 +17,7 @@ import uuid
 import itertools
 from pathlib import Path
 from tqdm import tqdm
-from multiprocessing import Pool
+from multiprocessing import Pool, current_process
 
 from preprocess.deepmind_geometry import *
 from preprocess.fusiongallery_geometry import *
@@ -119,7 +119,7 @@ class DeepmindToFusionGalleryConverter():
             # Add the per file counts to the global counts
             self.count += count
             self.converted_count += converted_count            
-        print(f"Converted {self.converted_count}/{self.count} sketches!")
+        print(f"\n\nConverted {self.converted_count}/{self.count} sketches!")
     
     def convert_serial(self):
         """Convert all of the input files in sequence"""
@@ -131,7 +131,7 @@ class DeepmindToFusionGalleryConverter():
             self.converted_count += converted_count
             if args.limit is not None and self.converted_count >= args.limit:
                 break    
-        print(f"Converted {self.converted_count}/{self.count} sketches!")
+        print(f"\nConverted {self.converted_count}/{self.count} sketches!")
 
 
     def convert_data(self, input_file, output_path, parallel=False):
@@ -147,9 +147,17 @@ class DeepmindToFusionGalleryConverter():
             if self.limit is not None:
                 if self.limit < total:
                     total = self.limit
-
-        for index, dm_sketch in enumerate(tqdm(dm_data, total=total)):
+        if parallel:
+            # Get the process id to identify the process and give it a position
+            p = current_process()
+            position = p._identity[0] % self.threads
+        else:
+            position = 0
+        pbar = tqdm(dm_data, total=total, position=position, leave=False)
+        pbar.set_description(f"[{position}] {input_file.stem}")
+        for index, dm_sketch in enumerate(pbar):
             fg_sketch = self.convert_sketch(dm_sketch, index)
+            # pbar.update(1)
             if fg_sketch is not None:
                 # BATCH SAVING
                 fg_sketches.append(fg_sketch) 
@@ -168,14 +176,13 @@ class DeepmindToFusionGalleryConverter():
                     # Get the count for all converted sketches so far
                     if self.converted_count + converted_count >= self.limit:
                         break
-            # else:
-            #     if index > 100:
-            #         break
 
         # BATCH SAVING
+        pbar.close()
         json_file = output_path / f"{input_file.stem}_fg.json"
         with open(json_file, "w") as f:
             json.dump(fg_sketches, f, indent=4)
+        print(f"Finished writing {json_file.name}")
         return count, converted_count
 
     def convert_sketch(self, dm_sketch, index):
