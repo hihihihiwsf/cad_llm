@@ -22,15 +22,15 @@ def get_sketch_strings_dataset(path, min_split_ratio=0.2, max_split_ratio=0.8):
     # Note that a new random split is generated on each call
     _transform = partial(batch_split_entities_to_io, min_ratio=min_split_ratio, max_ratio=max_split_ratio)
     dataset.set_transform(_transform)
-
     return dataset
 
 
 def batch_split_entities_to_io(batch, min_ratio, max_ratio):
-    io_pairs = [split_entities_to_io(entities, min_ratio, max_ratio) for entities in batch["entities"]]
+    io_triplets = [split_entities_to_io(entities, min_ratio, max_ratio) for entities in batch["entities"]]
     return {
-        "input_text": [input_text for input_text, output_text in io_pairs],
-        "output_text": [output_text for input_text, output_text in io_pairs],
+        "input_text": [input_text for input_text, output_text, length_list in io_triplets], #[input_text for input_text, output_text in io_pairs],
+        "output_text": [output_text for input_text, output_text, length_list in io_triplets], #[output_text for input_text, output_text in io_pairs],
+        "length": [length_list for input_text, output_text, length_list in io_triplets],
     }
 
 
@@ -40,8 +40,8 @@ def split_entities_to_io(entities, min_ratio, max_ratio):
     # Convert to strings
     input_text = get_entities_string(input_entities)
     output_text = get_entities_string(output_entities)
-
-    return input_text, output_text
+    length_list = [len(i_t)+len(o_t) for i_t,o_t in zip(input_text, output_text)]
+    return input_text, output_text, length_list
 
 
 def get_entities_string(entities):

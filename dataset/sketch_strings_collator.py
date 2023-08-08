@@ -5,6 +5,7 @@ class SketchStringsCollator:
 
     def tokenize(self, strings):
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        #return self.tokenizer(strings, padding=True, truncation=True, return_tensors="pt")
 
     def __call__(self, examples):
         # Collate input_text and output_text columns
@@ -13,6 +14,11 @@ class SketchStringsCollator:
 
         # Encode input and output
         tokenized_input = self.tokenize(input_text)
+        
+        # if tokenized_input.input_ids.shape[-1] == self.max_length:
+        #length_batch = [len(text) for text in input_text]
+        # tokenizer_without_maxlength = self.tokenizer(input_text, padding=True, truncation=True, return_tensors="pt")
+            
 
         tokenized_output = self.tokenize(output_text)
         labels = tokenized_output.input_ids

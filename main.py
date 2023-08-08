@@ -29,6 +29,7 @@ def get_model(args):
 
     return ByT5Model(args=args)
 
+lengths = []
 
 def get_dataloader(min_input_percent, max_input_percent, args, split, shuffle, model):
     if "segformer" in args.model_name:
@@ -40,7 +41,7 @@ def get_dataloader(min_input_percent, max_input_percent, args, split, shuffle, m
     if "entities" in args.dataset:  # Hack to select dataset loader based on dataset name
         datasets = get_sketch_strings_dataset(path=args.dataset, min_split_ratio=args.min_input_percent,
                                              max_split_ratio=args.max_input_percent)
-
+        lengths.append(datasets.length)
         collator = SketchStringsCollator(tokenizer=model.tokenizer, max_length=args.max_length)
 
         if args.limit_data != 1 and split == "train":

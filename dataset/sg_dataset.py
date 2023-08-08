@@ -40,7 +40,8 @@ class SketchGraphsDataset(Dataset):
         self.min_input_percent = min_input_percent
         self.max_input_percent = max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
-
+        
+    
     def __getitem__(self, index):
         """
         Applies a random mask to the entities of sketch
@@ -54,7 +55,9 @@ class SketchGraphsDataset(Dataset):
         input_entities, output_entities = split_list(entities, self.min_input_percent, self.max_input_percent)
         sketch_dict['input_text'] = "".join(input_entities)
         sketch_dict['output_text'] = "".join(output_entities)
-
+        text = "".join(input_entities)+"".join(output_entities)
+        lengths = len(text)
+        sketch_dict['length'] = lengths
         return sketch_dict
 
     def __len__(self):
@@ -64,6 +67,17 @@ class SketchGraphsDataset(Dataset):
 def get_sketchgraphs_dataloader(min_input_percent,max_input_percent, tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(min_input_percent=min_input_percent,max_input_percent=max_input_percent, split=split, args=args)
     collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
+    
+    lengths = [sample['length'] for sample in dataset]
+    
+    import numpy as np
+    # Define the number of bins or specify bin edges manually
+    bins = 10
+    counts, bin_edges = np.histogram(lengths, bins=bins)
+    for i in range(len(counts)):
+        print(f"Bin {i+1} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {counts[i]} samples")
+
+    
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
 

@@ -17,6 +17,7 @@ def get_random_mask(n, min_ratio, max_ratio):
 
 
 def split_list(items, min_ratio, max_ratio):
+    #length_list = [len(item) for item in items]
     mask = get_random_mask(len(items), min_ratio, max_ratio)
     input_items = [item for i, item in enumerate(items) if mask[i]]
     output_items = [item for i, item in enumerate(items) if not mask[i]]
