@@ -67,7 +67,7 @@ class SketchGraphsDataset(Dataset):
 def get_sketchgraphs_dataloader(min_input_percent,max_input_percent, tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(min_input_percent=min_input_percent,max_input_percent=max_input_percent, split=split, args=args)
     collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
-    
+    ''''''
     lengths = [sample['length'] for sample in dataset]
     
     import numpy as np
@@ -76,7 +76,7 @@ def get_sketchgraphs_dataloader(min_input_percent,max_input_percent, tokenizer, 
     counts, bin_edges = np.histogram(lengths, bins=bins)
     for i in range(len(counts)):
         print(f"Bin {i+1} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {counts[i]} samples")
-
+    ''''''
     
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
