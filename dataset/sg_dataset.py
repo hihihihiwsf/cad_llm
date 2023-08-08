@@ -12,7 +12,7 @@ from dataset.sketch_strings_collator import SketchStringsCollator
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, min_input_percent, args, split,):
+    def __init__(self, min_input_percent, max_input_percent, args, split,):
         # Load dataset from json or json.zip file
         data_files = {split: str(Path(args.dataset) / f"{split}.json*")}
         self.data = load_dataset("json", data_files=data_files)[split]
@@ -38,7 +38,7 @@ class SketchGraphsDataset(Dataset):
             assert "," not in self.data[0][self.entities_col][0], error_message
 
         self.min_input_percent = min_input_percent
-        self.max_input_percent = args.max_input_percent
+        self.max_input_percent = max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
 
     def __getitem__(self, index):
@@ -61,7 +61,7 @@ class SketchGraphsDataset(Dataset):
         return len(self.data)
 
 
-def get_sketchgraphs_dataloader(min_input_percent, tokenizer, args, split, shuffle):
+def get_sketchgraphs_dataloader(min_input_percent,max_input_percent, tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(min_input_percent=min_input_percent, split=split, args=args)
     collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
@@ -77,7 +77,8 @@ class SketchDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         current_epoch = self.trainer.current_epoch //10
         return get_sketchgraphs_dataloader(
-                min_input_percent=0.65 - 0.15*current_epoch,
+                min_input_percent=self.args.min_input_percent,
+                max_input_percent=self.args.max_input_percent,
                 tokenizer=self.tokenizer,
                 args=self.args,
                 split="train",
@@ -87,6 +88,7 @@ class SketchDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return get_sketchgraphs_dataloader(
                 min_input_percent=self.args.min_input_percent,
+                max_input_percent=self.args.max_input_percent,
                 tokenizer=self.tokenizer,
                 args=self.args,
                 split="val",
