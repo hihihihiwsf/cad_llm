@@ -39,6 +39,17 @@ def calculate_first_ent_accuracy_samples(labels, samples):
             count_accurate += 1
     return count_accurate / len(labels)
 
+def calculate_accuracy(labels, samples):
+    """
+    Count number of exact matches of decoded and sorted entities
+    """
+    count_accurate = 0
+    for label_entities, sample_entities in zip(labels, samples):
+        label_entities = tuple(sorted([ent for ent in label_entities if ent]))
+        sample_entities = tuple(sorted([ent for ent in sample_entities if ent]))
+        if label_entities == sample_entities:
+            count_accurate += 1
+    return count_accurate / len(labels)
 
 def calculate_first_ent_accuracy(labels, samples):
     """

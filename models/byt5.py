@@ -15,7 +15,7 @@ from transformers.modeling_utils import unwrap_model
 import sys
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-from metrics import calculate_accuracy_samples, calculate_first_ent_accuracy_samples, calculate_validity
+from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_accuracy_samples, calculate_first_ent_accuracy_samples, calculate_validity
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
@@ -111,11 +111,11 @@ class ByT5Model(pl.LightningModule):
         self.generate_samples(batch)
 
         # Calculate metrics
-        top1_full_sketch = calculate_accuracy_samples(samples=batch["point_samples"], labels=batch["point_labels"])
+        top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
-        top1_ent = calculate_first_ent_accuracy_samples(samples=batch["point_samples"], labels=batch["point_labels"])
+        top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
@@ -134,7 +134,7 @@ class ByT5Model(pl.LightningModule):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                         do_sample=True, num_beams=5, max_new_tokens=self.args.max_length+10, num_return_sequences=5)
+                                         max_new_tokens=self.args.max_length+10) #num_return_sequences=5, do_sample=True, num_beams=5)
 
         string_samples = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in string_samples]
