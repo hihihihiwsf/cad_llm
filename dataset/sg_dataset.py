@@ -62,7 +62,7 @@ class SketchGraphsDataset(Dataset):
 
 
 def get_sketchgraphs_dataloader(min_input_percent,max_input_percent, tokenizer, args, split, shuffle):
-    dataset = SketchGraphsDataset(min_input_percent=min_input_percent, split=split, args=args)
+    dataset = SketchGraphsDataset(min_input_percent=min_input_percent,max_input_percent=max_input_percent, split=split, args=args)
     collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
