@@ -108,6 +108,7 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         reload_dataloaders_every_n_epochs=10,
+        precision=16,
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
