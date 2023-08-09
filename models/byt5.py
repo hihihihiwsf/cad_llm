@@ -305,8 +305,8 @@ class ByT5Model(pl.LightningModule):
         lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
         
         lbl = o.clone()
-        lbl[lbl == self.tokenizer.pad_token_id] = -100
-        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl, ignore_index=-100)
+        # lbl[lbl == self.tokenizer.pad_token_id] = -100
+        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl)
         
         # tgt = tgt[:, :-1, :]
         # outputs = self.local_model.decode(tgt, unpacked_entities, tgt_mask=nn.Transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device))
