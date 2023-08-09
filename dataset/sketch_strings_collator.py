@@ -4,7 +4,7 @@ class SketchStringsCollator:
         self.max_length = max_length
 
     def tokenize(self, strings):
-        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        return self.tokenizer(strings, padding="max_length", truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, examples):
         # Collate input_text and output_text columns
