@@ -305,8 +305,8 @@ class ByT5Model(pl.LightningModule):
         lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
         
         lbl = o.clone()
-        # lbl[lbl == self.tokenizer.pad_token_id] = -100
-        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl)
+        lbl[lbl == self.tokenizer.pad_token_id] = -100
+        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl, ignore_index=-100)
         
         # tgt = tgt[:, :-1, :]
         # outputs = self.local_model.decode(tgt, unpacked_entities, tgt_mask=nn.Transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device))
@@ -638,8 +638,18 @@ class ByT5Model(pl.LightningModule):
         lbl = o.clone()
         lbl[lbl == self.tokenizer.pad_token_id] = -100
         loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl, ignore_index=-100)
-        # loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl)
         
+        gt_generation = []
+        indices = np.append(0, np.cumsum(l))
+        max_logits = torch.argmax(lm_logits, dim=2)
+        for i in range(1, len(indices)):
+            gt_generation.append(max_logits[indices[i-1]:indices[i], :].reshape(1, -1).squeeze())
+        
+        batch['samples'] = gt_generation
+        self.generate_samples(batch)
+            
+            
+                    
         
         self.log("loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
                 batch_size=self.batch_size, sync_dist=True)
