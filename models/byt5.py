@@ -207,6 +207,25 @@ class ByT5Model(pl.LightningModule):
         return shifted_input_ids
     
     
+    import torch
+
+    def create_attention_mask_from_seq_length(self, sequence_lengths):
+        # make attention mask from sequence length
+        # Determine the max length
+        sequence_lengths = torch.tensor(sequence_lengths)
+        max_length = max(sequence_lengths)
+        
+        # Create a tensor containing indices from 0 to max_length - 1
+        idx = torch.arange(0, max_length).unsqueeze(0)
+        
+        # Unsqueeze sequence_lengths to make it a column vector and compare against idx
+        mask = (idx < sequence_lengths.unsqueeze(1)).int()
+        
+        return mask
+
+
+    
+    
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
@@ -297,16 +316,28 @@ class ByT5Model(pl.LightningModule):
         #shifting to the right
         # s_e = start_embed.unsqueeze(0).repeat(tgt.shape[0], 1, 1).to(self.device)
         # batch_2['inputs_embeds'] = torch.concatenate((s_e, tgt[:, :-1, :]), dim=1)
-        batch_2['input_ids'] = self.shift_right(o, self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
         batch_2['attention_mask'] = batch['output_entities'].attention_mask[:, 1:]
+        
+        batch_input_ids, batch_encoder_hidden = [], []
+        indices = np.append(0, np.cumsum(l))
+        for i in range(1, len(indices)):
+            batch_input_ids.append(o[indices[i-1]:indices[i], :].reshape(1, -1))
+            batch_encoder_hidden.append(unpacked_entities[indices[i-1]:indices[i], 0, :].unsqueeze(0))
+            
+        
+        batch_2 = {}
+        batch_2['encoder_hidden_states'] = outputs["decoder_hidden_states"][-1]
+        batch_2['encoder_attention_mask'] = self.create_attention_mask_from_seq_length(l).to(self.device)
+        batch_2['input_ids'] = self.shift_right(batch['labels'], self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
+        batch_2['input_ids'][batch_2['input_ids'] == -100] = self.model.config.pad_token_id
         
         decoder_outputs = self.model.decoder(**batch_2)
         
         lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
         
-        lbl = o.clone()
-        lbl[lbl == self.tokenizer.pad_token_id] = -100
-        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl, ignore_index=-100)
+        # lbl = o.clone()
+        # lbl[lbl == self.tokenizer.pad_token_id] = -100
+        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), batch['labels'], ignore_index=-100)
         
         # tgt = tgt[:, :-1, :]
         # outputs = self.local_model.decode(tgt, unpacked_entities, tgt_mask=nn.Transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device))
@@ -624,29 +655,27 @@ class ByT5Model(pl.LightningModule):
         
         e_o = {}
         batch_2 = {}
-        batch_2['encoder_hidden_states'] = unpacked_entities
-        #shifting to the right
-        # s_e = start_embed.unsqueeze(0).repeat(tgt.shape[0], 1, 1).to(self.device)
-        # batch_2['inputs_embeds'] = torch.concatenate((s_e, tgt[:, :-1, :]), dim=1)
-        batch_2['input_ids'] = self.shift_right(o, self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
-        batch_2['attention_mask'] = batch['output_entities'].attention_mask[:, 1:]
+        batch_2['encoder_hidden_states'] = outputs["decoder_hidden_states"][-1]
+        batch_2['encoder_attention_mask'] = self.create_attention_mask_from_seq_length(l).to(self.device)
+        batch_2['input_ids'] = self.shift_right(batch['labels'], self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
+        batch_2['input_ids'][batch_2['input_ids'] == -100] = self.model.config.pad_token_id
         
         decoder_outputs = self.model.decoder(**batch_2)
         
         lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
         
-        lbl = o.clone()
-        lbl[lbl == self.tokenizer.pad_token_id] = -100
-        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl, ignore_index=-100)
+        # lbl = o.clone()
+        # lbl[lbl == self.tokenizer.pad_token_id] = -100
+        loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), batch['labels'], ignore_index=-100)
         
-        gt_generation = []
-        indices = np.append(0, np.cumsum(l))
-        max_logits = torch.argmax(lm_logits, dim=2)
-        for i in range(1, len(indices)):
-            gt_generation.append(max_logits[indices[i-1]:indices[i], :].reshape(1, -1).squeeze())
+        # gt_generation = []
+        # indices = np.append(0, np.cumsum(l))
+        # max_logits = torch.argmax(lm_logits, dim=2)
+        # for i in range(1, len(indices)):
+        #     gt_generation.append(max_logits[indices[i-1]:indices[i], :].reshape(1, -1).squeeze())
         
-        batch['samples'] = gt_generation
-        self.generate_samples(batch)
+        # batch['samples'] = gt_generation
+        # self.generate_samples(batch)
             
             
                     
@@ -694,11 +723,11 @@ class ByT5Model(pl.LightningModule):
         for e in outputs['decoder_hidden_states']:
             decoder_hidden_states.append(e[-1])
         src = torch.cat(decoder_hidden_states, dim=1)
-        src = src.view(-1, 1, src.shape[2])
+        # src = src.view(-1, 1, src.shape[2])
         
         batch_final = {}
         batch_final['inputs_embeds'] = src
-        final_out = self.model.generate(**batch_final, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=18)
+        final_out = self.model.generate(**batch_final, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=192)
         
         final_seq = []
         for e in final_out['decoder_hidden_states']:
@@ -709,6 +738,7 @@ class ByT5Model(pl.LightningModule):
         
         batch['samples'] = self.model.lm_head(final_seq)
         batch['samples'] = torch.argmax(batch['samples'], dim=2)
+        
         
         if batch_idx % 100 == 0:
             with open("output_string_logs.txt", "a") as file:
