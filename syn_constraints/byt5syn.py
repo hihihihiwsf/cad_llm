@@ -7,12 +7,13 @@ try:
 except ImportError:
     pass
 import pytorch_lightning as pl
+import torch.nn as nn
 import torch.optim as optim
 from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
 
 from syn_constraints.syn_contraints_preprocess import safe_constraints_sets_from_string
-from syn_constraints.metrics import IoU
+from syn_constraints.metrics import PartIoU, PartAccuracy
 
 
 class ByT5SynConstraintsModel(pl.LightningModule):
@@ -26,10 +27,13 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
 
-        self.horizontal_iou = IoU()
-        self.vertical_iou = IoU()
-        self.parallel_iou = IoU()
-        self.perpendicular_iou = IoU()
+        self.constraint_types = ["horizontal", "vertical", "parallel", "perpendicular"]
+        self.iou = nn.ModuleDict({constraint_type: PartIoU() for constraint_type in self.constraint_types})
+        self.acc = nn.ModuleDict({constraint_type: PartAccuracy() for constraint_type in self.constraint_types})
+
+        # self.all_input_texts = []
+        # self.all_predictions = []
+        # self.all_targets = []
 
     def prepare_data(self):
         print("in prepare_data")
@@ -56,7 +60,7 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
@@ -74,22 +78,35 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         preds = [safe_constraints_sets_from_string(sample) for sample in samples]
         targets = [safe_constraints_sets_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
 
+        # self.all_input_texts.extend(batch["input_text"])
+        # self.all_predictions.extend(preds)
+        # self.all_targets.extend(targets)
+
         # Calculate metrics
         for pred, target in zip(preds, targets):
-            self.horizontal_iou.update(pred["horizontal"], target["horizontal"])
-            self.vertical_iou.update(pred["vertical"], target["vertical"])
-            self.perpendicular_iou.update(pred["perpendicular"], target["perpendicular"])
-            # self.parallel_iou.update(pred["parallel"], target["parallel"])
+            for constraint_type in self.constraint_types:
+                self.iou[constraint_type].update(pred[constraint_type], target[constraint_type])
+                self.acc[constraint_type].update(pred[constraint_type], target[constraint_type])
+
+        # Log metrics
+        for constraint_type in self.constraint_types:
+            self.log(f"val_iou_{constraint_type}", self.iou[constraint_type], on_step=False, on_epoch=True,
+                     prog_bar=True, logger=True, batch_size=self.batch_size)
+
+            self.log(f"val_acc_{constraint_type}", self.acc[constraint_type], on_step=False, on_epoch=True,
+                     prog_bar=True, logger=True, batch_size=self.batch_size)
 
         return loss
 
-    def on_validation_epoch_end(self):
-        # Log metrics
-        horizontal_iou = self.horizontal_iou.compute()
-        print("iou", horizontal_iou)
-        self.log(f"val_horizontal_iou", horizontal_iou, on_step=False, on_epoch=True,
-                 prog_bar=True, logger=True, batch_size=self.batch_size)
-        self.horizontal_iou.reset()
+    # def on_validation_epoch_end(self):
+    #
+    #
+    #     # Save json
+    #
+    #     # Reset sample lists
+    #     # self.all_input_texts = []
+    #     # self.all_predictions = []
+    #     # self.all_targets = []
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
