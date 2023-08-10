@@ -4,14 +4,14 @@ Train a CAD LLM model on a Ray Cluster
 
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from dataset.syn_constraints_dataset import SynConstraintsDataModule
-from models.byt5syn import ByT5SynConstraintsModel
+from syn_constraints.syn_constraints_dataset import SynConstraintsDataModule
+from syn_constraints.byt5syn import ByT5SynConstraintsModel
 
 try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from util import get_loggers
+from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
 from pathlib import Path
 import pytorch_lightning as pl
@@ -43,10 +43,9 @@ def main():
     datamodule.setup(stage="fit")
     tokenizer = datamodule.get_tokenizer()
 
-    checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min", dirpath="checkpoints", filename=f"best",
-                                          save_last=True)
-    checkpoint_callback.CHECKPOINT_NAME_LAST = "last"
-    call_backs = [checkpoint_callback, LearningRateMonitor(logging_interval='step')]
+    call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
+                                          using_sagemaker=args.using_sagemaker)
+    call_backs.append(LearningRateMonitor(logging_interval='step'))
     log_every_n_steps = 10000
 
     model = ByT5SynConstraintsModel(args=args, tokenizer=tokenizer)

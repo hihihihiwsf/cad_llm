@@ -1,4 +1,5 @@
-class SketchStringsCollator:
+
+class SynConstraintsCollator:
     def __init__(self, tokenizer, max_length=None):
         self.tokenizer = tokenizer
         self.max_length = max_length

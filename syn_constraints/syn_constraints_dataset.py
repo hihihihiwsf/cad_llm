@@ -10,8 +10,8 @@ import pytorch_lightning as pl
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
-from preprocess.preprocess_syn_constraints import get_entities_for_syn_constraints
-from dataset.sketch_strings_collator import SketchStringsCollator
+from syn_constraints.syn_contraints_preprocess import get_entities_for_syn_constraints, constraints_to_string
+from syn_constraints.syn_constraints_collator import SynConstraintsCollator
 
 
 class SynConstraintsDataModule(pl.LightningDataModule):
@@ -20,6 +20,7 @@ class SynConstraintsDataModule(pl.LightningDataModule):
         self.args = args
         self.ray_args = ray_args
         self.tokenizer = None
+        self.collator = None
         self.ds = None
 
     def prepare_data(self):
@@ -42,7 +43,7 @@ class SynConstraintsDataModule(pl.LightningDataModule):
 
     def setup(self, stage, load_from_cache_file=True):
         self.tokenizer = self.get_tokenizer()
-        self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.args.max_length)
+        self.collator = SynConstraintsCollator(tokenizer=self.tokenizer, max_length=self.args.max_length)
 
         splits = ["val", "train", "test"]
         data_files = {split: str(Path(self.args.dataset) / f"*{split}.json*") for split in splits}
@@ -69,24 +70,13 @@ class SynConstraintsDataModule(pl.LightningDataModule):
 
     @staticmethod
     def add_output_string(example):
-        constraints = example["constraints"]
-
-        constraints_str = ""
-        constraints_str += "<horizontal>" + "".join([f"<ent_{i}>" for i in constraints["horizontal"]])
-        constraints_str += "<vertical>" + "".join([f"<ent_{i}>" for i in constraints["vertical"]])
-
-        for parallel_index_list in constraints["parallel"]:
-            constraints_str += "<parallel>" + "".join([f"<ent_{i}>" for i in parallel_index_list])
-
-        constraints_str += "<perpendicular>" + "".join([f"<ent_{i}><ent_{j}>" for i, j in constraints["perpendicular"]])
-        example["output_text"] = constraints_str
-
+        example["output_text"] = constraints_to_string(example["constraints"])
         return example
 
-    def get_tokenizer(self, num_coords=64, num_ent_names=60):
+    def get_tokenizer(self, num_coords=64, num_ent_names=62):
         tokenizer = AutoTokenizer.from_pretrained(self.args.model_name)
         new_tokens = [f"<{i}>" for i in range(num_coords)] + [f"<ent_{i}>" for i in range(num_ent_names)]
-        new_tokens += ["<horizontal>", "<vertical>", "<parallel>", "<perpendicular>"]
+        new_tokens += ["<constraint_sep>", "<parallel_sep>"]
         tokenizer.add_tokens(new_tokens)
         assert len(tokenizer) % 64 == 0
         return tokenizer

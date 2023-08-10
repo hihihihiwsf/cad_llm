@@ -59,11 +59,11 @@ def constraints_to_string(constraints):
     return constraints_str
 
 
-def safe_constraints_from_string(constraints_str):
+def safe_constraints_sets_from_string(constraints_str):
     try:
-        return constraints_from_string(constraints_str)
-    except Exception:
-        return None
+        return constraints_sets_from_string(constraints_str)
+    except Exception as e:
+        return {"horizontal": set(), "vertical": set(), "parallel": set(), "perpendicular": set()}
 
 
 def constraints_from_string(constraints_str):
@@ -86,6 +86,18 @@ def constraints_from_string(constraints_str):
     perpendicular_flat = entity_index_list_from_string(perpendicular_str)
     if len(perpendicular_flat) % 2 != 0:
         perpendicular_flat = perpendicular_flat[:-1]
-    perpendicular = [perpendicular_flat[i:i+2] for i in range(0, len(perpendicular_flat), 2)]
+    perpendicular = [tuple(perpendicular_flat[i:i+2]) for i in range(0, len(perpendicular_flat), 2)]
 
     return {"horizontal": horizontal, "vertical": vertical, "parallel": parallel, "perpendicular": perpendicular}
+
+
+def constraints_sets_from_string(constraints_str):
+    constraints = constraints_from_string(constraints_str)
+
+    constraints_sets = {}
+    constraints_sets["horizontal"] = set(constraints["horizontal"])
+    constraints_sets["vertical"] = set(constraints["vertical"])
+    constraints_sets["parallel"] = [set(indices) for indices in constraints["parallel"]]
+    constraints_sets["perpendicular"] = set([tuple(pair) for pair in constraints["perpendicular"]])
+
+    return constraints_sets

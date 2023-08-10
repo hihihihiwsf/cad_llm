@@ -11,7 +11,8 @@ import torch.optim as optim
 from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
 
-from preprocess.preprocess_syn_constraints import safe_constraints_from_string
+from syn_constraints.syn_contraints_preprocess import safe_constraints_sets_from_string
+from syn_constraints.metrics import IoU
 
 
 class ByT5SynConstraintsModel(pl.LightningModule):
@@ -25,11 +26,18 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
 
+        self.horizontal_iou = IoU()
+        self.vertical_iou = IoU()
+        self.parallel_iou = IoU()
+        self.perpendicular_iou = IoU()
+
     def prepare_data(self):
+        print("in prepare_data")
         # Download model
         T5ForConditionalGeneration.from_pretrained(self.args.model_name)
 
     def setup(self, stage):
+        print("in setup")
         self.model = T5ForConditionalGeneration.from_pretrained(self.args.model_name)
         self.tokenizer = self.tokenizer
 
@@ -63,18 +71,33 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         # Generate and process samples
         samples = self.generate_samples(batch)
 
+        preds = [safe_constraints_sets_from_string(sample) for sample in samples]
+        targets = [safe_constraints_sets_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
+
         # Calculate metrics
+        for pred, target in zip(preds, targets):
+            self.horizontal_iou.update(pred["horizontal"], target["horizontal"])
+            self.vertical_iou.update(pred["vertical"], target["vertical"])
+            self.perpendicular_iou.update(pred["perpendicular"], target["perpendicular"])
+            # self.parallel_iou.update(pred["parallel"], target["parallel"])
 
         return loss
+
+    def on_validation_epoch_end(self):
+        # Log metrics
+        horizontal_iou = self.horizontal_iou.compute()
+        print("iou", horizontal_iou)
+        self.log(f"val_horizontal_iou", horizontal_iou, on_step=False, on_epoch=True,
+                 prog_bar=True, logger=True, batch_size=self.batch_size)
+        self.horizontal_iou.reset()
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                do_sample=False, max_new_tokens=self.args.max_length + 10)
+                                do_sample=False, max_new_tokens=self.args.max_length)
 
         samples = self.tokenizer.batch_decode(samples, skip_special_tokens=True)
-        samples = [safe_constraints_from_string(sample) for sample in samples]
         return samples
 
     def configure_optimizers(self):

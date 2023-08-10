@@ -24,7 +24,7 @@ def get_parser():
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=0.8,
                         help="Maximal percentage of sketch entities to choose as input")
-    parser.add_argument("--max_length", type=int, default=192,
+    parser.add_argument("--max_length", type=int, default=128,
                         help="Maximal length in tokens for both input and output. Longer sequences will be truncated.")
     parser.add_argument("--eval", type=int, default=0, help="if true, goes directly to the eval mode. loading best from the ckpt dir")
     parser.add_argument("--seed", type=int, default=0, help="Random seed to use")

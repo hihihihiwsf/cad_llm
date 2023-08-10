@@ -9,12 +9,11 @@ from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 
 from args.main_args import get_main_args_for_launch
 from args.ray_args import get_ray_args
-from dataset.syn_constraints_dataset import SynConstraintsDataModule
-from models.byt5syn import ByT5SynConstraintsModel
+from syn_constraints.syn_constraints_dataset import SynConstraintsDataModule
+from syn_constraints.byt5syn import ByT5SynConstraintsModel
 
 
 def train_on_ray_cluster():
-
     ray_args = get_ray_args()
     main_args = get_main_args_for_launch()  # args to pass to main.py
 
