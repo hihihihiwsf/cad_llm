@@ -6,14 +6,17 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
+import json
+
 import pytorch_lightning as pl
 import torch.nn as nn
 import torch.optim as optim
+from pytorch_lightning.utilities import rank_zero_only
 from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
 
-from preprocess.syn_contraints_preprocess import safe_constraints_sets_from_string
 from metrics.syn_constraints_metrics import PartIoU, PartAccuracy
+from preprocess.syn_contraints_preprocess import safe_constraints_from_string, constraints_to_sets
 
 
 class ByT5SynConstraintsModel(pl.LightningModule):
@@ -31,9 +34,8 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         self.iou = nn.ModuleDict({constraint_type: PartIoU() for constraint_type in self.constraint_types})
         self.acc = nn.ModuleDict({constraint_type: PartAccuracy() for constraint_type in self.constraint_types})
 
-        # self.all_input_texts = []
-        # self.all_predictions = []
-        # self.all_targets = []
+        self.all_val_predictions = []
+        self.all_val_targets = []
 
     def prepare_data(self):
         print("in prepare_data")
@@ -75,15 +77,16 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         # Generate and process samples
         samples = self.generate_samples(batch)
 
-        preds = [safe_constraints_sets_from_string(sample) for sample in samples]
-        targets = [safe_constraints_sets_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
+        preds = [safe_constraints_from_string(sample) for sample in samples]
+        targets = [safe_constraints_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
 
-        # self.all_input_texts.extend(batch["input_text"])
-        # self.all_predictions.extend(preds)
-        # self.all_targets.extend(targets)
+        self.all_val_predictions.extend(preds)
+        self.all_val_targets.extend(targets)
 
         # Calculate metrics
         for pred, target in zip(preds, targets):
+            pred = constraints_to_sets(pred)
+            target = constraints_to_sets(target)
             for constraint_type in self.constraint_types:
                 self.iou[constraint_type].update(pred[constraint_type], target[constraint_type])
                 self.acc[constraint_type].update(pred[constraint_type], target[constraint_type])
@@ -91,22 +94,26 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         # Log metrics
         for constraint_type in self.constraint_types:
             self.log(f"val_iou_{constraint_type}", self.iou[constraint_type], on_step=False, on_epoch=True,
-                     prog_bar=True, logger=True, batch_size=self.batch_size)
+                     prog_bar=True, logger=True, batch_size=self.batch_size, sync_dist=True)
 
             self.log(f"val_acc_{constraint_type}", self.acc[constraint_type], on_step=False, on_epoch=True,
-                     prog_bar=True, logger=True, batch_size=self.batch_size)
+                     prog_bar=True, logger=True, batch_size=self.batch_size, sync_dist=True)
 
         return loss
 
-    # def on_validation_epoch_end(self):
-    #
-    #
-    #     # Save json
-    #
-    #     # Reset sample lists
-    #     # self.all_input_texts = []
-    #     # self.all_predictions = []
-    #     # self.all_targets = []
+    @rank_zero_only
+    def on_validation_epoch_end(self):
+        results = []
+        for pred, true in zip(self.all_val_predictions, self.all_val_targets):
+            results.append({"pred": pred, "true": true})
+
+        path = f"{self.args.samples_dir}/samples_and_targets_epoch_{self.current_epoch}.json"
+        with open(path, "w") as json_file:
+            json.dump(results, json_file)
+
+        # Reset sample lists
+        self.all_val_predictions = []
+        self.all_val_targets = []
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers

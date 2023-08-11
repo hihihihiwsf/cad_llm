@@ -59,6 +59,13 @@ def constraints_to_string(constraints):
     return constraints_str
 
 
+def safe_constraints_from_string(constraints_str):
+    try:
+        return constraints_from_string(constraints_str)
+    except Exception as e:
+        return {"horizontal": [], "vertical": [], "parallel": [], "perpendicular": []}
+
+
 def constraints_from_string(constraints_str):
     parts = constraints_str.split("<constraint_sep>")
     if len(parts) < 4:
@@ -97,22 +104,11 @@ def constraints_from_string(constraints_str):
     return {"horizontal": horizontal, "vertical": vertical, "parallel": parallel, "perpendicular": perpendicular}
 
 
-def constraints_sets_from_string(constraints_str):
-    constraints = constraints_from_string(constraints_str)
-
-    constraints_sets = {
+def constraints_to_sets(constraints):
+    return {
         "horizontal": set(constraints["horizontal"]),
         "vertical": set(constraints["vertical"]),
         "parallel": set([tuple(indices) for indices in constraints["parallel"]]),
         "perpendicular": set([tuple(pair) for pair in constraints["perpendicular"]]),
     }
-
-    return constraints_sets
-
-
-def safe_constraints_sets_from_string(constraints_str):
-    try:
-        return constraints_sets_from_string(constraints_str)
-    except Exception as e:
-        return {"horizontal": set(), "vertical": set(), "parallel": set(), "perpendicular": set()}
 
