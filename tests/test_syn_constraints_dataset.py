@@ -1,7 +1,5 @@
 import unittest
 
-from transformers import AutoTokenizer
-
 from dataset.syn_constraints_dataset import SynConstraintsDataModule
 
 
@@ -20,11 +18,8 @@ class TestSynConstraintsDataModule(unittest.TestCase):
 
         batch = next(iter(dataloader))
 
-        print(batch["input_text"])
-
-        print(batch["output_text"])
-
         expected_keys = ["input_ids", "attention_mask", "labels"]
         self.assertTrue(all(key in batch.keys() for key in expected_keys))
         self.assertEqual(len(batch["input_ids"]), batch_size)
         self.assertEqual(batch["input_ids"].shape, (batch_size, max_length))
+

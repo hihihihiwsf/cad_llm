@@ -47,7 +47,7 @@ def launch_sagemaker():
     print(f"\t{launch_args.instance_count} instances of {launch_args.instance_type}")
     print(f"\t{processes_per_host} GPU(s) per instance")
 
-    entry_point = "syn_constraints/train_syn_constraints.py"
+    entry_point = "train_syn_constraints.py"
     exp_name = main_args.exp_name
 
     exp_run_name = exp_name.replace("_", "-") + '-' + datetime.now().strftime("%m-%d-%y-%H%M")

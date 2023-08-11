@@ -58,6 +58,8 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         val_check_interval=args.val_check_interval,
+        limit_train_batches=0.001,
+        limit_val_batches=0.01,
     )
 
     print("Training the model...")
