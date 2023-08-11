@@ -10,8 +10,8 @@ import pytorch_lightning as pl
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
-from syn_constraints.syn_contraints_preprocess import get_entities_for_syn_constraints, constraints_to_string
-from syn_constraints.syn_constraints_collator import SynConstraintsCollator
+from preprocess.syn_contraints_preprocess import get_entities_for_syn_constraints, constraints_to_string
+from dataset.sketch_strings_collator import SketchStringsCollator
 
 
 class SynConstraintsDataModule(pl.LightningDataModule):
@@ -43,16 +43,16 @@ class SynConstraintsDataModule(pl.LightningDataModule):
 
     def setup(self, stage, load_from_cache_file=True):
         self.tokenizer = self.get_tokenizer()
-        self.collator = SynConstraintsCollator(tokenizer=self.tokenizer, max_length=self.args.max_length)
+        self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.args.max_length)
 
         splits = ["val", "train", "test"]
         data_files = {split: str(Path(self.args.dataset) / f"*{split}.json*") for split in splits}
         ds = load_dataset("json", data_files=data_files, field="data")
 
         ds = ds.rename_columns({"filename": "name"})
-        ds = ds.map(self.add_entities, load_from_cache_file=load_from_cache_file)
-        ds = ds.map(self.add_input_string, load_from_cache_file=load_from_cache_file)
-        ds = ds.map(self.add_output_string, load_from_cache_file=load_from_cache_file)
+        ds = ds.map(self.add_entities, load_from_cache_file=load_from_cache_file, num_proc=32)
+        ds = ds.map(self.add_input_string, load_from_cache_file=load_from_cache_file, num_proc=32)
+        ds = ds.map(self.add_output_string, load_from_cache_file=load_from_cache_file, num_proc=32)
         columns_to_remove = ["name", "vertices", "edges", "entities", "constraints", "constraints_seq"]
         ds = ds.remove_columns(column_names=columns_to_remove)
         self.ds = ds

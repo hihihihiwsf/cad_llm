@@ -4,8 +4,8 @@ Train a CAD LLM model on a Ray Cluster
 
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from syn_constraints.syn_constraints_dataset import SynConstraintsDataModule
-from syn_constraints.byt5syn import ByT5SynConstraintsModel
+from dataset.syn_constraints_dataset import SynConstraintsDataModule
+from models.byt5_syn_constraints import ByT5SynConstraintsModel
 
 try:
     import comet_ml  # Import before torch
@@ -46,7 +46,7 @@ def main():
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
     call_backs.append(LearningRateMonitor(logging_interval='step'))
-    log_every_n_steps = 10000
+    log_every_n_steps = 100
 
     model = ByT5SynConstraintsModel(args=args, tokenizer=tokenizer)
     trainer = pl.Trainer(

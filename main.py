@@ -17,16 +17,22 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
 from models.segformer import SegformerModel
+from models.byt5_syn_constraints import ByT5SynConstraintsModel
 from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
 from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
 
 
 def get_model(args):
+    if args.model_name == "SynConstraints":
+        return ByT5SynConstraintsModel()
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name)
+    if "byt5" in args.model_name:
+        return ByT5Model(args=args)
 
-    return ByT5Model(args=args)
+    assert False, f"Unknown model type {args.model_name}"
+
 
 
 def get_dataloader(args, split, shuffle, tokenizer):

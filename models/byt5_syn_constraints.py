@@ -12,8 +12,8 @@ import torch.optim as optim
 from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
 
-from syn_constraints.syn_contraints_preprocess import safe_constraints_sets_from_string
-from syn_constraints.metrics import PartIoU, PartAccuracy
+from preprocess.syn_contraints_preprocess import safe_constraints_sets_from_string
+from metrics.syn_constraints_metrics import PartIoU, PartAccuracy
 
 
 class ByT5SynConstraintsModel(pl.LightningModule):
