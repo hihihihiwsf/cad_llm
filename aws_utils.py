@@ -17,7 +17,17 @@ class SyncCheckpoint(Callback):
             base_s3_uri = os.path.dirname(os.path.dirname(os.getenv("SM_MODULE_DIR", "")))
             full_s3_uri = f"{base_s3_uri}/checkpoints/"
             print(f"Syncing checkpoints from local {pl_module.args.checkpoint_dir} to s3 {full_s3_uri}")
-            sync_local_checkpoints_to_s3(local_path=pl_module.args.checkpoint_dir, s3_uri=full_s3_uri)
+            sync_local_to_s3(local_path=pl_module.args.checkpoint_dir, s3_uri=full_s3_uri)
+
+
+class SyncSamples(Callback):
+    def on_val_epoch_end(self, trainer, pl_module):
+        # Sync the samples from Sagemaker to s3 manually
+        if trainer.global_rank == 0 and pl_module.args.using_sagemaker:
+            base_s3_uri = os.path.dirname(os.path.dirname(os.getenv("SM_MODULE_DIR", "")))
+            full_s3_uri = f"{base_s3_uri}/samples/"
+            print(f"Syncing checkpoints from local {pl_module.args.samples_dir} to s3 {full_s3_uri}")
+            sync_local_to_s3(local_path=pl_module.args.samples_dir, s3_uri=full_s3_uri)
 
 
 def aws_s3_sync(source, destination):
@@ -34,7 +44,7 @@ def aws_s3_sync(source, destination):
     return
 
 
-def sync_local_checkpoints_to_s3(local_path="/opt/ml/checkpoints", s3_uri=os.path.dirname(os.path.dirname(os.getenv('SM_MODULE_DIR', ''))) + '/checkpoints'):
+def sync_local_to_s3(local_path, s3_uri):
     """ sample function to sync checkpoints from local path to s3 """
 
     import boto3
@@ -54,31 +64,4 @@ def sync_local_checkpoints_to_s3(local_path="/opt/ml/checkpoints", s3_uri=os.pat
     except Exception as e:
         raise e
     aws_s3_sync(local_path, s3_uri)
-    return
-
-
-def sync_s3_checkpoints_to_local(local_path="/opt/ml/checkpoints", s3_uri=os.path.dirname(os.path.dirname(os.getenv('SM_MODULE_DIR', ''))) + '/checkpoints'):
-    """ sample function to sync checkpoints from s3 to local path """
-
-    import boto3
-    # try to create local path if it does not exist
-    if not os.path.exists(local_path):
-        print(f"Provided local path {local_path} does not exist. Creating...")
-        try:
-            os.makedirs(local_path)
-        except Exception as e:
-            raise RuntimeError(f"Failed to create {local_path}")
-
-    # check if s3 bucket exists
-    s3 = boto3.resource('s3')
-    if not s3_uri.startswith("s3://"):
-        raise ValueError(f"Provided s3 uri {s3_uri} is not valid.")
-
-    s3_bucket = s3_uri.replace('s3://', '').split('/')[0]
-    print(f"S3 Bucket: {s3_bucket}")
-    try:
-        s3.meta.client.head_bucket(Bucket=s3_bucket)
-    except Exception as e:
-        raise e
-    aws_s3_sync(s3_uri, local_path)
     return

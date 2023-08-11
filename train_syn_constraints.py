@@ -12,6 +12,7 @@ try:
 except ImportError:
     pass
 from util import get_loggers, get_checkpoint_callbacks
+from aws_utils import SyncSamples
 from args.main_args import get_training_args
 from pathlib import Path
 import pytorch_lightning as pl
@@ -46,6 +47,7 @@ def main():
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
     call_backs.append(LearningRateMonitor(logging_interval='step'))
+    call_backs.append(SyncSamples())
     log_every_n_steps = 100
 
     model = ByT5SynConstraintsModel(args=args, tokenizer=tokenizer)
@@ -58,6 +60,8 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         val_check_interval=args.val_check_interval,
+        limit_train_batches=0.0001,
+        limit_val_batches=0.01,
     )
 
     print("Training the model...")
