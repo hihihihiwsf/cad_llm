@@ -103,7 +103,7 @@ def constraints_sets_from_string(constraints_str):
     constraints_sets = {
         "horizontal": set(constraints["horizontal"]),
         "vertical": set(constraints["vertical"]),
-        "parallel": set([tuple(sorted(set(indices))) for indices in constraints["parallel"]]),
+        "parallel": set([tuple(indices) for indices in constraints["parallel"]]),
         "perpendicular": set([tuple(pair) for pair in constraints["perpendicular"]]),
     }
 
