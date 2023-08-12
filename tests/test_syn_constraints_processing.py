@@ -16,4 +16,3 @@ class TestSynConstraintsDataModule(unittest.TestCase):
             contraint_string = constraints_to_string(constraints)
             res = constraints_from_string(contraint_string)
             self.assertEqual(constraints, res)
-

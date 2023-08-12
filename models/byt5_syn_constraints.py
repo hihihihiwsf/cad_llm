@@ -34,8 +34,7 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         self.iou = nn.ModuleDict({constraint_type: PartIoU() for constraint_type in self.constraint_types})
         self.acc = nn.ModuleDict({constraint_type: PartAccuracy() for constraint_type in self.constraint_types})
 
-        self.all_val_predictions = []
-        self.all_val_targets = []
+        self.sample_infos = []
 
     def prepare_data(self):
         print("in prepare_data")
@@ -80,11 +79,15 @@ class ByT5SynConstraintsModel(pl.LightningModule):
         preds = [safe_constraints_from_string(sample) for sample in samples]
         targets = [safe_constraints_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
 
-        self.all_val_predictions.extend(preds)
-        self.all_val_targets.extend(targets)
-
         # Calculate metrics
-        for pred, target in zip(preds, targets):
+        for pred, target, sample, input_text in zip(preds, targets, samples, batch["input_text"]):
+            self.sample_infos.append({
+                "pred": pred,
+                "true": target,
+                "text_sample": sample,
+                "input_text": input_text,
+            })
+
             pred = constraints_to_sets(pred)
             target = constraints_to_sets(target)
             for constraint_type in self.constraint_types:
@@ -103,17 +106,12 @@ class ByT5SynConstraintsModel(pl.LightningModule):
 
     @rank_zero_only
     def on_validation_epoch_end(self):
-        results = []
-        for pred, true in zip(self.all_val_predictions, self.all_val_targets):
-            results.append({"pred": pred, "true": true})
-
         path = f"{self.args.samples_dir}/samples_and_targets_epoch_{self.current_epoch}.json"
         with open(path, "w") as json_file:
-            json.dump(results, json_file)
+            json.dump(self.sample_infos, json_file)
 
-        # Reset sample lists
-        self.all_val_predictions = []
-        self.all_val_targets = []
+        # Reset sample_infos
+        self.sample_infos = []
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers

@@ -39,8 +39,9 @@ def entity_index_list_to_string(indices):
 
 
 def entity_index_list_from_string(indices_str):
-    index_strings = [part.strip(">") for part in indices_str.split("<ent_") if part]
-    indices = [int(index_str) for index_str in index_strings]
+    index_strings = indices_str.split("<ent_")
+    index_strings = [index_string.strip("> ") for index_string in index_strings]
+    indices = [int(index_string) for index_string in index_strings if index_string]
     return indices
 
 
