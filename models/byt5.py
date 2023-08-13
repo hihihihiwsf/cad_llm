@@ -115,8 +115,10 @@ class ByT5Model(pl.LightningModule):
             model._init_weights(model)  # maybe redundant
         else:
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            model2 = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
+        self.model2 = model2
         
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
@@ -325,10 +327,10 @@ class ByT5Model(pl.LightningModule):
         batch_3 = {}
         batch_3['labels'] = batch['labels']
         batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
-        decoder_outputs = self.model(**batch_3, output_hidden_states=True)
+        decoder_outputs = self.model2(**batch_3, output_hidden_states=True)
         
         # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
-        lm_logits = self.model.lm_head(decoder_outputs['decoder_hidden_states'][-1])
+        lm_logits = self.model2.lm_head(decoder_outputs['decoder_hidden_states'][-1])
         
         # lbl = o.clone()
         # lbl[lbl == self.tokenizer.pad_token_id] = -100
@@ -437,10 +439,10 @@ class ByT5Model(pl.LightningModule):
         batch_3 = {}
         batch_3['labels'] = batch['labels']
         batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
-        decoder_outputs = self.model(**batch_3, output_hidden_states=True)
+        decoder_outputs = self.model2(**batch_3, output_hidden_states=True)
         
         # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
-        lm_logits = self.model.lm_head(decoder_outputs['decoder_hidden_states'][-1])
+        lm_logits = self.model2.lm_head(decoder_outputs['decoder_hidden_states'][-1])
 
         
         # lbl = o.clone()
@@ -506,7 +508,7 @@ class ByT5Model(pl.LightningModule):
         
         batch_final = {}
         batch_final['inputs_embeds'] = src
-        final_out = self.model.generate(**batch_final, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=192, early_stopping=True)
+        final_out = self.model2.generate(**batch_final, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=192, early_stopping=True)
         
         final_seq = []
         for e in final_out['decoder_hidden_states']:
