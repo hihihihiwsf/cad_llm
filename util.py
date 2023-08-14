@@ -53,14 +53,16 @@ import numpy as np
 class EmbeddingCallback(pl.Callback):
     def __init__(self):
         super().__init__()
-        self.embeddings = []
+        self.image_embeddings = []
+        self.txt_embeddings = []
         self.pixel = []
         self.name = []
         self.fulltext = []
         self.intext = []
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
-        self.embeddings.append(pl_module.embeddings.detach().cpu().numpy())
+        #self.image_embeddings.append(pl_module.image_embeddings.detach().cpu().numpy())
+        self.txt_embeddings.append(pl_module.txt_embeddings.detach().cpu().numpy())
         self.pixel.append(pl_module.px.detach().cpu().numpy())
         self.name.append(pl_module.name)
         self.fulltext.append(pl_module.fulltext)
