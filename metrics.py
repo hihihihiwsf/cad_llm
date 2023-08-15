@@ -11,7 +11,7 @@ def calculate_accuracy_samples(labels, samples):
     for idx in range(bsz):
         label_entities = labels[idx]
         for j in range(5):
-            sample_entities = samples[idx*5+j]
+            sample_entities = samples[idx*5]
     #for label_entities, sample_entities in zip(labels, samples):
             label_entities = tuple(sorted([ent for ent in label_entities if ent]))
             sample_entities = tuple(sorted([ent for ent in sample_entities if ent]))
