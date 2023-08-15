@@ -115,10 +115,10 @@ class ByT5Model(pl.LightningModule):
             model._init_weights(model)  # maybe redundant
         else:
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-            model2 = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            # model2 = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.model2 = model2
+        # self.model2 = model2
         
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
@@ -286,50 +286,14 @@ class ByT5Model(pl.LightningModule):
             # decoder_inputs_embeds.requires_grad_(False)
         
         model_batch['inputs_embeds'] = input_tensor
-        model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
+        # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
         del model_batch['input_ids'], 
-        del model_batch['labels']
+        # del model_batch['labels']
         model_batch['attention_mask'] =  batch['batch_att_mask']
+        
         outputs = self.model(**model_batch, output_hidden_states=True)
         
-
-        o = batch['output_entities'].input_ids
-        o = torch.concatenate((o[:, 0].unsqueeze(1), o[:, 2:]), dim=1)
-        
-        l = batch['output_ent_length']
-        
-        # unpacked_entities = []
-        # for i,j in enumerate(l):
-        #     unpacked_entities.append(outputs["decoder_hidden_states"][-1][i, :j, :])
-        # unpacked_entities = torch.cat(unpacked_entities, dim=0).unsqueeze(1)
-        
-        # batch_2 = {}
-        # batch_2['encoder_hidden_states'] = unpacked_entities
-        # #shifting to the right
-        # # s_e = start_embed.unsqueeze(0).repeat(tgt.shape[0], 1, 1).to(self.device)
-        # # batch_2['inputs_embeds'] = torch.concatenate((s_e, tgt[:, :-1, :]), dim=1)
-        # batch_2['attention_mask'] = batch['output_entities'].attention_mask[:, 1:]
-        
-        # batch_input_ids, batch_encoder_hidden = [], []
-        # indices = np.append(0, np.cumsum(l))
-        # for i in range(1, len(indices)):
-        #     batch_input_ids.append(o[indices[i-1]:indices[i], :].reshape(1, -1))
-        #     batch_encoder_hidden.append(unpacked_entities[indices[i-1]:indices[i], 0, :].unsqueeze(0))
-            
-        
-        # batch_2 = {}
-        # batch_2['encoder_hidden_states'] = outputs["decoder_hidden_states"][-1]
-        # # batch_2['encoder_attention_mask'] = self.create_attention_mask_from_seq_length(l).to(self.device)
-        # batch_2['input_ids'] = self.shift_right(batch['labels'], self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
-        # batch_2['input_ids'][batch_2['input_ids'] == -100] = self.model.config.pad_token_id
-        
-        # decoder_outputs = self.model.decoder(**batch_2)
-        
-        batch_3 = {}
-        batch_3['labels'] = batch['labels']
-        batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
-        decoder_outputs = self.model2(**batch_3, output_hidden_states=True)
-        loss = decoder_outputs.loss
+        loss = outputs.loss
         
         # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
         # lm_logits = self.model2.lm_head(decoder_outputs['decoder_hidden_states'][-1])
@@ -411,60 +375,19 @@ class ByT5Model(pl.LightningModule):
         
         model_batch['inputs_embeds'] = input_tensor
         del model_batch['input_ids'] 
-        del model_batch['labels']
+        # del model_batch['labels']
         model_batch['attention_mask'] = batch['batch_att_mask']
+        
+
+        
+        # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
+
+        # model_batch['attention_mask'] =  batch['batch_att_mask']
+        outputs = self.model(**model_batch, output_hidden_states=True)
+        loss = outputs.loss    
         
         self.seq_inference(model_batch, batch, batch_idx)
         self.generate_samples(batch)
-        
-        model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
- 
-        # model_batch['attention_mask'] =  batch['batch_att_mask']
-        outputs = self.model(**model_batch, output_hidden_states=True)
-        
-        # o = batch['output_entities'].input_ids
-        # o = torch.concatenate((o[:, 0].unsqueeze(1), o[:, 2:]), dim=1)
-        
-        # l = batch['output_ent_length']
-        # unpacked_entities = []
-        # for i,j in enumerate(l):
-        #     unpacked_entities.append(outputs["decoder_hidden_states"][-1][i, :j, :])
-        # unpacked_entities = torch.cat(unpacked_entities, dim=0).unsqueeze(1)
-        
-        e_o = {}
-        # batch_2 = {}
-        # batch_2['encoder_hidden_states'] = outputs["decoder_hidden_states"][-1]
-        # # batch_2['encoder_attention_mask'] = self.create_attention_mask_from_seq_length(l).to(self.device)
-        # batch_2['input_ids'] = self.shift_right(batch['labels'], self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
-        # batch_2['input_ids'][batch_2['input_ids'] == -100] = self.model.config.pad_token_id
-        
-        # decoder_outputs = self.model.decoder(**batch_2)
-        
-        batch_3 = {}
-        batch_3['labels'] = batch['labels']
-        batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
-        decoder_outputs = self.model2(**batch_3, output_hidden_states=True)
-        loss = decoder_outputs.loss
-        
-        # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
-        # lm_logits = self.model2.lm_head(decoder_outputs['decoder_hidden_states'][-1])
-
-        
-        # lbl = o.clone()
-        # lbl[lbl == self.tokenizer.pad_token_id] = -100
-        # loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), batch['labels'], ignore_index=-100)
-        
-        # gt_generation = []
-        # indices = np.append(0, np.cumsum(l))
-        # max_logits = torch.argmax(lm_logits, dim=2)
-        # for i in range(1, len(indices)):
-        #     gt_generation.append(max_logits[indices[i-1]:indices[i], :].reshape(1, -1).squeeze())
-        
-        # batch['samples'] = gt_generation
-        # self.generate_samples(batch)
-            
-            
-                    
         
         self.log("loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
                 batch_size=self.batch_size, sync_dist=True)
@@ -502,22 +425,23 @@ class ByT5Model(pl.LightningModule):
     
     def seq_inference(self, model_batch, batch, batch_idx=None):
         
-        outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=30, early_stopping=False, do_sample=False)
+        # outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=30, early_stopping=False, do_sample=False)
         
         
-        decoder_hidden_states = []
-        for e in outputs['decoder_hidden_states']:
-            decoder_hidden_states.append(e[-1])
-        src = torch.cat(decoder_hidden_states, dim=1)
-        # src = src.view(-1, 1, src.shape[2])
+        # decoder_hidden_states = []
+        # for e in outputs['decoder_hidden_states']:
+        #     decoder_hidden_states.append(e[-1])
+        # src = torch.cat(decoder_hidden_states, dim=1)
+        # # src = src.view(-1, 1, src.shape[2])
         
-        if batch_idx % 10 == 0:
-            print(src.shape)
+        # if batch_idx % 10 == 0:
+        #     print(src.shape)
         
-        batch_final = {}
-        batch_final['inputs_embeds'] = src
-        # batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
-        batch['samples'] = self.model2.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=192, early_stopping=True, do_sample=False)
+        # batch_final = {}
+        # batch_final['inputs_embeds'] = src
+        # # batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
+        del model_batch['labels']
+        batch['samples'] = self.model.generate(**model_batch, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=192, early_stopping=True, do_sample=False)
         
         
         # final_seq = []
