@@ -63,6 +63,7 @@ def train_on_ray_cluster():
     num_workers = ray_args.num_gpus
     num_cpus_per_worker = ray_args.num_cpus_per_worker
     strategy = ray_args.strategy
+    strategy_kwargs = {}
     model_class_kwargs = {
         "args": main_args,
         "tokenizer": tokenizer,
@@ -99,6 +100,7 @@ def train_on_ray_cluster():
             num_workers,
             num_cpus_per_worker,
             strategy,
+            strategy_kwargs,
             model_class,
             model_class_kwargs,
             data_class,
