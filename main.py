@@ -124,7 +124,7 @@ def main():
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
-        ckpt= '/home/ec2-user/icl-ceil/test_multisample/best.ckpt' #'s3://cad-llm-katzm/jobs/amir-Codet5p-ascii1-max64-deepmindv1-06-09-23-2253/checkpoints/model/Codet5p_ascii1_max64_deepmindv1/best.ckpt'
+        ckpt= 's3://cad-llm-katzm/checkpoints/codet5p_220m/best.ckpt' #'s3://cad-llm-katzm/jobs/amir-Codet5p-ascii1-max64-deepmindv1-06-09-23-2253/checkpoints/model/Codet5p_ascii1_max64_deepmindv1/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt, datamodule=sketchdata)
 
 

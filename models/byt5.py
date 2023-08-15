@@ -133,8 +133,11 @@ class ByT5Model(pl.LightningModule):
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
+        
+        #generate_func = unwrap_model(self.model).contrastive_search  ###############try contrastive search
+        
         batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                         max_new_tokens=self.args.max_length+10, num_return_sequences=5, do_sample=True, num_beams=5)
+                                         max_new_tokens=self.args.max_length+10, num_return_sequences=5, do_sample=True, top_k=10)
 
         string_samples = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in string_samples]
