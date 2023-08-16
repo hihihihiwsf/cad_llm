@@ -301,8 +301,8 @@ class ByT5Model(pl.LightningModule):
         batch_2['attention_mask'] = batch['output_entities'].attention_mask[:, 1:]
         
         decoder_outputs = self.model.decoder(**batch_2)
-        
-        lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
+        seq_output = decoder_outputs['last_hidden_state'] * (self.model.model_dim**-0.5)
+        lm_logits = self.model.lm_head(seq_output)
         
         lbl = o.clone()
         lbl[lbl == self.tokenizer.pad_token_id] = -100
@@ -628,9 +628,11 @@ class ByT5Model(pl.LightningModule):
         batch_2['input_ids'] = self.shift_right(o, self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
         batch_2['attention_mask'] = batch['output_entities'].attention_mask[:, 1:]
         
+
         decoder_outputs = self.model.decoder(**batch_2)
-        
-        lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
+        seq_output = decoder_outputs['last_hidden_state'] * (self.model.model_dim**-0.5)
+        lm_logits = self.model.lm_head(seq_output)
+        # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
         
         lbl = o.clone()
         lbl[lbl == self.tokenizer.pad_token_id] = -100
@@ -701,22 +703,25 @@ class ByT5Model(pl.LightningModule):
         for e in final_out['decoder_hidden_states']:
             final_seq.append(e[-1])
         final_seq = torch.cat(final_seq, dim=1)
-        
+        final_seq = final_seq * (self.model.model_dim**-0.5)
         # final_seq = final_seq.reshape(len(batch['labels']), -1, final_seq.shape[2])
         
         batch['samples'] = self.model.lm_head(final_seq)
         batch['samples'] = torch.argmax(batch['samples'], dim=2)
         
-        if batch_idx % 100 == 0:
-            with open("output_string_logs.txt", "a") as file:
-                i = 0
-                text_string = "\n EPOCH: {} ---- Batch Idx: {} \n".format(self.current_epoch, batch_idx)
-                for j in range(30): #the first 30 elements of this shit
-                    text_string += self.tokenizer.decode(batch['samples'][j])+ "------"
-                text_string += "\n" + "GROUND TRUTH: \n"
-                text_string += batch['output_text'][i]
-                text_string += "\n"
-                file.write(text_string)
+        try:
+            if batch_idx % 100 == 0:
+                with open("output_string_logs.txt", "a") as file:
+                    i = 0
+                    text_string = "\n EPOCH: {} ---- Batch Idx: {} \n".format(self.current_epoch, batch_idx)
+                    for j in range(30): #the first 30 elements of this shit
+                        text_string += self.tokenizer.decode(batch['samples'][j])+ "------"
+                    text_string += "\n" + "GROUND TRUTH: \n"
+                    text_string += batch['output_text'][i]
+                    text_string += "\n"
+                    file.write(text_string)
+        except:
+            pass
                 
         batch['samples'] = batch['samples'].reshape(len(batch['labels']), -1)
         
