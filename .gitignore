@@ -5,6 +5,7 @@ __pycache__/
 */.ipynb_checkpoints/*
 data
 results
+logs
 lightning_logs
 .vscode/launch.json
 cometml.json
