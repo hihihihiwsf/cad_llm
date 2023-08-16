@@ -106,8 +106,8 @@ def main():
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
         val_check_interval=args.val_check_interval,
-        limit_train_batches=0.001,  
-        limit_val_batches=0.1,
+        # limit_train_batches=0.001,  
+        # limit_val_batches=0.01,
         precision='16'
     )
     if not args.eval: 
@@ -117,7 +117,7 @@ def main():
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
-        # trainer.validate(model, ckpt_path=ckpt_dir, datamodule=SketchGraphsDataModule)
+        # trainer.validate(model, ckpt_path=ckpt_dir, datamodule=SketchGraphsDataModule) 
 
 
 if __name__ == "__main__":
