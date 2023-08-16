@@ -115,10 +115,10 @@ class ByT5Model(pl.LightningModule):
             model._init_weights(model)  # maybe redundant
         else:
             model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-            model2 = T5ForConditionalGeneration.from_pretrained(args.model_name)
+            # model2 = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.model2 = model2
+        # self.model2 = model2
         
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.args = args
@@ -248,7 +248,8 @@ class ByT5Model(pl.LightningModule):
         txt_embeddings = txt_embeddings[:, 1, :]
         pad_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
         start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
-                
+        bos_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.bos_token_id]).to(self.device))
+
         ########### INPUT CHUNKS
         # Find the maximum chunk size
         chunks = batch['input_ent_length']
@@ -328,6 +329,8 @@ class ByT5Model(pl.LightningModule):
         batch_3 = {}
         batch_3['labels'] = batch['labels']
         batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
+        batch_3['inputs_embeds'] = torch.concatenate((bos_embed.repeat(outputs["decoder_hidden_states"][-1].shape[0], 1, 1), outputs["decoder_hidden_states"][-1]), dim=1)
+        batch["output_ent_length"] = [x + 1 for x in batch["output_ent_length"]] #because I added bos token embed
         batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
         decoder_outputs = self.model(**batch_3, output_hidden_states=True)
         loss = decoder_outputs.loss
@@ -373,6 +376,7 @@ class ByT5Model(pl.LightningModule):
         txt_embeddings = txt_embeddings[:, 1, :]
         pad_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
         start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
+        bos_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.bos_token_id]).to(self.device))
                 
         ########### INPUT CHUNKS
         # Find the maximum chunk size
@@ -443,6 +447,8 @@ class ByT5Model(pl.LightningModule):
         batch_3 = {}
         batch_3['labels'] = batch['labels']
         batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
+        batch_3['inputs_embeds'] = torch.concatenate((bos_embed.repeat(outputs["decoder_hidden_states"][-1].shape[0], 1, 1), outputs["decoder_hidden_states"][-1]), dim=1)
+        batch["output_ent_length"] = [x + 1 for x in batch["output_ent_length"]] #because I added bos token embed
         batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
         decoder_outputs = self.model(**batch_3, output_hidden_states=True)
         loss = decoder_outputs.loss
@@ -463,7 +469,7 @@ class ByT5Model(pl.LightningModule):
         
         # batch['samples'] = gt_generation
         # self.generate_samples(batch)
-            
+        del model_batch['decoder_inputs_embeds']
         self.seq_inference(model_batch, batch, batch_idx)
         self.generate_samples(batch)
                     
@@ -504,6 +510,11 @@ class ByT5Model(pl.LightningModule):
     
     def seq_inference(self, model_batch, batch, batch_idx=None):
         
+        bos_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.bos_token_id]).to(self.device))
+
+        # batch['samples'] = self.model.generate(**model_batch, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=192, early_stopping=True, do_sample=False)
+        
+        
         outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=30, early_stopping=False, do_sample=False)
         
         
@@ -517,8 +528,10 @@ class ByT5Model(pl.LightningModule):
         #     print(src.shape)
         
         batch_final = {}
-        batch_final['inputs_embeds'] = src
-        batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
+        # batch_final['inputs_embeds'] = src
+        batch_final['inputs_embeds'] = torch.concatenate((bos_embed.repeat(src.shape[0], 1, 1), src), dim=1)
+        batch["output_ent_length"] = [x + 1 for x in batch["output_ent_length"]]
+        batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_final['inputs_embeds'].shape[1])
         batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=192, early_stopping=True, do_sample=False)
         
         
