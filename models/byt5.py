@@ -328,7 +328,8 @@ class ByT5Model(pl.LightningModule):
         batch_3 = {}
         batch_3['labels'] = batch['labels']
         batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
-        decoder_outputs = self.model2(**batch_3, output_hidden_states=True)
+        batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
+        decoder_outputs = self.model(**batch_3, output_hidden_states=True)
         loss = decoder_outputs.loss
         
         # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
@@ -414,8 +415,7 @@ class ByT5Model(pl.LightningModule):
         del model_batch['labels']
         model_batch['attention_mask'] = batch['batch_att_mask']
         
-        self.seq_inference(model_batch, batch, batch_idx)
-        self.generate_samples(batch)
+
         
         model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
  
@@ -443,7 +443,8 @@ class ByT5Model(pl.LightningModule):
         batch_3 = {}
         batch_3['labels'] = batch['labels']
         batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
-        decoder_outputs = self.model2(**batch_3, output_hidden_states=True)
+        batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
+        decoder_outputs = self.model(**batch_3, output_hidden_states=True)
         loss = decoder_outputs.loss
         
         # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
@@ -463,7 +464,8 @@ class ByT5Model(pl.LightningModule):
         # batch['samples'] = gt_generation
         # self.generate_samples(batch)
             
-            
+        self.seq_inference(model_batch, batch, batch_idx)
+        self.generate_samples(batch)
                     
         
         self.log("loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
@@ -511,13 +513,13 @@ class ByT5Model(pl.LightningModule):
         src = torch.cat(decoder_hidden_states, dim=1)
         # src = src.view(-1, 1, src.shape[2])
         
-        if batch_idx % 10 == 0:
-            print(src.shape)
+        # if batch_idx % 10 == 0:
+        #     print(src.shape)
         
         batch_final = {}
         batch_final['inputs_embeds'] = src
-        # batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
-        batch['samples'] = self.model2.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=192, early_stopping=True, do_sample=False)
+        batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
+        batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=192, early_stopping=True, do_sample=False)
         
         
         # final_seq = []
