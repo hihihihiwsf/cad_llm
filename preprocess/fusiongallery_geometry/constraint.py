@@ -32,7 +32,6 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
     # Offset = 13   
     # Fix = 16
     # Projected = 1
-    # Mirror = 2
     # Circular_Pattern = 18
     # Pierce = 19
     # Linear_Pattern = 20
@@ -68,6 +67,8 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             constraint_dict = self.make_equal_constraint_dict()
         elif self.type == "concentricConstraint":
             constraint_dict = self.make_concentric_constraint_dict()
+        elif self.type == "mirrorConstraint":
+            constraint_dict = self.make_symmetry_constraint_dict()
         else:
             self.converter.log_failure(f"{self.type} constraint not supported")
             return None
@@ -400,3 +401,40 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "curve_two": curve_two,
             "type": "ConcentricConstraint"
         }
+    
+    def make_symmetry_constraint_dict(self):
+        """
+        {
+            "entity_one": "cd825d62-b830-11ea-9e77-180373af3277",
+            "entity_two": "cdcf11a4-b830-11ea-bfa8-180373af3277",
+            "symmetry_line": "b93bf2dc-b830-11ea-a8ed-180373af3277",
+            "type": "SymmetryConstraint"
+        },
+        """
+        symmetry_line = self.entities[0]["uuid"]
+        # Loop to handle multiple entity equal constraints
+        # e.g.
+        # 
+        # "mirrorConstraint": {
+        #     "mirroredPairs": [
+        #         {
+        #             "first": 10,
+        #             "second": 13
+        #         },
+        #         {
+        #             "first": 11,
+        #             "second": 14
+        #         }
+        #     ]
+        # }
+        multi_cst = []
+        for index in range(1, self.entity_count - 1, 2):
+            multi_cst.append({
+                "entity_one": self.entities[index]["uuid"],
+                "entity_two": self.entities[index + 1]["uuid"],
+                "symmetry_line": symmetry_line,
+                "type": "SymmetryConstraint"
+            })
+        if len(multi_cst) == 1:
+            return multi_cst[0]
+        return multi_cst

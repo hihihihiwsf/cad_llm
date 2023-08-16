@@ -22,6 +22,7 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         cls.load_data(cls, Path("tests/test_data/dm_sketch_7.json"), 7)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_8.json"), 8)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_9.json"), 9)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_10.json"), 10)
     
     def load_data(self, dm_sketch_file, index):
         with open(dm_sketch_file) as f:
@@ -267,4 +268,20 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         self.assertIn("curve_two", fg_cst_dict)
         self.assertIn(fg_cst_dict["curve_one"], self.curves7)
         self.assertIn(fg_cst_dict["curve_two"], self.curves7)
+    
+    def test_mirror_constraint(self):
+        cst = self.dm_constraints10[6]
+        fg_cst = FusionGalleryConstraint(cst, self.points10, self.curves10, self.entity_map10)
+        fg_cst_list = fg_cst.to_dict()
+        self.assertIsNotNone(fg_cst_list)
+        self.assertIsInstance(fg_cst_list, list)
+        self.assertEqual(len(fg_cst_list), 2)
+        for fg_cst in fg_cst_list:
+            self.assertEqual(fg_cst["type"], "SymmetryConstraint")
+            self.assertIn("entity_one", fg_cst)
+            self.assertIn("entity_two", fg_cst)
+            entity_one_found = fg_cst["entity_one"] in self.curves10 or fg_cst["entity_one"] in self.points10
+            entity_two_found = fg_cst["entity_two"] in self.curves10 or fg_cst["entity_two"] in self.points10
+            self.assertTrue(entity_one_found)
+            self.assertTrue(entity_two_found)
 

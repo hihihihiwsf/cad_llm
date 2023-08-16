@@ -117,6 +117,16 @@ class FusionGalleryBaseConstraint:
             else:
                 entities.append(self.constraint[self.type].get("entity", 0))
         
+        elif self.type == "mirrorConstraint":
+            entities = [
+                self.constraint[self.type].get("mirror", 0)
+            ]
+            # Loop over each mirrored paird
+            for pair in self.constraint[self.type]["mirroredPairs"]:
+                entities.append(pair.get("first", 0))
+                entities.append(pair.get("second", 0))
+            assert len(entities) >= 3 and len(entities) % 2 == 1, "Mirror constraint has wrong number of entities"
+
         # DIMENSIONS
         elif self.type == "distanceConstraint" or self.type == "angleConstraint":
             entities = [
