@@ -18,12 +18,10 @@ sketch_obj_dict = {
     ]),
 }
 
-expected_entity_strings = ['-31,-17,-31,17;', '-31,-17,31,-17;', '-31,17,31,17;', '31,-17,31,17;']
-expected_new_tokens_entity_strings = ['<-31><-17><-31><17>;', '<-31><-17><31><-17>;',
-                                      '<-31><17><31><17>;', '<31><-17><31><17>;']
-expected_user_ordered_entity_strings = ['<31><17><-31><17>;', '<31><-17><-31><-17>;',
-                                        '<31><17><31><-17>;', '<-31><17><-31><-17>;']
+expected_entity_strings = ['-32,-19,-32,17;', '-32,-19,31,-19;', '-32,17,31,17;', '31,-19,31,17;']
 
+expected_new_tokens_entity_strings = ['<-32><-19><-32><17>;', '<-32><-19><31><-19>;',
+                                      '<-32><17><31><17>;', '<31><-19><31><17>;']
 
 class TestSketchLLM(unittest.TestCase):
     def test_generate_random_input_output(self):
@@ -32,4 +30,3 @@ class TestSketchLLM(unittest.TestCase):
 
         sketch_str_dict = preprocess_sketch(sketch_obj_dict, quantize_bits=6, new_tokens=True)
         self.assertEqual(sketch_str_dict["entities"], expected_new_tokens_entity_strings)
-        self.assertEqual(sketch_str_dict["user_ordered_entities"], expected_user_ordered_entity_strings)

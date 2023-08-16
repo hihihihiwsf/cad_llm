@@ -15,43 +15,29 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     # combine vertices and curves back to entities (lists of points)
     entities = [[list(vertices[i - 1]) for i in curve] for curve in curves]
 
+    # sort points in each entity
+    entities = [sort_points(points) for points in entities]
+
     # convert to tuples for deduplication
     entities = [tuple(tuple(point) for point in points) for points in entities]
+
+    # deduplicate entities
+    entities = list(set(entities))
 
     # remove degenerate entities e.g. line with same start and end point
     entities = [points for points in entities if len(points) == len(set(points))]
 
-    # make a copy to leave in user order
-    user_ordered_entities = [points for points in entities]
-
-    # sort points in each entity, keep entity order
-    sorted_entities = [sort_points(points) for points in entities]
-
-    # find duplicate entities using sorted_entities as keys
-    seen = set()
-    deduped_ent_indices = set()
-    for i, sorted_entity in enumerate(sorted_entities):
-        if sorted_entity in seen:
-            continue
-        seen.add(sorted_entity)
-        deduped_ent_indices.add(i)
-
     # filter out sketches with only none or one entity remaining
-    if len(deduped_ent_indices) <= 1:
+    if len(entities) <= 1:
         return None
 
-    # deduplicate entities
-    user_ordered_entities = [points for i, points in enumerate(user_ordered_entities) if deduped_ent_indices]
-    sorted_entities = [points for i, points in enumerate(sorted_entities) if i in deduped_ent_indices]
-
     # sort entities
-    sorted_entities.sort()
+    entities.sort()
 
     # convert to strings
-    entities_string = get_entities_string(sorted_entities, new_tokens=new_tokens)
-    user_ordered_entities_string = get_entities_string(user_ordered_entities, new_tokens=new_tokens)
+    entities_string = get_entities_string(entities, new_tokens=new_tokens)
 
-    return dict(name=name, entities=entities_string, user_ordered_entities=user_ordered_entities_string)
+    return dict(name=name, entities=entities_string)
 
 
 def get_entities_string(entities, new_tokens):
