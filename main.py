@@ -7,26 +7,28 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
-from torch.utils.data import DataLoader
-from util import get_loggers, get_checkpoint_callbacks
-from args.main_args import get_training_args
 from pathlib import Path
+
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
-from models.segformer import SegformerModel
+from torch.utils.data import DataLoader
+
+from args.main_args import get_training_args
 from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
-from dataset.sketch_strings_dataset import get_sketch_strings_dataset
+from dataset.sg_dataset import get_sketchgraphs_dataloader
 from dataset.sketch_strings_collator import SketchStringsCollator
+from dataset.sketch_strings_dataset import get_sketch_strings_dataset
+from models.byt5 import ByT5Model
+from models.segformer import SegformerModel
+from util import get_loggers, get_checkpoint_callbacks
 
 
-def get_model(args):
+def get_model(args, tokenizer, total_train_steps):
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name)
 
-    return ByT5Model(args=args)
+    return ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
 
 
 def get_dataloader(args, split, shuffle, tokenizer):
@@ -71,7 +73,6 @@ def main():
 
     loggers = get_loggers(args=args, log_dir=results_dir)
 
-    # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
 
     tokenizer = ByT5Model.get_tokenizer(args.model_name)
@@ -85,7 +86,7 @@ def main():
     total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, num_gpus, args.epochs)
 
     print("Loading model...")
-    model = ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
+    model = get_model(args, tokenizer=tokenizer, total_train_steps=total_train_steps)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -108,10 +109,11 @@ def main():
         # limit_train_batches=0.001,
         # limit_val_batches=0.01,
     )
-    if not args.eval: 
+    if not args.eval:
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     else:
         # loading the model from exp_name/best.ckpt
+        # TODO: get this working on sagemaker
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 

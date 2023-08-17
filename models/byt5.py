@@ -6,13 +6,12 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-import torch
-import torch.optim as optim
-# import lightning.pytorch as pl
+import sys
+
 import pytorch_lightning as pl
+import torch.optim as optim
 from transformers import T5Config, T5ForConditionalGeneration, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
-import sys
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
