@@ -292,13 +292,14 @@ class ByT5Model(pl.LightningModule):
             unpacked_entities.append(outputs["decoder_hidden_states"][-1][i, :j, :])
         unpacked_entities = torch.cat(unpacked_entities, dim=0).unsqueeze(1)
         
+        
         batch_2 = {}
         batch_2['encoder_hidden_states'] = unpacked_entities
         #shifting to the right
         # s_e = start_embed.unsqueeze(0).repeat(tgt.shape[0], 1, 1).to(self.device)
         # batch_2['inputs_embeds'] = torch.concatenate((s_e, tgt[:, :-1, :]), dim=1)
         batch_2['input_ids'] = self.shift_right(o, self.model.config.decoder_start_token_id, self.model.config.pad_token_id)
-        batch_2['attention_mask'] = batch['output_entities'].attention_mask[:, 1:]
+        # batch_2['attention_mask'] = batch['output_entities'].attention_mask[:, 1:]
         
         decoder_outputs = self.model.decoder(**batch_2)
         seq_output = decoder_outputs['last_hidden_state'] * (self.model.model_dim**-0.5)
@@ -308,10 +309,14 @@ class ByT5Model(pl.LightningModule):
         lbl[lbl == self.tokenizer.pad_token_id] = -100
         loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl, ignore_index=-100)
         
-        # tgt = tgt[:, :-1, :]
+        # tgt = torch.concatenate((pad_embed.repeat(tgt.shape[0], 1 ,1), tgt[:, :-1, :]), dim=1) 
         # outputs = self.local_model.decode(tgt, unpacked_entities, tgt_mask=nn.Transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device))
-        # outputs = self.local_model.lmhead(outputs)
-        # outputs = self.model.lm_head(outputs)
+        # # outputs = outputs * (self.model.model_dim**-0.5)
+        # # outputs = self.local_model.lmhead(outputs)
+        # lm_logits = self.model.lm_head(outputs)
+        # lbl = o.clone()
+        # lbl[lbl == self.tokenizer.pad_token_id] = -100
+        # loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), lbl, ignore_index=-100)
         
         # lbl = o.clone()[:, 1:]
         

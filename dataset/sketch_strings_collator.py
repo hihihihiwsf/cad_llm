@@ -20,8 +20,8 @@ class SketchStringsCollator:
             input_entities.extend(single_ents)
             single_ents_length.append(len(single_ents))
 
-            single_ents_out = ["C"+x+";" for x in example['output_text'].split(";") if x][:29]
-            single_ents_out.extend(["C" + "END"*15])
+            single_ents_out = ["C"+x+";" for x in example['output_text'].split(";") if x][:30]
+            # single_ents_out.extend(["C" + "END"*15])
             output_entities.extend(single_ents_out)
             single_ents_length_out.append(len(single_ents_out))
             
