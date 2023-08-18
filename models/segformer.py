@@ -18,7 +18,7 @@ from PIL import Image
 
 class SegformerModel(pl.LightningModule):
 
-    def __init__(self, model_name):
+    def __init__(self, model_name, checkpoint_dir):
         super().__init__()
 
         self.save_hyperparameters()
@@ -39,6 +39,7 @@ class SegformerModel(pl.LightningModule):
         self.val_output_list = []
 
         self.lr = 3e-4
+        self.checkpoint_dir = checkpoint_dir
 
         # Use weights calculated with sklearn compute_class_weight
         self.weighted_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor([0.5, 6.]))

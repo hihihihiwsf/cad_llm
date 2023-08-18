@@ -22,16 +22,36 @@ from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from models.byt5 import ByT5Model
 from models.segformer import SegformerModel
 from util import get_loggers, get_checkpoint_callbacks
+from dataset.syn_constraints_dataset import SynConstraintsDataModule, SynConstraintsPPDataModule
+from models.byt5_syn_constraints import ByT5SynConstraintsModel
 
 
 def get_model(args, tokenizer, total_train_steps):
-    if "segformer" in args.model_name:
-        return SegformerModel(model_name=args.model_name)
+    if args.model_name == "syn_constraints" or args.model_name == "syn_constraints_pp":
+        return ByT5SynConstraintsModel(model_name="google/byt5-small", lr=args.lr, batch_size=args.batch_size,
+                                       max_length=args.max_length, checkpoint_dir=args.checkpoint_dir,
+                                       samples_dir=args.samples_dir, tokenizer=tokenizer)
 
-    return ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
+    if "segformer" in args.model_name:
+        return SegformerModel(model_name=args.model_name, checkpoint_dir=args.checkpoint_dir)
+
+    if "byt5" in args.model_name:
+        return ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
+
+    raise ValueError(f"Unsupported model type {args.model_name}")
 
 
 def get_dataloader_and_tokenizer(args):
+    if "syn_constraints" in args.model_name:
+        model_class = SynConstraintsDataModule if args.model_name == "syn_constraints" else SynConstraintsPPDataModule
+
+        datamodule = model_class(model_name="google/byt5-small", batch_size=args.batch_size, max_length=args.max_length,
+                                 dataset_path=args.dataset, num_workers=args.num_workers)
+
+        datamodule.setup(stage="fit")
+        tokenizer = datamodule.get_tokenizer()
+        return {"train": datamodule.train_dataloader(), "val": datamodule.val_dataloader()}, tokenizer
+
     if "segformer" in args.model_name:
         datasets = get_rendered_sketch_dataset(path=args.dataset)
         train_dataloader = DataLoader(datasets["train"], batch_size=args.batch_size, shuffle=True,

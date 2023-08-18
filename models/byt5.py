@@ -38,6 +38,7 @@ class ByT5Model(pl.LightningModule):
         self.tokenizer = tokenizer
         self.args = args
 
+        self.checkpoint_dir = args.checkpoint_dir
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
         self.total_train_steps = total_train_steps  # should be set later for lr scheduler
@@ -152,4 +153,3 @@ class ByT5Model(pl.LightningModule):
                 "frequency": 1,
             }
         }
-

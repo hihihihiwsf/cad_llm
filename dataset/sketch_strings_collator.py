@@ -10,6 +10,7 @@ class SketchStringsCollator:
         # Collate input_text and output_text columns
         input_text = [example['input_text'] for example in examples]
         output_text = [example['output_text'] for example in examples]
+        name = [example['name'] for example in examples]
 
         # Encode input and output
         tokenized_input = self.tokenize(input_text)
@@ -25,6 +26,7 @@ class SketchStringsCollator:
             "labels": labels,
             "input_text": input_text,
             "output_text": output_text,
+            "name": name,
         }
 
         return batch
