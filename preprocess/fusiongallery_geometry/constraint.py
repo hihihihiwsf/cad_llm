@@ -25,7 +25,8 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
         "PerpendicularConstraint",
         "MidPointConstraint",
         "EqualConstraint",
-        "ConcentricConstraint"
+        "ConcentricConstraint",
+        "SymmetryConstraint"
     }
     # Currently these constraint types are not supported
     # 

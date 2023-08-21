@@ -125,12 +125,30 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
             "type": "SketchLinearDimension"
         }
         """
-        if not self.is_entity_point_or_line(0) and not self.is_entity_point_or_line(1):
-            self.converter.log_failure("SketchGym only supports point-point, point-line or line-line distance dimensions")
-            return None
+        # if not self.is_entity_point_or_line(0) and not self.is_entity_point_or_line(1):
+        #     self.converter.log_failure("SketchGym only supports point-point, point-line or line-line distance dimensions")
+        #     return None
+        
         dimension_dict = self.make_common_dimension_dict()
-        dimension_dict["entity_one"] = self.entities[0]["uuid"] # first
-        dimension_dict["entity_two"] = self.entities[1]["uuid"] # second
+        # Handle different distance dimension cases
+        both_points = self.is_entity_point(0) and self.is_entity_point(1)
+        one_point = self.is_entity_point(0) or self.is_entity_point(1)
+        one_line = self.is_entity_line(0) or self.is_entity_line(1)
+        both_lines = self.is_entity_line(0) and self.is_entity_line(1)
+        # Point-Point
+        if both_points:
+            dimension_dict["entity_one"] = self.entities[0]["uuid"] # first
+            dimension_dict["entity_two"] = self.entities[1]["uuid"] # second
+        # Point-Line
+        # elif one_point and one_line:
+        #     pass
+        # elif both_lines:
+        #     pass
+        else:
+            entity_types = sorted([self.entities[0]['type'], self.entities[1]['type']])
+            self.converter.log_failure(f"distanceDimension has unsupported entities {entity_types[0]} and {entity_types[1]}")
+            return None
+        
         # Assume the default is HORIZONTAL, i.e. the 0 enum value here:
         # https://github.com/deepmind/deepmind-research/blob/master/cadl/constraints.proto#L69C5-L69C15
         direction = self.constraint[self.type].get("direction", "HORIZONTAL")
