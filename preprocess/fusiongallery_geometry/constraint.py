@@ -168,7 +168,7 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 "type": "HorizontalConstraint"
             }
         elif self.entity_count > 1 and self.are_entities_lines():
-            # Handle multiple separate constraints
+            # Handle multiple separate line constraints
             multi_cst = []
             for ent in self.entities:
                 multi_cst.append({
@@ -176,8 +176,19 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                     "type": "HorizontalConstraint"
                 })
             return multi_cst
+        elif self.entity_count > 1 and self.are_entities_points():
+            # Handle multiple separate point constraints
+            multi_cst = []
+            for index in range(self.entity_count - 1):
+                multi_cst.append({
+                    "point_one": self.entities[index]["uuid"],
+                    "point_two": self.entities[index + 1]["uuid"],
+                    "type": "HorizontalPointsConstraint"
+                })
+            return multi_cst
         else:
-            self.converter.log_failure("Unknown horizontal constraint entities")
+            entity_types = sorted([self.entities[0]['type'], self.entities[1]['type']])
+            self.converter.log_failure(f"horizontalConstraint has unsupported entities {entity_types[0]} and {entity_types[1]}")
             return None
     
     def make_parallel_constraint_dict(self):
