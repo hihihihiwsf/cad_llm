@@ -78,32 +78,33 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
     def make_coincident_constraint_cases(self):
         if self.is_entity_line(0) and self.is_entity_line(1):
             return self.make_collinear_constraint_dict()
-        if self.is_entity_point(0) or self.is_entity_point(1):
-            # In the OnShape world geometric entities own their points.
-            # For example a line owns its start and end point.
-            # Coincident constraints are then used to hold the end points together.
+        
+        # In the OnShape world geometric entities own their points.
+        # For example a line owns its start and end point.
+        # Coincident constraints are then used to hold the end points together.
 
-            # In the Fusion Gallery world things are a little different.
-            # Fusion Gallery has SketchPoints which are geometric entities all by themselves.
-            # Geometric entities like lines will then reference the point entities
-            # and conicindent constraints are not required to hold them together.
+        # In the Fusion Gallery world things are a little different.
+        # Fusion Gallery has SketchPoints which are geometric entities all by themselves.
+        # Geometric entities like lines will then reference the point entities
+        # and conicindent constraints are not required to hold them together.
 
-            # Basically this means we need to remove some points and coincident constraints
-            # from the data.
+        # Basically this means we need to remove some points and coincident constraints
+        # from the data.
 
-            # Check if both entities refer to the same merged point to skip 
-            # if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
-            if self.entity_points_identical():
-                # Return a special flag to indicate the points have been merged
-                return "Merge"
-            return self.make_coincident_constraint_dict()
-        if self.is_entity_arc(0) or self.is_entity_arc(1):
-            self.converter.log_failure("SketchArc, SketchArc coincident constraint not supported")
-            return None
-        if self.is_entity_circle(0) or self.is_entity_circle(1):
-            self.converter.log_failure("SketchCircle, SketchCircle coincident constraint not supported")
-            return None
-        self.converter.log_failure("Unknown constraint case")
+        # Check if both entities refer to the same merged point to skip 
+        # if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
+        if self.entity_points_identical():
+            # Return a special flag to indicate the points have been merged
+            return "Merge"
+        
+        # Handle the standard case of a constraint between a point and a line
+        cst_dict = self.make_coincident_constraint_dict()
+        if cst_dict is not None:
+            return cst_dict
+
+        # Report the constraint entities failing
+        entity_types = sorted([self.entities[0]['type'], self.entities[1]['type']])
+        self.converter.log_failure(f"coincidentConstraint has unsupported entities {entity_types[0]} and {entity_types[1]}")
         return None
 
     def make_coincident_constraint_dict(self):
@@ -116,21 +117,18 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
         """
         point = None
         entity = None
-        if self.is_entity_point(0):
+        # Fusion expects a coincident constraint between a point and a point/curve
+        if self.is_entity_point(0) and self.is_entity_point(1):
             point = self.entities[0]
             entity = self.entities[1]
-        elif self.is_entity_point(1):
+        elif self.is_entity_point(0) and self.is_entity_curve(1):
+            point = self.entities[0]
+            entity = self.entities[1]
+        elif self.is_entity_point(1) and self.is_entity_curve(0):
             point = self.entities[1]
             entity = self.entities[0]
         if point is None:
-            # Unhandled case.  Coincident lines.  Should this be a colinear constraint?
-            # {
-            # "type": "CollinearConstraint",
-            # "line_one": "d7852898-b74c-11ea-b79f-180373af3277",
-            # "line_two": "d7854f9e-b74c-11ea-9502-180373af3277"
-            # }
-            self.converter.log_failure("Collinear constraint not implemented")
-            return
+            return None
         return {
             "type": "CoincidentConstraint",
             "entity": entity["uuid"],
