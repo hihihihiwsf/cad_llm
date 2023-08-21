@@ -236,9 +236,15 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 })
             return multi_cst
         elif self.entity_count > 1 and self.are_entities_points():
-            # TODO: Handle this case where we have 2+ points
-            self.converter.log_failure("Multiple vertical constraint point entities not implemented")
-            return None
+            # Handle multiple separate point constraints
+            multi_cst = []
+            for index in range(self.entity_count - 1):
+                multi_cst.append({
+                    "point_one": self.entities[index]["uuid"],
+                    "point_two": self.entities[index + 1]["uuid"],
+                    "type": "VerticalPointsConstraint"
+                })
+            return multi_cst
         else:
             self.converter.log_failure("Unknown vertical constraint entities")
             return None
