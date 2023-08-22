@@ -7,49 +7,82 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
-from torch.utils.data import DataLoader
-from util import get_loggers, get_checkpoint_callbacks
-from args.main_args import get_training_args
 from pathlib import Path
+
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
-from models.segformer import SegformerModel
+from torch.utils.data import DataLoader
+
+from args.main_args import get_training_args
 from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
-from dataset.sketch_strings_dataset import get_sketch_strings_dataset
+from dataset.sg_dataset import get_sketchgraphs_dataloader
 from dataset.sketch_strings_collator import SketchStringsCollator
+from dataset.sketch_strings_dataset import get_sketch_strings_dataset
+from models.byt5 import ByT5Model
+from models.segformer import SegformerModel
+from util import get_loggers, get_checkpoint_callbacks
+from dataset.syn_constraints_dataset import SynConstraintsDataModule, SynConstraintsPPDataModule
+from models.byt5_syn_constraints import ByT5SynConstraintsModel
 
 
-def get_model(args):
+def get_model(args, tokenizer, total_train_steps):
+    if args.model_name == "syn_constraints" or args.model_name == "syn_constraints_pp":
+        return ByT5SynConstraintsModel(model_name="google/byt5-small", lr=args.lr, batch_size=args.batch_size,
+                                       max_length=args.max_length, checkpoint_dir=args.checkpoint_dir,
+                                       samples_dir=args.samples_dir, tokenizer=tokenizer)
+
     if "segformer" in args.model_name:
-        return SegformerModel(model_name=args.model_name)
+        return SegformerModel(model_name=args.model_name, checkpoint_dir=args.checkpoint_dir)
 
-    return ByT5Model(args=args)
+    if "byt5" in args.model_name:
+        return ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
+
+    raise ValueError(f"Unsupported model type {args.model_name}")
 
 
-def get_dataloader(args, split, shuffle, tokenizer):
+def get_dataloader_and_tokenizer(args):
+    if "syn_constraints" in args.model_name:
+        model_class = SynConstraintsDataModule if args.model_name == "syn_constraints" else SynConstraintsPPDataModule
+
+        datamodule = model_class(model_name="google/byt5-small", batch_size=args.batch_size, max_length=args.max_length,
+                                 dataset_path=args.dataset, num_workers=args.num_workers)
+
+        datamodule.setup(stage="fit")
+        tokenizer = datamodule.get_tokenizer()
+        return {"train": datamodule.train_dataloader(), "val": datamodule.val_dataloader()}, tokenizer
+
     if "segformer" in args.model_name:
         datasets = get_rendered_sketch_dataset(path=args.dataset)
-        dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
-                                num_workers=args.num_workers)
-        return dataloader
+        train_dataloader = DataLoader(datasets["train"], batch_size=args.batch_size, shuffle=True,
+                                      num_workers=args.num_workers)
+        val_dataloader = DataLoader(datasets["val"], batch_size=args.batch_size, shuffle=True,
+                                    num_workers=args.num_workers)
+        return {"train": train_dataloader, "val": val_dataloader}, None
 
     if "entities" in args.dataset:  # Hack to select dataset loader based on dataset name
+        tokenizer = ByT5Model.get_tokenizer(args.model_name)
+
         datasets = get_sketch_strings_dataset(path=args.dataset, min_split_ratio=args.min_input_percent,
-                                             max_split_ratio=args.max_input_percent)
+                                              max_split_ratio=args.max_input_percent)
 
-        collator = SketchStringsCollator(tokenizer=model.tokenizer, max_length=args.max_length)
+        collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
 
-        if args.limit_data != 1 and split == "train":
+        if args.limit_data != 1:
             n = int(args.limit_data * len(datasets["train"]))
             datasets["train"] = datasets["train"].shuffle().select(range(n))
 
-        return DataLoader(datasets[split], batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
-                          num_workers=args.num_workers)
+        train_dataloader = DataLoader(datasets["train"], batch_size=args.batch_size, collate_fn=collator, shuffle=True,
+                                      num_workers=args.num_workers)
+        val_dataloader = DataLoader(datasets["val"], batch_size=args.batch_size, collate_fn=collator, shuffle=False,
+                                    num_workers=args.num_workers)
+        return {"train": train_dataloader, "val": val_dataloader}, tokenizer
+    else:
+        tokenizer = ByT5Model.get_tokenizer(args.model_name)
 
-    return get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split=split, shuffle=shuffle)
+        train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
+        val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
+        return {"train": train_dataloader, "val": val_dataloader}, tokenizer
 
 
 def main():
@@ -71,21 +104,17 @@ def main():
 
     loggers = get_loggers(args=args, log_dir=results_dir)
 
-    # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
 
-    tokenizer = ByT5Model.get_tokenizer(args.model_name)
-
     print("Loading data...")
-    train_dataloader = get_dataloader(args=args, split="train", shuffle=True, tokenizer=tokenizer)
-    val_dataloader = get_dataloader(args=args, split="val", shuffle=False, tokenizer=tokenizer)
+    dataloader, tokenizer = get_dataloader_and_tokenizer(args=args)
 
-    num_train_batches = len(train_dataloader)
+    num_train_batches = len(dataloader["train"])
     num_gpus = torch.cuda.device_count()
     total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, num_gpus, args.epochs)
 
     print("Loading model...")
-    model = ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
+    model = get_model(args, tokenizer=tokenizer, total_train_steps=total_train_steps)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -108,12 +137,13 @@ def main():
         # limit_train_batches=0.001,
         # limit_val_batches=0.01,
     )
-    if not args.eval: 
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    if not args.eval:
+        trainer.fit(model, train_dataloaders=dataloader["train"], val_dataloaders=dataloader["val"])
     else:
         # loading the model from exp_name/best.ckpt
+        # TODO: get this working on sagemaker
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
-        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
+        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=dataloader["val"])
 
 
 if __name__ == "__main__":

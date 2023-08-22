@@ -13,11 +13,11 @@ from pytorch_lightning.callbacks import Callback
 class SyncCheckpoint(Callback):
     def on_train_epoch_end(self, trainer, pl_module):
         # Sync the checkpoints to Sagemaker manually
-        if trainer.global_rank == 0 and pl_module.args.using_sagemaker:
+        if trainer.global_rank == 0:
             base_s3_uri = os.path.dirname(os.path.dirname(os.getenv("SM_MODULE_DIR", "")))
             full_s3_uri = f"{base_s3_uri}/checkpoints/"
-            print(f"Syncing checkpoints from local {pl_module.args.checkpoint_dir} to s3 {full_s3_uri}")
-            sync_local_checkpoints_to_s3(local_path=pl_module.args.checkpoint_dir, s3_uri=full_s3_uri)
+            print(f"Syncing checkpoints from local {pl_module.checkpoint_dir} to s3 {full_s3_uri}")
+            sync_local_checkpoints_to_s3(local_path=pl_module.checkpoint_dir, s3_uri=full_s3_uri)
 
 
 def aws_s3_sync(source, destination):

@@ -70,6 +70,7 @@ def sort_points(points):
 
 def center_vertices(vertices):
     """Translate the vertices so that bounding box is centered at zero."""
+    vertices = np.array(vertices)
     vert_min = vertices.min(axis=0)
     vert_max = vertices.max(axis=0)
     vert_center = 0.5 * (vert_min + vert_max)
