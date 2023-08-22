@@ -29,10 +29,10 @@ class SynConstraintsBaseDataModule(pl.LightningDataModule):
         # Download tokenizer
         AutoTokenizer.from_pretrained(self.model_name)
 
-    def setup(self, stage, load_from_cache_file=True):
+    def setup(self, stage, load_from_cache_file=True, num_proc=32):
         self.tokenizer = self.get_tokenizer()
         self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.max_length)
-        self.ds = self.get_dataset()
+        self.ds = self.get_dataset(load_from_cache_file=load_from_cache_file, num_proc=num_proc)
 
     def get_dataset(self, load_from_cache_file=True, num_proc=32):
         # Load dataset

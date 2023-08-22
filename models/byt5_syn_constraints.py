@@ -40,7 +40,6 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
     def setup(self, stage):
         print("in setup")
         self.model = T5ForConditionalGeneration.from_pretrained(self.model_name)
-        self.tokenizer = self.tokenizer
 
         num_special_tokens = 3
         original_token_count = self.model.get_input_embeddings().weight.data.shape[0]

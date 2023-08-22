@@ -10,6 +10,8 @@ def get_entities_for_syn_constraints(sketch_dict):
 
     # quantize vertices
     vertices = normalize_and_quantize_vertices(vertices=vertices, n_bits=6)
+    # shift coordinate range to start at 0
+    vertices += 32
 
     # combine vertices and curves back to entities (lists of points)
     entities = [[list(vertices[i - 1]) for i in curve] for curve in curves]
