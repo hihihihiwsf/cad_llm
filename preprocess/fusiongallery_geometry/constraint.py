@@ -403,13 +403,13 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             if "parent" in self.entities[0]:
                 curve_one = self.entities[0]["parent"]
             else:
-                self.converter.log_failure("Concentric constraint entity is not a curve")
+                self.converter.log_failure(f"concentricConstraint has unsupported entity {self.entities[0]['type']}")
                 return None 
         if self.is_entity_point(1):
             if "parent" in self.entities[1]:
                 curve_two = self.entities[1]["parent"]
             else:
-                self.converter.log_failure("Concentric constraint entity is not a curve")
+                self.converter.log_failure(f"concentricConstraint has unsupported entity {self.entities[1]['type']}")
                 return None 
 
         return {

@@ -184,7 +184,7 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
 
         """
         if not self.is_entity_line(0):
-            self.converter.log_failure("Length dimension entity is not a line")
+            self.converter.log_failure(f"lengthDimension has unsupported entity {self.entities[0]['type']}")
             return None
         # We need to find the end points
         start_point = self.entities[0]["start_point"]
