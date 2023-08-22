@@ -10,6 +10,79 @@ import torch
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 
+class sketchGraphRetrievalDataset(Dataset):
+    def __init__(self, args, split):
+        path = Path(args.retrieved_dataset) / f"{split}.json"
+        with open(path, "r") as f:
+            self.data = json.load(f)
+    
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, index):
+        """
+        Applies a random mask to the entities of sketch
+        Returns (input_text, output_text, retrieved_text)
+        """
+        sketch_dict = self.data[index]
+
+        # sketch_dict['input_text'] = input_text
+        # sketch_dict['output_text'] = output_text
+        sketch_dict['icl_text'] = sketch_dict['prompt'].split('\n')[0].replace('\t','')
+        return sketch_dict
+   
+class SketchGraphsRetrievalCollator:
+    def __init__(self, tokenizer, max_length=None, args=None):
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.args = args
+        # _, self.clip_preprocess = clip.load("ViT-B/32")
+        # self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
+        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
+
+    def tokenize(self, strings):
+        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+
+    def __call__(self, sketch_dicts):
+        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
+        output_strings = [sketch['output_text'] for sketch in sketch_dicts]
+        tokenized_input = self.tokenize(input_strings)
+        tokenized_output = self.tokenize(output_strings)
+
+        labels = tokenized_output.input_ids
+        # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
+        labels[labels == self.tokenizer.pad_token_id] = -100
+
+        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        list_of_img = visualize_sample_pil(point_entities=point_inputs, box_lim=64 + 3)
+        input_batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        input_batch_images = input_batch_images
+        
+        
+        point_inputs = [get_point_entities(sketch["icl_text"]) for sketch in sketch_dicts]
+        list_of_img = visualize_sample_pil(point_entities=point_inputs, box_lim=64 + 3)
+        icl_batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        icl_batch_images = icl_batch_images
+        
+        # images = []
+        # for img in list_of_img:
+        #     images.append(self.clip_preprocess(img))
+        #     batch_images = torch.tensor(np.stack(images))
+
+        # for im in list_of_img:
+        #     im.close()
+        
+              
+        batch = {
+            "input_ids": tokenized_input.input_ids,
+            "attention_mask": tokenized_input.attention_mask,
+            "labels": labels,
+            "sketches": sketch_dicts,
+            "input_images": input_batch_images,
+            "icl_image": icl_batch_images,
+        }
+        return batch 
+
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
@@ -127,5 +200,12 @@ class SketchGraphsCollator:
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
+    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
+                      num_workers=args.num_workers)
+
+
+def get_icl_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
+    dataset = sketchGraphRetrievalDataset(split=split, args=args)
+    collator = SketchGraphsRetrievalCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
