@@ -68,18 +68,13 @@ def main():
 
     print("Loading model...")
     model = ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
-    #model = VisRecon(args=args)
-    #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-    #model.tokenizer = AutoTokenizer.from_pretrained('google/byt5-base')
 
+    call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
+                                          using_sagemaker=args.using_sagemaker)
 
-
-    # call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
-    #                                       using_sagemaker=args.using_sagemaker)
-
-    # call_backs.append(LearningRateMonitor(logging_interval='step'))
+    call_backs.append(LearningRateMonitor(logging_interval='step'))
     
-    embedding_callback= EmbeddingCallback()
+    # embedding_callback= EmbeddingCallback()
     
 
     print("Training the model...")
@@ -87,7 +82,7 @@ def main():
     # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
-        callbacks=[embedding_callback],
+        callbacks=call_backs,   #[embedding_callback],
         accelerator=args.accelerator,
         devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),
@@ -105,26 +100,26 @@ def main():
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
-        path = 's3://cad-llm-katzm/jobs/amir-Codet5p-ascii1-max64-deepmindv1-06-09-23-2253/checkpoints/model/Codet5p_ascii1_max64_deepmindv1/best.ckpt'
-        trainer.validate(model, ckpt_path=path, dataloaders=val_dataloader)
+        #path = 's3://cad-llm-katzm/jobs/amir-Codet5p-ascii1-max64-deepmindv1-06-09-23-2253/checkpoints/model/Codet5p_ascii1_max64_deepmindv1/best.ckpt'
+        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
         print("end evaluation")
         
-        #saved_image_embeddings = embedding_callback.image_embeddings
-        saved_txt_embeddings = embedding_callback.txt_embeddings
-        saved_pixels = embedding_callback.pixel
-        saved_name = embedding_callback.name
-        saved_fulltext = embedding_callback.fulltext
-        saved_intext = embedding_callback.intext
+        # #saved_image_embeddings = embedding_callback.image_embeddings
+        # saved_txt_embeddings = embedding_callback.txt_embeddings
+        # saved_pixels = embedding_callback.pixel
+        # saved_name = embedding_callback.name
+        # saved_fulltext = embedding_callback.fulltext
+        # saved_intext = embedding_callback.intext
         
-        #import pdb; pdb.set_trace()
+        # #import pdb; pdb.set_trace()
         
-        import numpy as np
-        np.save('embeddings.npy', saved_txt_embeddings)
-        np.save('pixel.npy', saved_pixels)
-        np.save('intext.npy', saved_intext)
-        np.save('name.npy', saved_name)
-        np.save('fulltext.npy', saved_fulltext)
+        # import numpy as np
+        # np.save('embeddings.npy', saved_txt_embeddings)
+        # np.save('pixel.npy', saved_pixels)
+        # np.save('intext.npy', saved_intext)
+        # np.save('name.npy', saved_name)
+        # np.save('fulltext.npy', saved_fulltext)
         
         '''
         import numpy as np

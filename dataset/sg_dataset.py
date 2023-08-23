@@ -112,6 +112,8 @@ class SketchGraphsDataset(Dataset):
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
+        
+        self.token_sum = 0
 
     def __getitem__(self, index):
         """
@@ -129,6 +131,8 @@ class SketchGraphsDataset(Dataset):
         sketch_dict['input_text'] = input_text
         sketch_dict['output_text'] = output_text
         sketch_dict['full_text'] = input_text+output_text
+        self.token_sum += len(sketch_dict['full_text'])
+        
         return sketch_dict
 
     def get_mask(self, n):
@@ -145,7 +149,7 @@ class SketchGraphsDataset(Dataset):
         return mask
 
     def __len__(self):
-        return len(self.data)
+        return self.token_sum #len(self.data)
 
 
 class SketchGraphsCollator:
@@ -198,7 +202,9 @@ class SketchGraphsCollator:
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
+    
     dataset = SketchGraphsDataset(split=split, args=args)
+    
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)

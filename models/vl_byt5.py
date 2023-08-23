@@ -72,42 +72,7 @@ class ByT5Model(pl.LightningModule):
         self.fusion_image = torch.nn.Transformer(nhead=8, num_encoder_layers=1, d_model=self.vis_model.config.hidden_size)
 
     def training_step(self, batch, batch_idx):
-        cols = ["attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
-
-        #convert to PIL image for CLIP
-        # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-        with torch.no_grad():
-            # image_features = self.clip_model.encode_image(batch['images'])
-            # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
-            image_features = torch.sum(oi['last_hidden_state'], 1)
-            # oi = self.clip_model(**batch['images'])
-            # image_features = oi.image_embeds
-            # image_features = oi['pooler_output']
-
-        image_for_llm = self.mapper(image_features.float())
-        txt_embedder = self.model.get_input_embeddings()
-        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
-        input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
-        model_batch['inputs_embeds'] = input_embed
-        # adding ones to attention_mask
-
-
-        att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
-
-
-
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        
-        cols = ["attention_mask", "labels"]
+        cols = ["labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
         
@@ -120,7 +85,7 @@ class ByT5Model(pl.LightningModule):
         retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
         icl_image_features =  torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1)
         
-        src = torch.cat(input_image_features, icl_image_features, 1)
+        src = torch.cat((input_image_features, icl_image_features), 1)
         image_features = self.fusion_image.encoder(src)  #shape (bsz, 2, vis_dim 768)
         
         image_for_llm = self.mapper(image_features)
@@ -129,20 +94,64 @@ class ByT5Model(pl.LightningModule):
         #equence_output = image_features
         self.image_embeddings = image_features #self.model.vit.layernorm(sequence_output)
         
-        self.px = batch['images'].pixel_values
-        self.fulltext = [sketch["full_text"] for sketch in batch['sketches']]
+        #self.fulltext = [sketch["full_text"] for sketch in batch['sketches']]
         self.intext = [sketch["input_text"] for sketch in batch['sketches']]
-        self.name = [sketch["name"] for sketch in batch['sketches']]
         
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
-        input_embed = torch.concatenate((image_for_llm.unsqueeze(1), txt_embeddings), dim=1)
+        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
-        model_batch['inputs_embeds'] = txt_embeddings
+        model_batch['inputs_embeds'] = input_embed #txt_embeddings
+
+        att = torch.ones(input_embed.shape[0], image_for_llm.shape[1]).to(self.device)
+        model_batch['attention_mask'] = torch.cat((att, batch['attention_mask']), dim=1)
+
+
+
+        outputs = self.model(**model_batch)
+        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        
+        cols = ["labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+
+        
+        # image_features = self.clip_model.encode_image(batch['images'])
+        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
+        input_image_features = torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1)       # oi = self.clip_model(**batch['images'])
+        # image_features = oi.image_embeds
+        # image_features = oi['pooler_output']
+        retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
+        icl_image_features =  torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1)
+        
+        src = torch.cat((input_image_features, icl_image_features), 1)
+        image_features = self.fusion_image.encoder(src)  #shape (bsz, 2, 768)
+        
+        image_for_llm = self.mapper(image_features)
+        
+        
+        #equence_output = image_features
+        self.image_embeddings = image_features #self.model.vit.layernorm(sequence_output)
+        
+        #self.fulltext = [sketch["full_text"] for sketch in batch['sketches']]
+        self.intext = [sketch["input_text"] for sketch in batch['sketches']]
+        
+        txt_embedder = self.model.get_input_embeddings()
+        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        
+        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+        # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        model_batch['inputs_embeds'] = input_embed #txt_embeddings
 
         # adding ones to attention_mask
-        att = model_batch['attention_mask']
+        att = torch.ones(input_embed.shape[0], image_for_llm.shape[1]).to(self.device)
+        model_batch['attention_mask'] = torch.cat((att, batch['attention_mask']), dim=1)
 
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']

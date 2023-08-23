@@ -8,13 +8,13 @@ def get_parser():
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="/home/ec2-user/results", help="Directory to save checkpoints and logs")
     parser.add_argument("--dataset", type=str, default="/home/ec2-user/data/deepmind_strings_v1_ascii1_max64", help="Dataset path")
-    parser.add_argument("--retrieved_dataset", type=str, default="/home/ec2-user/data/icl_pred", help="Dataset path")
+    parser.add_argument("--retrieved_dataset", type=str, default="/home/ec2-user/data/icl_pred", help="Dataset path")   #icl_pred   #deepmind_strings_v1_ascii1_max64
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
     parser.add_argument("--strategy", type=str, default="ddp", help="Lightning Trainer strategy parameter")
     parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
-    parser.add_argument("--ascii_encoding", type=int, default=0,
+    parser.add_argument("--ascii_encoding", type=int, default=1,
                         help="Use ascii ByT5 encoding instead of single token encoding")
     parser.add_argument("--model_name", type=str, default="Salesforce/Codet5p-220m", help="Huggingface model name")
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
@@ -25,7 +25,7 @@ def get_parser():
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=0.8,
                         help="Maximal percentage of sketch entities to choose as input")
-    parser.add_argument("--max_length", type=int, default=96,
+    parser.add_argument("--max_length", type=int, default=192,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")
