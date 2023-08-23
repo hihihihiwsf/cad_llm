@@ -75,13 +75,14 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
         targets = [self.constraints_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
 
         # Log all samples for later metric extraction
-        for pred, target, sample, input_text, name in zip(preds, targets, samples, batch["input_text"], batch["name"]):
+        for i in range(len(preds)):
             self.sample_infos.append({
-                "pred": pred,
-                "true": target,
-                "text_sample": sample,
-                "input_text": input_text,
-                "name": name,
+                "pred": preds[i],
+                "true": targets[i],
+                "text_sample": samples[i],
+                "input_text": batch["input_text"][i],
+                "input_ids": batch["input_ids"][i].tolist(),
+                "labels": batch["labels"][i].tolist(),
             })
 
         return loss

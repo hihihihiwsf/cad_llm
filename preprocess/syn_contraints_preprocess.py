@@ -77,6 +77,8 @@ def get_midpoint_strings(vertices, edges, quantize_bits=6):
 
     all_vertices = np.vstack([vertices, np_mid_points])
     all_vertices = normalize_and_quantize_vertices(vertices=all_vertices, n_bits=quantize_bits)
+    # shift coordinate range to start at 0
+    # all_vertices += 32
 
     # Convert to mid-points to strings
     mid_point_strings = []
