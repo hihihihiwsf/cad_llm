@@ -273,10 +273,10 @@ class ByT5Model(pl.LightningModule):
         self.log("f1", np.mean(f1), on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         
-        self.log("first_ent", m_top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log("m_first_ent", m_top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         
-        self.log("f1", m_f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log("m_f1", m_f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         
         # Convert string entities to curves and check validity
