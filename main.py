@@ -60,7 +60,7 @@ def main():
 
     if not args.untrained_model:
         #model = ByT5Model(args=args, vit_mae=None)
-        model = BiVLT5Model(args=args, vit_mae=None)
+        model = ByT5Model(args=args, vit_mae=None)
         
         # model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt') # ('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')   
     else:
@@ -71,7 +71,7 @@ def main():
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True,rate=None)
+    #train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True,rate=None)
     val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False,rate=args.val_rate)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
@@ -101,12 +101,12 @@ def main():
     )
     if not args.eval: 
         print("Start training")
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
+        #trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
     else:
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
         #ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        ckpt_dir =  's3://cad-llm-katzm/jobs/sifan-vl-biloss-07-17-23-1618/checkpoints/model/vl_biloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
+        ckpt_dir =  's3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'   ##'s3://cad-llm-katzm/jobs/sifan-vl-biloss-07-17-23-1618/checkpoints/model/vl_biloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
         
 

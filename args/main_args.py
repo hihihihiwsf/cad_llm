@@ -24,7 +24,7 @@ def get_parser():
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=0.8,
                         help="Maximal percentage of sketch entities to choose as input")
-    parser.add_argument("--max_length", type=int, default=96,
+    parser.add_argument("--max_length", type=int, default=192,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")

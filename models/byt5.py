@@ -15,7 +15,7 @@ from transformers.modeling_utils import unwrap_model
 import sys
 from models.vis_recon import VisRecon
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
+from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity,calculate_f1
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch, visualize_sample
@@ -267,7 +267,7 @@ class ByT5Model(pl.LightningModule):
 
 
         # Calculate metrics
-        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        m_top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         mx = 0
         for i,j in zip(batch['string_samples'], batch['string_labels']):
             out, l = i.split(";"), j.split(";")
@@ -277,18 +277,46 @@ class ByT5Model(pl.LightningModule):
         top1_full_sketch = mx/len(batch['string_labels'])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
+        self.log("m_top1_full_sketch", m_top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
 
-        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        m_top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        m_f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        mx = 0
+        TP = 0
+        f1=[]
+        eps=1e-6
+        
+        top1_sum = 0
         for i,j in zip(batch['string_samples'], batch['string_labels']):
             label_all_ent = j.split(";")
-            first_ent = i.split(";")[0]
-            if first_ent in label_all_ent:
-                mx += 1
-        top1_ent = mx/len(batch['string_labels'])
-        self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            sample_entities = i.split(";")
+            top1_ent = 0
+            for first_ent in sample_entities:
+                if first_ent in label_all_ent:
+                    top1_ent = 1
+                    TP += 1
+            top1_sum += top1_ent
+            FP = len(sample_entities) - TP
+            FN = len(label_all_ent) - TP
+            precision = (TP / (TP + FP)) + eps
+            recall = (TP / (TP + FN)) + eps
+            f1.append(2 * precision * recall / (precision + recall))
+        
+        first1_ent = top1_sum/len(batch['string_labels'])
+        
+        self.log("first_ent", first1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
+        
+        self.log("f1", np.mean(f1), on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        
+        self.log("first_ent", m_top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        
+        self.log("f1", m_f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        
         # Convert string entities to curves and check validity
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
         self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
