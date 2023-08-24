@@ -37,7 +37,7 @@ class SketchGraphsDataset(Dataset):
             assert entity_string[0] == "<", error_message
             assert "," not in self.data[0][self.entities_col][0], error_message
 
-        
+        self.mask_rate=None
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
