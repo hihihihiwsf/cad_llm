@@ -11,7 +11,7 @@ from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 
 class SketchGraphsDataset(Dataset):
-    def __init__(self, args, split, rate):
+    def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
@@ -37,7 +37,7 @@ class SketchGraphsDataset(Dataset):
             assert entity_string[0] == "<", error_message
             assert "," not in self.data[0][self.entities_col][0], error_message
 
-        self.mask_rate = rate
+        
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
@@ -134,8 +134,8 @@ class SketchGraphsCollator:
         return batch
 
 
-def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle, rate):
-    dataset = SketchGraphsDataset(split=split, args=args, rate=rate)
+def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
+    dataset = SketchGraphsDataset(split=split, args=args)
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
