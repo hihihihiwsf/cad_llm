@@ -212,6 +212,10 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
 
 def get_icl_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = sketchGraphRetrievalDataset(split=split, args=args)
+    
+    print(f'{split}_dataset_length:', len(dataset))
+    
     collator = SketchGraphsRetrievalCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
-    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
+    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle, pin_memory=True, 
+                      persistent_workers=True,
                       num_workers=args.num_workers)
