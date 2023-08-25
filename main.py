@@ -71,7 +71,7 @@ def main():
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
     print("Loading data...")
-    #train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True,rate=None)
+    train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True,rate=None)
     val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
@@ -101,7 +101,7 @@ def main():
     )
     if not args.eval: 
         print("Start training")
-        #trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
+        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
     else:
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
