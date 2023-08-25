@@ -12,7 +12,7 @@ from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 class sketchGraphRetrievalDataset(Dataset):
     def __init__(self, args, split):
-        path = Path(args.retrieved_dataset) / f"{split}.json"
+        path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
     
