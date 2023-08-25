@@ -30,7 +30,7 @@ def get_model(args, tokenizer, total_train_steps):
     if args.model_name == "syn_constraints" or args.model_name == "syn_constraints_pp":
         return ByT5SynConstraintsModel(model_name="google/byt5-small", lr=args.lr, batch_size=args.batch_size,
                                        max_length=args.max_length, checkpoint_dir=args.checkpoint_dir,
-                                       samples_dir=args.samples_dir, tokenizer=tokenizer)
+                                       samples_dir=args.samples_dir, tokenizer=tokenizer, use_adafactor=args.adafactor)
 
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name, checkpoint_dir=args.checkpoint_dir)

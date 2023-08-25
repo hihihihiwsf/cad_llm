@@ -20,6 +20,7 @@ from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from transformers.optimization import Adafactor, AdafactorSchedule
 
 
 class ByT5Model(pl.LightningModule):
@@ -131,7 +132,7 @@ class ByT5Model(pl.LightningModule):
         # Assumes running on gpus, one node and no accumulate_grad_batches
         train_batches = num_train_batches // num_gpus if num_gpus else num_train_batches
         total_train_steps = train_batches * epochs
-        
+
         return total_train_steps
 
     @staticmethod
@@ -140,11 +141,20 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
-        if not self.args.cosinedecay:
+        if not self.args.cosinedecay and not self.args.adafactor:
             return optimizer
 
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+        if self.args.cosinedecay:
+            scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
+            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+
+        if self.args.adafactor:
+            # optimizer = Adafactor(self.model.parameters(), scale_parameter=False, relative_step=False,
+            #                       warmup_init=False, lr=self.lr)
+            optimizer = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True,
+                                  warmup_init=True, lr=None)
+            scheduler = AdafactorSchedule(optimizer)
+
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

@@ -12,12 +12,14 @@ import pytorch_lightning as pl
 import torch.optim as optim
 from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
+from transformers.optimization import Adafactor, AdafactorSchedule
 
 from preprocess.syn_contraints_preprocess import safe_constraints_from_string, safe_pp_constraints_from_string
 
 
 class ByT5SynConstraintsModelBase(pl.LightningModule):
-    def __init__(self, model_name, lr, batch_size, max_length, checkpoint_dir, samples_dir, tokenizer):
+    def __init__(self, model_name, lr, batch_size, max_length, checkpoint_dir, samples_dir, tokenizer,
+                 use_adafactor=False):
         super().__init__()
         self.save_hyperparameters()
 
@@ -29,6 +31,7 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
         self.max_length = max_length
         self.checkpoint_dir = checkpoint_dir
         self.samples_dir = samples_dir
+        self.use_adafactor = use_adafactor
 
         self.sample_infos = []
 
@@ -100,7 +103,19 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
         return samples
 
     def configure_optimizers(self):
-        return optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+        if not self.use_adafactor:
+            return optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+
+        # optimizer = Adafactor(self.model.parameters(), scale_parameter=False, relative_step=False,
+        #                       warmup_init=False, lr=self.lr)
+        optimizer = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True,
+                              warmup_init=True, lr=None)
+        scheduler = AdafactorSchedule(optimizer)
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {"scheduler": scheduler, "interval": "step", "frequency": 1}
+        }
 
     @staticmethod
     def constraints_from_string(sample):

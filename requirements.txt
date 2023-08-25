@@ -7,6 +7,6 @@ pytorch-lightning==2.0.0
 torchmetrics==0.11.3
 comet_ml
 datasets
-transformers
+transformers==4.26.1
 tensorboardX
 opencv-python-headless
