@@ -6,7 +6,6 @@ from preprocess.preprocessing import normalize_and_quantize_vertices, sort_point
 
 def get_entities_for_syn_constraints(sketch_dict):
     vertices = sketch_dict["vertices"]
-    curves = [[i-1 for i in edge] for edge in sketch_dict["edges"]]
 
     # quantize vertices
     vertices = normalize_and_quantize_vertices(vertices=vertices, n_bits=6)
@@ -14,7 +13,7 @@ def get_entities_for_syn_constraints(sketch_dict):
     vertices += 32
 
     # combine vertices and curves back to entities (lists of points)
-    entities = [[list(vertices[i - 1]) for i in curve] for curve in curves]
+    entities = [[list(vertices[i]) for i in edge] for edge in sketch_dict["edges"]]
 
     # sort points in each entity
     entities = [sort_points(points) for points in entities]
@@ -78,7 +77,7 @@ def get_midpoint_strings(vertices, edges, quantize_bits=6):
     all_vertices = np.vstack([vertices, np_mid_points])
     all_vertices = normalize_and_quantize_vertices(vertices=all_vertices, n_bits=quantize_bits)
     # shift coordinate range to start at 0
-    # all_vertices += 32
+    all_vertices += 32
 
     # Convert to mid-points to strings
     mid_point_strings = []

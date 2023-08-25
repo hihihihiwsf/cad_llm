@@ -32,13 +32,6 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
 
         self.sample_infos = []
 
-    def prepare_data(self):
-        print("in prepare_data")
-        # Download model
-        T5ForConditionalGeneration.from_pretrained(self.model_name)
-
-    def setup(self, stage):
-        print("in setup")
         self.model = T5ForConditionalGeneration.from_pretrained(self.model_name)
 
         num_special_tokens = 3
@@ -71,18 +64,20 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
         # Generate and process samples
         samples = self.generate_samples(batch)
 
-        preds = [self.constraints_from_string(sample) for sample in samples]
-        targets = [self.constraints_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
-
         # Log all samples for later metric extraction
-        for i in range(len(preds)):
+        for i in range(len(samples)):
+            pred = self.constraints_from_string(samples[i])
             self.sample_infos.append({
-                "pred": preds[i],
-                "true": targets[i],
+                "pred": pred,
+                "true": batch["constraints"][i],
                 "text_sample": samples[i],
                 "input_text": batch["input_text"][i],
+                "output_text": batch["input_text"][i],
                 "input_ids": batch["input_ids"][i].tolist(),
                 "labels": batch["labels"][i].tolist(),
+                "vertices": batch["vertices"][i],
+                "edges": batch["edges"][i],
+                "name": batch["name"][i],
             })
 
         return loss

@@ -45,7 +45,8 @@ def save_infos(path, data):
         json.dump(data, json_file)
 
 
-def points_to_indices(vertices, edges, points):
+def points_to_indices(vertices, edges, quantized_points_0_to_63):
+    points = np.array(quantized_points_0_to_63) / 64 - 0.5
     indices = find_closest_lines(vertices, edges, points)
     indices = [int(i) for i in indices]
     return indices

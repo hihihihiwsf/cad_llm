@@ -1,7 +1,5 @@
 import unittest
 
-import torch
-
 from dataset.syn_constraints_dataset import SynConstraintsDataModule, SynConstraintsPPDataModule
 
 
