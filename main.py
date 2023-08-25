@@ -20,7 +20,7 @@ from models.vis_recon import VisRecon
 
 
 from torch.utils.data import DataLoader
-from util import get_loggers, get_checkpoint_callbacks, EmbeddingCallback
+from util import get_loggers, get_checkpoint_callbacks, EmbeddingCallback, StringCallback
 from args.main_args import get_training_args
 from pathlib import Path
 import pytorch_lightning as pl
@@ -79,14 +79,14 @@ def main():
 
     call_backs.append(LearningRateMonitor(logging_interval='step'))
     
-    embedding_callback = EmbeddingCallback()
+    embedding_callback = StringCallback()
 
     print("Training the model...")
     log_every_n_steps = 1000
     # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
-        callbacks=call_backs, #[call_backs,embedding_callback],
+        callbacks=[call_backs,embedding_callback],
         accelerator=args.accelerator,
         devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),
@@ -106,9 +106,10 @@ def main():
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
         #ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        ckpt_dir =  's3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'   ##'s3://cad-llm-katzm/jobs/sifan-vl-biloss-07-17-23-1618/checkpoints/model/vl_biloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
+        ckpt_dir =  '/home/ubuntu/sifan/results/vit_mae_pd_14_precision16/best.ckpt'   ##'s3://cad-llm-katzm/jobs/sifan-vl-biloss-07-17-23-1618/checkpoints/model/vl_biloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
         
+        print("evaluating end.........")
 
 if __name__ == "__main__":
     main()

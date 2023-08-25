@@ -153,6 +153,11 @@ class ByT5Model(pl.LightningModule):
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
+        self.generate_samples(batch)
+
+        self.pred_string = batch['string_samples']
+        self.label_string = batch['string_labels']
+        
         
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -228,55 +233,21 @@ class ByT5Model(pl.LightningModule):
         self.generate_samples(batch)
 
 
+        self.pred_string = batch['string_samples']
+        self.label_string = batch['string_labels']
         # Calculate metrics
         m_top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        mx = 0
-        for i,j in zip(batch['string_samples'], batch['string_labels']):
-            out, l = i.split(";"), j.split(";")
-            # label_all_ent = j.split(";")
-            if set(out) == set(l):
-                mx += 1
-        top1_full_sketch = mx/len(batch['string_labels'])
-        self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
-        self.log("m_top1_full_sketch", m_top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
 
         m_top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         m_f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        TP = 0
-        f1=[]
-        eps=1e-6
-        
-        top1_sum = 0
-        for i,j in zip(batch['string_samples'], batch['string_labels']):
-            label_all_ent = j.split(";")
-            sample_entities = i.split(";")
-            top1_ent = 0
-            for first_ent in sample_entities:
-                if first_ent in label_all_ent:
-                    top1_ent = 1
-                    TP += 1
-            top1_sum += top1_ent
-            FP = len(sample_entities) - TP
-            FN = len(label_all_ent) - TP
-            precision = (TP / (TP + FP)) + eps
-            recall = (TP / (TP + FN)) + eps
-            f1.append(2 * precision * recall / (precision + recall))
-        
-        first1_ent = top1_sum/len(batch['string_labels'])
-        
-        self.log("first_ent", first1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log("first_ent", m_top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         
-        self.log("f1", np.mean(f1), on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log("f1", m_f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         
-        self.log("m_first_ent", m_top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-            batch_size=self.batch_size, sync_dist=True)
-        
-        self.log("m_f1", m_f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log("top1_full_sketch", m_top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         
         # Convert string entities to curves and check validity
