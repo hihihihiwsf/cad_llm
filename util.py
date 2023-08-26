@@ -64,13 +64,15 @@ class EmbeddingCallback(pl.Callback):
 class StringCallback(pl.Callback):
     def __init__(self):
         super().__init__()
-        self.pred_string = []
-        self.label_string = []
+        self.train_pred_string = []
+        self.train_label_string = []
+        self.val_pred_string = []
+        self.val_label_string = []
         
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
-        self.pred_string.append(pl_module.pred_string.detach().cpu().numpy())
-        self.label_string.append(pl_module.label_string.detach().cpu().numpy())
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        self.train_pred_string.append(pl_module.pred_string)
+        self.train_label_string.append(pl_module.label_string)
         
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
-        self.pred_string.append(pl_module.pred_string.detach().cpu().numpy())
-        self.label_string.append(pl_module.label_string.detach().cpu().numpy())
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        self.val_pred_string.extend(pl_module.pred_string)
+        self.val_label_string.extend(pl_module.label_string)

@@ -74,10 +74,10 @@ def main():
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
     val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
 
-    call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
-                                          using_sagemaker=args.using_sagemaker)
+    # call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
+    #                                       using_sagemaker=args.using_sagemaker)
 
-    call_backs.append(LearningRateMonitor(logging_interval='step'))
+    # call_backs.append(LearningRateMonitor(logging_interval='step'))
     
     embedding_callback = StringCallback()
 
@@ -86,7 +86,7 @@ def main():
     # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
-        callbacks=[call_backs,embedding_callback],
+        callbacks=[embedding_callback],
         accelerator=args.accelerator,
         devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),
@@ -101,7 +101,8 @@ def main():
     )
     if not args.eval: 
         print("Start training")
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
+        ckpt_dir =  '/home/ubuntu/sifan/results/vit_mae_pd_14_precision16/best.ckpt'
+        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=ckpt_dir)  #ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
     else:
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
@@ -109,7 +110,33 @@ def main():
         ckpt_dir =  '/home/ubuntu/sifan/results/vit_mae_pd_14_precision16/best.ckpt'   ##'s3://cad-llm-katzm/jobs/sifan-vl-biloss-07-17-23-1618/checkpoints/model/vl_biloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
         
-        print("evaluating end.........")
+    print("running end.........")
+    val_pred_string = embedding_callback.val_pred_string
+    val_label_string = embedding_callback.val_label_string
+    train_pred_string = embedding_callback.train_pred_string
+    train_label_string = embedding_callback.train_label_string
+    
+    import json
+    from IPython import embed
+    try:
+        val_pred_dir = args.results_dir +'/'+"val_pred_string.json"
+        with open(val_pred_dir, 'w') as f:
+            json.dump(val_pred_string, f)
+            
+        val_label_dir = args.results_dir +'/'+"val_label_string.json"
+        with open(val_label_dir, 'w') as f:
+            json.dump(val_label_string, f)
+            
+        train_pred_dir = args.results_dir +'/'+"train_pred_string.json"
+        with open(val_pred_dir, 'w') as f:
+            json.dump(train_pred_string, f)
+            
+        train_label_dir = args.results_dir +'/'+"train_label_string.json"
+        with open(val_label_dir, 'w') as f:
+            json.dump(train_label_string, f)
+    except:
+        embed()
+        
 
 if __name__ == "__main__":
     main()
