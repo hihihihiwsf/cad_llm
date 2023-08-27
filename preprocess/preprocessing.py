@@ -1,16 +1,20 @@
 import numpy as np
 
-
+from IPython import embed
 def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     if not sketch_dict:
         return None
-
     name = sketch_dict["name"]
     vertices = sketch_dict["vertices"]
     curves = sketch_dict["curves"]
 
     # quantize vertices
+      
+    if len(vertices) ==0:
+        return None
     vertices = normalize_and_quantize_vertices(vertices=vertices, n_bits=quantize_bits)
+    
+    
 
     # combine vertices and curves back to entities (lists of points)
     entities = [[list(vertices[i - 1]) for i in curve] for curve in curves]

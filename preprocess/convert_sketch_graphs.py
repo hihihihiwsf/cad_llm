@@ -28,6 +28,8 @@ from deduplicate import deduplicate_splits
 importlib.reload(sketch_sg)
 from sketch_sg import SketchSG
 
+from IPython import embed
+
 
 def get_files(args):
     """Get the Sketch Graphs files to process"""
@@ -92,7 +94,10 @@ def convert_sketch(index, seq, split_name, quantize_bits, new_tokens):
     sketch_name = f"{split_name}_{index:08}"
     sketch_obj = SketchSG(sketch, sketch_name)
     sketch_dict = sketch_obj.convert()
-    return preprocess_sketch(sketch_dict=sketch_dict, quantize_bits=quantize_bits, new_tokens=new_tokens)
+    
+    res = preprocess_sketch(sketch_dict=sketch_dict, quantize_bits=quantize_bits, new_tokens=new_tokens)
+    
+    return res
 
 
 def convert_split(file, split_name, filter_filenames, limit, quantize_bits, new_tokens):
@@ -120,6 +125,25 @@ def convert_split(file, split_name, filter_filenames, limit, quantize_bits, new_
 
     return sketch_str_dicts
 
+def convert_unique(file, limit, quantize_bits, new_tokens):
+    """Convert the sketches of a given SketchGraphs dataset split"""
+    seq_data = flat_array.load_dictionary_flat(file)
+    seq_count = len(seq_data["sequences"])
+    seq_limit = seq_count
+
+    print(f"Converting {seq_limit} unique designs...")
+    sketch_str_dicts = []
+    
+   
+    for idx, seq in enumerate(seq_data["sequences"]):
+        
+        sketch_dict = convert_sketch(index=idx, seq=seq, split_name="total", quantize_bits=quantize_bits,
+                                     new_tokens=new_tokens)
+        if not sketch_dict:
+            continue
+        sketch_str_dicts.append(sketch_dict)
+
+    return sketch_str_dicts
 
 def save_splits(output_dir, split_to_sketches):
     for split_name, sketches in split_to_sketches.items():
@@ -129,31 +153,34 @@ def save_splits(output_dir, split_to_sketches):
 
 
 def main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tokens):
-    split_to_filenames = load_filter(filter_path)
-    assert split_to_filenames.keys() == {"train", "val", "test"}, "All splits required for deduplication"
+    #split_to_filenames = load_filter(filter_path)
+    #assert split_to_filenames.keys() == {"train", "val", "test"}, "All splits required for deduplication"
 
     start_time = time.time()
 
     split_to_sketches = {}
-    for sg_file in sg_files:
-        split_name = get_split_name(sg_file)
-        filter_filenames = split_to_filenames[split_name]
-        sketches = convert_split(file=sg_file, split_name=split_name, filter_filenames=filter_filenames,
-                                 limit=limit, quantize_bits=quantize_bits, new_tokens=new_tokens)
-        split_to_sketches[split_name] = sketches
+    # for sg_file in sg_files:
+    sg_file = sg_files
+    #split_name = get_split_name(sg_file)
+    #filter_filenames = split_to_filenames[split_name]
+    sketches = convert_unique(file=sg_file,
+                                limit=limit, quantize_bits=quantize_bits, new_tokens=new_tokens)
+    split_to_sketches = sketches
+    try:
+        split_to_sketches = deduplicate_splits(split_to_sketches)
 
-    split_to_sketches = deduplicate_splits(split_to_sketches)
-
-    save_splits(output_dir, split_to_sketches)
+        save_splits(output_dir, split_to_sketches)
+    except:
+        embed()
 
     print(f"Processing Time: {time.time() - start_time} secs")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="./data/data_npy",
+    parser.add_argument("--input", type=str, default='/home/ubuntu/vitruvion/data/sg_filtered_unique.npy',  #"./data/data_npy",
                         help="Input folder containing the SketchGraphs filter sequence .npy files")
-    parser.add_argument("--output", type=str, help="Output folder to save the data [default: output]")
+    parser.add_argument("--output", type=str, default="/home/ubuntu/sifan/data/convert_vitru_unique_output/", help="Output folder to save the data [default: output]")
     parser.add_argument("--filter", type=str, default="./preprocess/split_to_filenames_v4.json",
                         help="File containing indices of deduped sketches ('train_test.json')")
     parser.add_argument("--limit", type=int, help="Only process this number of designs")
@@ -164,7 +191,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     output_dir = get_output_dir(args)
-    sg_files = get_files(args)
+    #sg_files = get_files(args)
 
-    main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter, limit=args.limit,
+    main(sg_files=args.input, output_dir=output_dir, filter_path=args.filter, limit=args.limit,
          quantize_bits=args.quantize_bits, new_tokens=args.new_tokens)

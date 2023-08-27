@@ -31,6 +31,9 @@ from models.modeling_vlt5 import T5ForConditionalGeneration
 
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
+def contains_nan_or_inf(tensor):
+    return torch.isnan(tensor).any() or torch.isinf(tensor).any()
+
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, tokenizer, total_train_steps, vit_mae=None):
         super().__init__()
@@ -107,8 +110,11 @@ class ByT5Model(pl.LightningModule):
         att = torch.ones(input_embed.shape[0], image_for_llm.shape[1]).to(self.device)
         model_batch['attention_mask'] = torch.cat((att, batch['attention_mask']), dim=1)
 
+        try:
+            assert not contains_nan_or_inf(model_batch['inputs_embeds']) 
 
-
+        except:
+            print(model_batch)
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=True, on_epoch=False, prog_bar=False, logger=True,

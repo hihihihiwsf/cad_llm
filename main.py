@@ -83,7 +83,7 @@ def main():
 
     trainer = pl.Trainer(
         callbacks=call_backs,   #[embedding_callback],
-        accelerator=args.accelerator,
+        accelerator= "cpu", #args.accelerator,
         devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),
         logger=loggers,
@@ -92,8 +92,8 @@ def main():
         # resume_from_checkpoint=None,
         precision=16,
         check_val_every_n_epoch=args.val_every_n_epoch,
-        limit_train_batches=0.1,
-        limit_val_batches=0.1,
+        #limit_train_batches=0.1,
+        #limit_val_batches=0.1,
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
