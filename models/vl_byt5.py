@@ -111,7 +111,7 @@ class ByT5Model(pl.LightningModule):
 
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+        self.log("train_loss", loss, on_step=True, on_epoch=False, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
@@ -158,7 +158,7 @@ class ByT5Model(pl.LightningModule):
 
         outputs = self.model(**model_batch)
         loss = outputs.loss
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log("val_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
         
