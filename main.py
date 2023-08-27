@@ -78,7 +78,7 @@ def main():
     
 
     print("Training the model...")
-    log_every_n_steps = 1000
+    log_every_n_steps = 50
     # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
@@ -92,8 +92,8 @@ def main():
         # resume_from_checkpoint=None,
         precision=16,
         check_val_every_n_epoch=args.val_every_n_epoch,
-        #limit_train_batches=0.01,
-        #limit_val_batches=0.1,
+        limit_train_batches=0.1,
+        limit_val_batches=0.1,
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
