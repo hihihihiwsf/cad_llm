@@ -1,6 +1,8 @@
 import torch
 import numpy as np
 
+from IPython import embed
+
 def calculate_f1(labels, samples):
     """
     Count number of exact matches of decoded and sorted entities
@@ -16,9 +18,10 @@ def calculate_f1(labels, samples):
         FN = len(label_entities) - TP
         precision = (TP / (TP + FP)) + eps
         recall = (TP / (TP + FN)) + eps
-        
-        f1.append(2 * precision * recall / (precision + recall))
-
+        try:
+            f1.append(2 * precision * recall / (precision + recall))
+        except:
+           f1.append(0)
     return np.mean(f1)
 
 

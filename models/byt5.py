@@ -30,6 +30,7 @@ from geometry.visualize_vit import Visualize_VIT
 #from geometry.attention_map import draw_attention_map
 
 from transformers.optimization import Adafactor, AdafactorSchedule
+from IPython import embed
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, vit_mae):
@@ -159,7 +160,7 @@ class ByT5Model(pl.LightningModule):
         self.label_string = batch['string_labels']
         
         
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+        self.log("train_loss", loss, on_step=True, on_epoch=False, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
@@ -221,7 +222,94 @@ class ByT5Model(pl.LightningModule):
 
         outputs = self.model(**model_batch, output_attentions=True)
         loss = outputs.loss
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log("val_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+        
+        # '''draw attention maps'''
+        # cross_attn = outputs.cross_attentions[-1] # shape: [bsz, num_heads, output_seq_len, input_seq_len] ]last layer, num_layers:12; num_heads:16; 
+        # image_out_attn = cross_attn[:,:,:,:self.patch_num]
+        # draw_attention_map(cross_attn[0].cpu().detach())
+        
+        # Generate and process samples
+        self.generate_samples(batch)
+
+
+        self.pred_string = batch['string_samples']
+        self.label_string = batch['string_labels']
+        # Calculate metrics
+        m_top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+
+        m_top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        try:
+            m_f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        except:
+            embed()
+
+        self.log("first_ent", m_top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        
+        self.log("f1", m_f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        
+        self.log("top1_full_sketch", m_top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        
+        # Convert string entities to curves and check validity
+        validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
+        self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+
+
+        # # Plot sketches
+        if batch_idx < 5:
+            self.log_samples(batch=batch, batch_idx=batch_idx)
+        
+        return loss
+
+    def test_step(self, batch, batch_idx):
+        
+        cols = ["attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+
+        
+        # image_features = self.clip_model.encode_image(batch['images'])
+        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']), output_hidden_states=True) 
+        image_features = torch.sum(oi.hidden_states[0], 1)        # oi = self.clip_model(**batch['images'])
+        # image_features = oi.image_embeds
+        # image_features = oi['pooler_output']
+
+        '''owl vit'''
+        last_hidden_state = oi['last_hidden_state']
+        #pooled_output= last_hidden_state[:, 0, :]
+        image_embeds = self.post_layernorm(last_hidden_state)
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
+
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
+        image_for_llm = self.layernorm(image_for_llm)
+
+        txt_embedder = self.model.get_input_embeddings()
+        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        
+        
+        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+
+        # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        model_batch['inputs_embeds'] = input_embed
+
+
+        # adding ones to attention_mask
+        att = model_batch['attention_mask']
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
+
+        batch['attention_mask'] = model_batch['attention_mask']
+        batch['inputs_embeds'] = model_batch['inputs_embeds']
+
+        outputs = self.model(**model_batch, output_attentions=True)
+        loss = outputs.loss
+        self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
         # '''draw attention maps'''

@@ -73,6 +73,7 @@ def main():
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
     val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
+    test_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="test", shuffle=False)
 
     # call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
     #                                       using_sagemaker=args.using_sagemaker)
@@ -93,16 +94,17 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        precision=16,
+        precision='16-mixed',
         check_val_every_n_epoch=args.val_every_n_epoch,
         #resume_from_checkpoint='s3://cad-llm-katzm/jobs/sifan-vlt5-07-07-23-1038/checkpoints/model/vlt5/best.ckpt',  #'s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
-        limit_train_batches=0.01,
+        # limit_train_batches=0.01,
         # limit_val_batches=0.1,
     )
     if not args.eval: 
         print("Start training")
         ckpt_dir =  '/home/ubuntu/sifan/results/vit_mae_pd_14_precision16/best.ckpt'
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=ckpt_dir)  #ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
+        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)#, #ckpt_path=ckpt_dir)  #ckpt_path='s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')
+        trainer.test(dataloaders=test_dataloader)
     else:
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
