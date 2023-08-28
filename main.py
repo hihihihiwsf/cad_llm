@@ -10,11 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader
 from models.byt5 import ByT5Model
-#from models.mem_byt5 import ByModel
 
-from models.vl_t5 import VLT5Model
-from models.vision_only import VisionT5Model
-from models.vl_biloss import BiVLT5Model
 
 from models.vis_recon import VisRecon
 
@@ -75,19 +71,19 @@ def main():
     val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
     test_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="test", shuffle=False)
 
-    # call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
-    #                                       using_sagemaker=args.using_sagemaker)
+    call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
+                                          using_sagemaker=args.using_sagemaker)
 
-    # call_backs.append(LearningRateMonitor(logging_interval='step'))
+    call_backs.append(LearningRateMonitor(logging_interval='step'))
     
-    embedding_callback = StringCallback()
+    # embedding_callback = StringCallback()
 
     print("Training the model...")
     log_every_n_steps = 1000
     # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     trainer = pl.Trainer(
-        callbacks=[embedding_callback],
+        callbacks=call_backs, #[embedding_callback],
         accelerator=args.accelerator,
         devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),
@@ -112,32 +108,32 @@ def main():
         ckpt_dir =  '/home/ubuntu/sifan/results/vit_mae_pd_14_precision16/best.ckpt'   ##'s3://cad-llm-katzm/jobs/sifan-vl-biloss-07-17-23-1618/checkpoints/model/vl_biloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vlbiloss-05-lmloss-07-19-23-1617/checkpoints/model/vlbiloss_05_lmloss/best.ckpt' #s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
         
-    print("running end.........")
-    val_pred_string = embedding_callback.val_pred_string
-    val_label_string = embedding_callback.val_label_string
-    train_pred_string = embedding_callback.train_pred_string
-    train_label_string = embedding_callback.train_label_string
+    # print("running end.........")
+    # val_pred_string = embedding_callback.val_pred_string
+    # val_label_string = embedding_callback.val_label_string
+    # train_pred_string = embedding_callback.train_pred_string
+    # train_label_string = embedding_callback.train_label_string
     
-    import json
-    from IPython import embed
-    try:
-        val_pred_dir = args.results_dir +'/'+"val_pred_string.json"
-        with open(val_pred_dir, 'w') as f:
-            json.dump(val_pred_string, f)
+    # import json
+    # from IPython import embed
+    # try:
+    #     val_pred_dir = args.results_dir +'/'+"val_pred_string.json"
+    #     with open(val_pred_dir, 'w') as f:
+    #         json.dump(val_pred_string, f)
             
-        val_label_dir = args.results_dir +'/'+"val_label_string.json"
-        with open(val_label_dir, 'w') as f:
-            json.dump(val_label_string, f)
+    #     val_label_dir = args.results_dir +'/'+"val_label_string.json"
+    #     with open(val_label_dir, 'w') as f:
+    #         json.dump(val_label_string, f)
             
-        train_pred_dir = args.results_dir +'/'+"train_pred_string.json"
-        with open(val_pred_dir, 'w') as f:
-            json.dump(train_pred_string, f)
+    #     train_pred_dir = args.results_dir +'/'+"train_pred_string.json"
+    #     with open(val_pred_dir, 'w') as f:
+    #         json.dump(train_pred_string, f)
             
-        train_label_dir = args.results_dir +'/'+"train_label_string.json"
-        with open(val_label_dir, 'w') as f:
-            json.dump(train_label_string, f)
-    except:
-        embed()
+    #     train_label_dir = args.results_dir +'/'+"train_label_string.json"
+    #     with open(val_label_dir, 'w') as f:
+    #         json.dump(train_label_string, f)
+    # except:
+    #     embed()
         
 
 if __name__ == "__main__":
