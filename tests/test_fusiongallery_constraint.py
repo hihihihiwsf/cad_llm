@@ -23,6 +23,7 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         cls.load_data(cls, Path("tests/test_data/dm_sketch_8.json"), 8)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_9.json"), 9)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_10.json"), 10)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_11.json"), 11)
     
     def load_data(self, dm_sketch_file, index):
         with open(dm_sketch_file) as f:
@@ -145,7 +146,6 @@ class TestFusionGalleryConstraint(unittest.TestCase):
             self.assertEqual(fg_cst["type"], "VerticalConstraint")
             self.assertIn("line", fg_cst)
             self.assertIn(fg_cst["line"], self.curves9)
-
 
     def test_tangent_constraint(self):
         cst = self.dm_constraints2[6]
@@ -284,4 +284,20 @@ class TestFusionGalleryConstraint(unittest.TestCase):
             entity_two_found = fg_cst["entity_two"] in self.curves10 or fg_cst["entity_two"] in self.points10
             self.assertTrue(entity_one_found)
             self.assertTrue(entity_two_found)
+
+    def test_fix_constraint(self):
+        cst = self.dm_constraints11[0]
+        fg_cst = FusionGalleryConstraint(cst, self.points11, self.curves11, self.entity_map11)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsNone(fg_cst_dict)
+        entity_indices = cst["fixConstraint"]["entities"]
+        for index in entity_indices:
+            entity = self.entity_map11[index]
+            # Some entities are points
+            if entity["type"] == "curve":
+                self.assertIn(entity["uuid"], self.curves11)
+                curve = self.curves11[entity["uuid"]]
+                self.assertTrue(curve["fixed"])
+
+
 

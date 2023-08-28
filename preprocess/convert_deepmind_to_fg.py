@@ -430,7 +430,8 @@ class DeepmindToFusionGalleryConverter():
         constraint = FusionGalleryConstraint(constraint, points, curves, constraint_entity_map, converter=self)
         cst_dict_or_list = constraint.to_dict()
         # Don't count merged points as conversion failures
-        if cst_dict_or_list != "Merge":
+        # or fix constraints that aren't constraints in Fusion
+        if cst_dict_or_list != "Merge" or cst_dict_or_list != "Fix":
             self.constraint_count += 1
             if cst_dict_or_list is not None:
                 # Ignore multiple constraint counts

@@ -70,6 +70,8 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             constraint_dict = self.make_concentric_constraint_dict()
         elif self.type == "mirrorConstraint":
             constraint_dict = self.make_symmetry_constraint_dict()
+        elif self.type == "fixConstraint":
+            constraint_dict = self.apply_fix_constraint()
         else:
             self.converter.log_failure(f"{self.type} constraint not supported")
             return None
@@ -454,3 +456,17 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
         if len(multi_cst) == 1:
             return multi_cst[0]
         return multi_cst
+
+    def apply_fix_constraint(self):
+        """
+        Apply a fix constraint, i.e. fix, to existing curves
+        """
+        for index, entity in enumerate(self.entities):
+            entity_uuid = entity["uuid"]
+            # In Fusion, only curves are fixed
+            if not self.is_entity_point(index):
+                # Set the curve to be fixed in place
+                self.curves[entity_uuid]["fixed"] = True
+        # Special case flag to indicate we fixed a curve
+        # rather than a constraint failure
+        return "Fix"
