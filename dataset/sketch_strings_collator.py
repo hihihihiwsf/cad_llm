@@ -1,7 +1,8 @@
 class SketchStringsCollator:
-    def __init__(self, tokenizer, max_length=None):
+    def __init__(self, tokenizer, max_length=None, additional_cols=False):
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.additional_cols = additional_cols
 
     def tokenize(self, strings):
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
@@ -28,5 +29,9 @@ class SketchStringsCollator:
             "output_text": output_text,
             "name": name,
         }
+
+        if self.additional_cols:
+            for col in self.additional_cols:
+                batch[col] = [example[col] for example in examples]
 
         return batch

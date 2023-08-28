@@ -12,12 +12,12 @@ import pytorch_lightning as pl
 import torch.optim as optim
 from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
+from transformers.optimization import Adafactor, AdafactorSchedule
 
-from preprocess.syn_contraints_preprocess import safe_constraints_from_string, safe_pp_constraints_from_string
 
-
-class ByT5SynConstraintsModelBase(pl.LightningModule):
-    def __init__(self, model_name, lr, batch_size, max_length, checkpoint_dir, samples_dir, tokenizer):
+class ByT5SynConstraintsModel(pl.LightningModule):
+    def __init__(self, model_name, lr, batch_size, max_length, checkpoint_dir, samples_dir, tokenizer,
+                 use_adafactor=False):
         super().__init__()
         self.save_hyperparameters()
 
@@ -29,16 +29,10 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
         self.max_length = max_length
         self.checkpoint_dir = checkpoint_dir
         self.samples_dir = samples_dir
+        self.use_adafactor = use_adafactor
 
         self.sample_infos = []
 
-    def prepare_data(self):
-        print("in prepare_data")
-        # Download model
-        T5ForConditionalGeneration.from_pretrained(self.model_name)
-
-    def setup(self, stage):
-        print("in setup")
         self.model = T5ForConditionalGeneration.from_pretrained(self.model_name)
 
         num_special_tokens = 3
@@ -69,19 +63,23 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
                  batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
-        samples = self.generate_samples(batch)
-
-        preds = [self.constraints_from_string(sample) for sample in samples]
-        targets = [self.constraints_from_string(constraints_srt) for constraints_srt in batch["output_text"]]
+        # Recursively unwrap the model from potential distributed training containers
+        generate_func = unwrap_model(self.model).generate
+        samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                                do_sample=False, max_new_tokens=self.max_length)
 
         # Log all samples for later metric extraction
-        for pred, target, sample, input_text, name in zip(preds, targets, samples, batch["input_text"], batch["name"]):
+        for i in range(len(samples)):
             self.sample_infos.append({
-                "pred": pred,
-                "true": target,
-                "text_sample": sample,
-                "input_text": input_text,
-                "name": name,
+                "constraints": batch["constraints"][i],
+                "samples": samples[i].tolist(),
+                "input_text": batch["input_text"][i],
+                "output_text": batch["output_text"][i],
+                "input_ids": batch["input_ids"][i].tolist(),
+                "labels": batch["labels"][i].tolist(),
+                "vertices": batch["vertices"][i],
+                "edges": batch["edges"][i],
+                "name": batch["name"][i],
             })
 
         return loss
@@ -94,30 +92,17 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
         # Reset sample_infos
         self.sample_infos = []
 
-    def generate_samples(self, batch):
-        # Recursively unwrap the model from potential distributed training containers
-        generate_func = unwrap_model(self.model).generate
-        samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                do_sample=False, max_new_tokens=self.max_length)
-
-        samples = self.tokenizer.batch_decode(samples, skip_special_tokens=True)
-        return samples
-
     def configure_optimizers(self):
-        return optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+        if not self.use_adafactor:
+            return optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
 
-    @staticmethod
-    def constraints_from_string(sample):
-        raise NotImplementedError
+        # optimizer = Adafactor(self.model.parameters(), scale_parameter=False, relative_step=False,
+        #                       warmup_init=False, lr=self.lr)
+        optimizer = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True,
+                              warmup_init=True, lr=None)
+        scheduler = AdafactorSchedule(optimizer)
 
-
-class ByT5SynConstraintsModel(ByT5SynConstraintsModelBase):
-    @staticmethod
-    def constraints_from_string(sample):
-        return safe_constraints_from_string(sample)
-
-
-class ByT5SynConstraintsPPModel(ByT5SynConstraintsModelBase):
-    @staticmethod
-    def constraints_from_string(sample):
-        return safe_pp_constraints_from_string(sample)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {"scheduler": scheduler, "interval": "step", "frequency": 1}
+        }

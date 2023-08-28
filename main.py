@@ -22,15 +22,19 @@ from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from models.byt5 import ByT5Model
 from models.segformer import SegformerModel
 from util import get_loggers, get_checkpoint_callbacks
-from dataset.syn_constraints_dataset import SynConstraintsDataModule, SynConstraintsPPDataModule
+from dataset.syn_constraints_dataset import (
+    SynConstraintsDataModule,
+    SynConstraintsPPDataModule,
+    SynConstraintsSchema2DataModule,
+)
 from models.byt5_syn_constraints import ByT5SynConstraintsModel
 
 
 def get_model(args, tokenizer, total_train_steps):
-    if args.model_name == "syn_constraints" or args.model_name == "syn_constraints_pp":
+    if "syn_constraints" in args.model_name:
         return ByT5SynConstraintsModel(model_name="google/byt5-small", lr=args.lr, batch_size=args.batch_size,
                                        max_length=args.max_length, checkpoint_dir=args.checkpoint_dir,
-                                       samples_dir=args.samples_dir, tokenizer=tokenizer)
+                                       samples_dir=args.samples_dir, tokenizer=tokenizer, use_adafactor=args.adafactor)
 
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name, checkpoint_dir=args.checkpoint_dir)
@@ -43,7 +47,12 @@ def get_model(args, tokenizer, total_train_steps):
 
 def get_dataloader_and_tokenizer(args):
     if "syn_constraints" in args.model_name:
-        model_class = SynConstraintsDataModule if args.model_name == "syn_constraints" else SynConstraintsPPDataModule
+        if args.model_name == "syn_constraints":
+            model_class = SynConstraintsDataModule
+        elif args.model_name == "syn_constraints_pp":
+            model_class = SynConstraintsPPDataModule
+        elif args.model_name == "syn_constraints_schema2":
+            model_class = SynConstraintsSchema2DataModule
 
         datamodule = model_class(model_name="google/byt5-small", batch_size=args.batch_size, max_length=args.max_length,
                                  dataset_path=args.dataset, num_workers=args.num_workers)

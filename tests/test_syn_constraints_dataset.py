@@ -1,8 +1,10 @@
 import unittest
 
-import torch
-
-from dataset.syn_constraints_dataset import SynConstraintsDataModule, SynConstraintsPPDataModule
+from dataset.syn_constraints_dataset import (
+    SynConstraintsDataModule,
+    SynConstraintsPPDataModule,
+    SynConstraintsSchema2DataModule,
+)
 
 
 class TestSynConstraintsDataModule(unittest.TestCase):
@@ -31,9 +33,12 @@ class TestSynConstraintsDataModule(unittest.TestCase):
         self.assertEqual(len(batch["input_ids"]), batch_size)
         self.assertLessEqual(batch["input_ids"].size()[1], max_length)
 
-        actual_num_tokens = int(torch.sum(batch["attention_mask"][0]))
+        actual_num_tokens = batch["attention_mask"][0].sum()
         expected_num_tokens = batch["input_text"][0].count("<") + 1
+        self.assertEqual(actual_num_tokens, expected_num_tokens)
 
+        actual_num_tokens = (batch["labels"][0] != -100).sum()
+        expected_num_tokens = batch["output_text"][0].count("<") + 1
         self.assertEqual(actual_num_tokens, expected_num_tokens)
 
     def test_syn_constraints_datamodule(self):
@@ -41,3 +46,6 @@ class TestSynConstraintsDataModule(unittest.TestCase):
 
     def test_syn_constraints_pp_datamodule(self):
         self._test_syn_constraints_datamodule(SynConstraintsPPDataModule)
+
+    def test_syn_constraints_schema2_datamodule(self):
+        self._test_syn_constraints_datamodule(SynConstraintsSchema2DataModule)
