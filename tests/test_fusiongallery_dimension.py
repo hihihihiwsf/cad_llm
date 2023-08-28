@@ -59,15 +59,18 @@ class TestFusionGalleryDimension(unittest.TestCase):
         fg_cst = FusionGalleryDimension(cst, self.points4, self.curves4, self.entity_map4)
         fg_cst_dict = fg_cst.to_dict()
         self.assertIsInstance(fg_cst_dict, dict)
-        self.assertEqual(fg_cst_dict["type"], "SketchLinearDimension")
-        self.assertIn("entity_one", fg_cst_dict)
+        self.assertEqual(fg_cst_dict["type"], "SketchOffsetDimension")
+        self.assertIn("line", fg_cst_dict)
         self.assertIn("entity_two", fg_cst_dict)
-        entity_one_found = fg_cst_dict["entity_one"] in self.curves4
+        entity_one_found = fg_cst_dict["line"] in self.curves4
         entity_two_found = fg_cst_dict["entity_two"] in self.curves4
         self.assertTrue(entity_one_found)
         self.assertTrue(entity_two_found)
-        self.assertEqual(fg_cst_dict["orientation"], "AlignedDimensionOrientation")
         self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 0.29999969997030007)
+    
+    def test_distance_dimension_point_line(self):
+        # TODO - add point line test
+        self.assertTrue(False)
 
     def test_distance_dimension_arcs(self):
         cst = self.dm_constraints10[-1]

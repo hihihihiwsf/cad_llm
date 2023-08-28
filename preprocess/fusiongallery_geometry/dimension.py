@@ -104,6 +104,45 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
 
 
     def make_distance_dimension_dict(self):
+        """
+        An OnShape distance dimension can be one of several types of dimensions
+        in Fusion 360, depending on the entities used:
+
+        SketchPoint and SketchPoint - SketchLinearDimension
+        SketchLine and SketchLine - SketchOffsetDimension between the two lines
+        Point3D and SketchLine - SketchOffsetDimension between the point and line
+        SketchCircle and SketchCircle - SketchLinearDimension between the center points
+        SketchArc and SketchArc - SketchLinearDimension between the center points
+        SketchCircle and SketchLine - CAUSES FUSION ADDIN TO THROW EXCEPTION
+        SketchArc and SketchLine - CAUSES FUSION ADDIN TO THROW EXCEPTION
+        Point3D and SketchCircle - SketchLinearDimension from the center point
+        SketchArc and SketchCircle - SketchLinearDimension between the center points
+        Point3D and SketchArc - SketchLinearDimension from the center point
+
+        """        
+        # Handle different distance dimension cases
+        both_points = self.is_entity_point(0) and self.is_entity_point(1)
+        one_point = self.is_entity_point(0) or self.is_entity_point(1)
+        one_line = self.is_entity_line(0) or self.is_entity_line(1)
+        both_lines = self.is_entity_line(0) and self.is_entity_line(1)
+        # Point-Point
+        if both_points:
+            # TODO: Support circle and arc types
+            dimension_dict = self.make_linear_dimension_dict()
+        # Point-Line or Line-Line
+        elif (one_point and one_line) or both_lines:
+            dimension_dict = self.make_offset_dimension_dict(both_lines)
+        else:
+            dimension_dict = None
+
+        if dimension_dict is None:
+            entity_types = sorted([self.entities[0]["type"], self.entities[1]["type"]])
+            self.converter.log_failure(f"distanceDimension has unsupported entities {entity_types[0]} and {entity_types[1]}")
+            return None
+
+        return dimension_dict
+    
+    def make_linear_dimension_dict(self):
         """ 
         {
             "parameter": {
@@ -125,30 +164,10 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
             "type": "SketchLinearDimension"
         }
         """
-        # if not self.is_entity_point_or_line(0) and not self.is_entity_point_or_line(1):
-        #     self.converter.log_failure("SketchGym only supports point-point, point-line or line-line distance dimensions")
-        #     return None
-        
         dimension_dict = self.make_common_dimension_dict()
-        # Handle different distance dimension cases
-        both_points = self.is_entity_point(0) and self.is_entity_point(1)
-        one_point = self.is_entity_point(0) or self.is_entity_point(1)
-        one_line = self.is_entity_line(0) or self.is_entity_line(1)
-        both_lines = self.is_entity_line(0) and self.is_entity_line(1)
-        # Point-Point
-        if both_points:
-            dimension_dict["entity_one"] = self.entities[0]["uuid"] # first
-            dimension_dict["entity_two"] = self.entities[1]["uuid"] # second
-        # Point-Line
-        # elif one_point and one_line:
-        #     pass
-        # elif both_lines:
-        #     pass
-        else:
-            entity_types = sorted([self.entities[0]['type'], self.entities[1]['type']])
-            self.converter.log_failure(f"distanceDimension has unsupported entities {entity_types[0]} and {entity_types[1]}")
-            return None
-        
+        dimension_dict["entity_one"] = self.entities[0]["uuid"] # first
+        dimension_dict["entity_two"] = self.entities[1]["uuid"] # second
+
         # Assume the default is HORIZONTAL, i.e. the 0 enum value here:
         # https://github.com/deepmind/deepmind-research/blob/master/cadl/constraints.proto#L69C5-L69C15
         direction = self.constraint[self.type].get("direction", "HORIZONTAL")
@@ -156,10 +175,49 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         if orientation is None:
             self.converter.log_failure("Unknown direction for distance dimension")
             return None
-        dimension_dict["orientation"]= orientation
+        dimension_dict["orientation"] = orientation
         dimension_dict["type"] = "SketchLinearDimension"
         return dimension_dict
-    
+
+    def make_offset_dimension_dict(self, both_lines):
+        """
+        {
+            "parameter": {
+                "type": "ModelParameter",
+                "value": 4.73202,
+                "name": "d28_2_1",
+                "role": "Linear Dimension-9"
+            },
+            "text_position": {
+                "type": "Point3D",
+                "x": 5.726415849460624,
+                "y": 2.574062149476403,
+                "z": 0.0
+            },
+            "is_driving": true,
+            "line": "7420ba2e-e2b8-11ea-b3a4-54bf646e7e1f",
+            "entity_two": "7424611e-e2b8-11ea-b9fc-54bf646e7e1f",
+            "type": "SketchOffsetDimension"
+        }
+        """
+        dimension_dict = self.make_common_dimension_dict()
+        # Line-Line
+        if both_lines:
+            dimension_dict["line"] = self.entities[0]["uuid"] # first
+            dimension_dict["entity_two"] = self.entities[1]["uuid"] # second
+        else:
+            # Point-Line
+            if self.is_entity_line(0):
+                dimension_dict["line"] = self.entities[0]["uuid"]
+                dimension_dict["entity_two"] = self.entities[1]["uuid"]
+            elif self.is_entity_line(1):
+                dimension_dict["line"] = self.entities[1]["uuid"]
+                dimension_dict["entity_two"] = self.entities[0]["uuid"]
+            else:
+                return None
+        dimension_dict["type"] = "SketchOffsetDimension"
+        return dimension_dict
+
     def make_length_dimension_dict(self):
         """
         {

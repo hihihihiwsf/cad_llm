@@ -289,7 +289,7 @@ class TestFusionGalleryConstraint(unittest.TestCase):
         cst = self.dm_constraints11[0]
         fg_cst = FusionGalleryConstraint(cst, self.points11, self.curves11, self.entity_map11)
         fg_cst_dict = fg_cst.to_dict()
-        self.assertIsNone(fg_cst_dict)
+        self.assertEqual(fg_cst_dict, "Fix")
         entity_indices = cst["fixConstraint"]["entities"]
         for index in entity_indices:
             entity = self.entity_map11[index]
