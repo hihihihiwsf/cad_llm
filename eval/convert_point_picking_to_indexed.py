@@ -1,10 +1,7 @@
 import argparse
 import json
 
-import numpy as np
-
-from eval.find_closest_lines import find_closest_lines
-from preprocess.syn_contraints_preprocess import pp_constraints_from_string
+from preprocess.syn_contraints_preprocess import pp_constraints_from_string, process_for_syn_constraints
 from tqdm import tqdm
 
 
@@ -27,15 +24,12 @@ def convert_infos_from_pp_to_indexed(infos, ds):
     for info in tqdm(infos):
         text_sample = info['text_sample']
         sketch = name_to_sketch[info['name']]
-        vertices = np.array(sketch['vertices'])
-        edges = sketch['edges']
 
-        pp_constraints = pp_constraints_from_string(text_sample)
-        indexed_constraints = convert_pp_constraints_to_indexed(pp_constraints, vertices, edges)
+        res = process_for_syn_constraints(sketch=sketch, return_mid_points=True)
+        mid_points = res['mid_points']
 
         info['true'] = sketch['constraints']
-        info['pred'] = indexed_constraints
-
+        info['pred'] = pp_constraints_from_string(text_sample, mid_points=mid_points)
 
     return infos
 
@@ -43,29 +37,6 @@ def convert_infos_from_pp_to_indexed(infos, ds):
 def save_infos(path, data):
     with open(path, "w") as json_file:
         json.dump(data, json_file)
-
-
-def points_to_indices(vertices, edges, quantized_points_0_to_63):
-    points = np.array(quantized_points_0_to_63) / 64 - 0.5
-    indices = find_closest_lines(vertices, edges, points)
-    indices = [int(i) for i in indices]
-    return indices
-
-
-def convert_pp_constraints_to_indexed(pp_constraints, vertices, edges):
-    horizontal = points_to_indices(vertices, edges, pp_constraints["horizontal"])
-    vertical = points_to_indices(vertices, edges, pp_constraints["vertical"])
-    parallel = [points_to_indices(vertices, edges, points) for points in pp_constraints["parallel"]]
-    perpendicular = [points_to_indices(vertices, edges, points) for points in pp_constraints["perpendicular"]]
-
-    indexed_constraints = {
-        "horizontal": list(set(horizontal)),
-        "vertical": list(set(vertical)),
-        "parallel": [list(set(indices)) for indices in parallel],
-        "perpendicular": [indices for indices in perpendicular],
-    }
-
-    return indexed_constraints
 
 
 if __name__ == "__main__":

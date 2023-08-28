@@ -14,10 +14,8 @@ from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
 from transformers.optimization import Adafactor, AdafactorSchedule
 
-from preprocess.syn_contraints_preprocess import safe_constraints_from_string, safe_pp_constraints_from_string
 
-
-class ByT5SynConstraintsModelBase(pl.LightningModule):
+class ByT5SynConstraintsModel(pl.LightningModule):
     def __init__(self, model_name, lr, batch_size, max_length, checkpoint_dir, samples_dir, tokenizer,
                  use_adafactor=False):
         super().__init__()
@@ -65,17 +63,18 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
                  batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
-        samples = self.generate_samples(batch)
+        # Recursively unwrap the model from potential distributed training containers
+        generate_func = unwrap_model(self.model).generate
+        samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                                do_sample=False, max_new_tokens=self.max_length)
 
         # Log all samples for later metric extraction
         for i in range(len(samples)):
-            pred = self.constraints_from_string(samples[i])
             self.sample_infos.append({
-                "pred": pred,
-                "true": batch["constraints"][i],
-                "text_sample": samples[i],
+                "constraints": batch["constraints"][i],
+                "samples": samples[i].tolist(),
                 "input_text": batch["input_text"][i],
-                "output_text": batch["input_text"][i],
+                "output_text": batch["output_text"][i],
                 "input_ids": batch["input_ids"][i].tolist(),
                 "labels": batch["labels"][i].tolist(),
                 "vertices": batch["vertices"][i],
@@ -93,15 +92,6 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
         # Reset sample_infos
         self.sample_infos = []
 
-    def generate_samples(self, batch):
-        # Recursively unwrap the model from potential distributed training containers
-        generate_func = unwrap_model(self.model).generate
-        samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                do_sample=False, max_new_tokens=self.max_length)
-
-        samples = self.tokenizer.batch_decode(samples, skip_special_tokens=True)
-        return samples
-
     def configure_optimizers(self):
         if not self.use_adafactor:
             return optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
@@ -116,19 +106,3 @@ class ByT5SynConstraintsModelBase(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {"scheduler": scheduler, "interval": "step", "frequency": 1}
         }
-
-    @staticmethod
-    def constraints_from_string(sample):
-        raise NotImplementedError
-
-
-class ByT5SynConstraintsModel(ByT5SynConstraintsModelBase):
-    @staticmethod
-    def constraints_from_string(sample):
-        return safe_constraints_from_string(sample)
-
-
-class ByT5SynConstraintsPPModel(ByT5SynConstraintsModelBase):
-    @staticmethod
-    def constraints_from_string(sample):
-        return safe_pp_constraints_from_string(sample)

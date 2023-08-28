@@ -1,6 +1,10 @@
 import unittest
 
-from dataset.syn_constraints_dataset import SynConstraintsDataModule, SynConstraintsPPDataModule
+from dataset.syn_constraints_dataset import (
+    SynConstraintsDataModule,
+    SynConstraintsPPDataModule,
+    SynConstraintsSchema2DataModule,
+)
 
 
 class TestSynConstraintsDataModule(unittest.TestCase):
@@ -42,3 +46,6 @@ class TestSynConstraintsDataModule(unittest.TestCase):
 
     def test_syn_constraints_pp_datamodule(self):
         self._test_syn_constraints_datamodule(SynConstraintsPPDataModule)
+
+    def test_syn_constraints_schema2_datamodule(self):
+        self._test_syn_constraints_datamodule(SynConstraintsSchema2DataModule)

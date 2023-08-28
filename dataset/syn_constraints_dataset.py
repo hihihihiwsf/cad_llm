@@ -8,8 +8,14 @@ import pytorch_lightning as pl
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
-from preprocess.syn_contraints_preprocess import get_entities_for_syn_constraints, constraints_to_string, get_pp_constraints_string
+
 from dataset.sketch_strings_collator import SketchStringsCollator
+from preprocess.syn_contraints_preprocess import (
+    process_for_syn_constraints,
+    constraints_to_string,
+    pp_constraints_to_string,
+    constraints_to_string_schema2,
+)
 
 
 class SynConstraintsBaseDataModule(pl.LightningDataModule):
@@ -71,12 +77,15 @@ class SynConstraintsDataModule(SynConstraintsBaseDataModule):
 
     @staticmethod
     def add_input_output_strings(example):
-        entities = get_entities_for_syn_constraints(example)
+        res = process_for_syn_constraints(example)
+        example["entities"] = res["entities"]
 
-        example["input_text"] = "".join([f"<ent_{i}>{ent}" for i, ent in enumerate(entities)])
-        example["input_text"] = example["input_text"].replace(";", "")
+        flat_entities = [sum(points, []) for points in example["entities"]]
+        entity_strings = ["".join([f"<{x}>" for x in ent]) for ent in flat_entities]
 
+        example["input_text"] = "".join([f"<ent_{i}>{ent}" for i, ent in enumerate(entity_strings)])
         example["output_text"] = constraints_to_string(example["constraints"])
+
         return example
 
     def get_tokenizer(self, num_coords=64):
@@ -95,16 +104,52 @@ class SynConstraintsPPDataModule(SynConstraintsBaseDataModule):
 
     @staticmethod
     def add_input_output_strings(example):
-        entities = get_entities_for_syn_constraints(example)
-        example["input_text"] = "".join(entities).replace(";", "<ent_sep>")
+        res = process_for_syn_constraints(example, return_mid_points=True)
+        example["entities"] = res["entities"]
+        example["mid_points"] = res["mid_points"]
 
-        example["output_text"] = get_pp_constraints_string(example)
+        flat_entities = [sum(points, []) for points in example["entities"]]
+        entity_strings = ["".join([f"<{x}>" for x in ent]) + "<ent_sep>" for ent in flat_entities]
+
+        example["input_text"] = "".join(entity_strings)
+        example["output_text"] = pp_constraints_to_string(example["constraints"], example["mid_points"])
         return example
 
     def get_tokenizer(self, num_coords=64):
         tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         new_tokens = [f"<{i}>" for i in range(num_coords)]
         new_tokens += ["<ent_sep>", "<constraint_sep>", "<parallel_sep>"]
+        tokenizer.add_tokens(new_tokens)
+        # assert len(tokenizer) % 64 == 0
+        return tokenizer
+
+
+class SynConstraintsSchema2DataModule(SynConstraintsBaseDataModule):
+    """
+    Distinct constraint tokens
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def add_input_output_strings(example):
+        res = process_for_syn_constraints(example)
+        example["entities"] = res["entities"]
+
+        flat_entities = [sum(points, []) for points in example["entities"]]
+        entity_strings = ["".join([f"<{x}>" for x in ent]) for ent in flat_entities]
+
+        example["input_text"] = "".join([f"<ent_{i}>{ent}" for i, ent in enumerate(entity_strings)])
+        example["input_text"] = example["input_text"].replace(";", "")
+
+        example["output_text"] = constraints_to_string_schema2(example["constraints"])
+        return example
+
+    def get_tokenizer(self, num_coords=64):
+        num_ent_names = 62
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        new_tokens = [f"<{i}>" for i in range(num_coords)] + [f"<ent_{i}>" for i in range(num_ent_names)]
+        new_tokens += ["<horizontal>", "<vertical>", "<parallel>", "<perpendicular>", "<parallel_sep>"]
         tokenizer.add_tokens(new_tokens)
         # assert len(tokenizer) % 64 == 0
         return tokenizer
