@@ -189,24 +189,6 @@ def main():
         
         
 if __name__ == "__main__":
-    # import json
-    # args = get_training_args()
-    # with open(args.dataset+'/val.json') as f:
-    #     data = json.load(f)
-
-
-    
-    # samples = []
-    # for sam in data:
-    #     if sam['name'] in [23557, 40996, 22401]:
-    #         name = sam['name']
-    #         fulltext = "".join([ent for  ent in sam['entities']])
-    #         point_inputs = [get_point_entities(fulltext)]
-    #         list_of_img = visualize_sample_pil(point_entities=point_inputs, box_lim=64 + 3)
-    #         plt.imshow(list_of_img[0])
-    #         plt.savefig(f'test_re{name}.png')
-
-            
     # print("test")    
     
     

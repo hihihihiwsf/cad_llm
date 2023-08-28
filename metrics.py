@@ -20,6 +20,8 @@ def calculate_f1(labels, samples):
     f1 = []
     eps = 1e-6
     for label_entities, sample_entities in zip(labels, samples):
+        if not sample_entities:
+            continue
         TP = 0
         for ent in sample_entities:
             if ent in label_entities:

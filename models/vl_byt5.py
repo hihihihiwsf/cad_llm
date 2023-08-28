@@ -114,6 +114,7 @@ class ByT5Model(pl.LightningModule):
             assert not contains_nan_or_inf(model_batch['inputs_embeds']) 
 
         except:
+            print("contains nan................")
             print(model_batch)
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
