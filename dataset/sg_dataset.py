@@ -28,7 +28,9 @@ class sketchGraphRetrievalDataset(Dataset):
 
         # sketch_dict['input_text'] = input_text
         # sketch_dict['output_text'] = output_text
-        sketch_dict['icl_text'] = sketch_dict['prompt'].split('\n')[0].replace('\t','')
+        sketch_dict['icl_text'] = sketch_dict['ice_prompt'].split('\n')[0].replace('\t','')
+        assert len(sketch_dict['icl_text'])>0
+        
         return sketch_dict
    
 class SketchGraphsRetrievalCollator:
@@ -58,8 +60,7 @@ class SketchGraphsRetrievalCollator:
         input_batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         input_batch_images = input_batch_images
         
-        
-        point_inputs = [get_point_entities(sketch["icl_text"]) for sketch in sketch_dicts]
+        point_inputs = [get_point_entities(sketch["icl_text"]) if len(sketch["icl_text"])>0 else None for sketch in sketch_dicts]
         list_of_img = visualize_sample_pil(point_entities=point_inputs, box_lim=64 + 3)
         icl_batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         icl_batch_images = icl_batch_images

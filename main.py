@@ -83,7 +83,7 @@ def main():
 
     trainer = pl.Trainer(
         callbacks=call_backs,   #[embedding_callback],
-        accelerator= "cpu", #args.accelerator,
+        accelerator= args.accelerator,
         devices=args.devices,
         strategy=DDPStrategy(find_unused_parameters=True),
         logger=loggers,
