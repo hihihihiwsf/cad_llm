@@ -141,12 +141,11 @@ class ByT5Model(pl.LightningModule):
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         
-        self.generate_samples(batch)
+        # self.generate_samples(batch)
 
-        self.pred_string = batch['string_samples']
-        self.label_string = batch['string_labels']
-        
-        
+        # self.pred_string = batch['string_samples']
+        # self.label_string = batch['string_labels']
+           
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
