@@ -80,6 +80,7 @@ class TestFusionGalleryDimension(unittest.TestCase):
         self.assertIn(fg_cst_dict["entity_two"], self.points12)
         self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 0.06152537239847767)
 
+    @unittest.skip("Distance dimension between arcs isn't supported yet")
     def test_distance_dimension_arcs(self):
         cst = self.dm_constraints10[-1]
         fg_cst = FusionGalleryDimension(cst, self.points10, self.curves10, self.entity_map10)

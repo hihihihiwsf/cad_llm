@@ -14,7 +14,8 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         "SketchLinearDimension",
         "SketchDiameterDimension",
         "SketchRadialDimension",
-        "SketchAngularDimension"
+        "SketchAngularDimension",
+        "SketchOffsetDimension"
     }     
    
     @staticmethod
