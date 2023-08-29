@@ -115,24 +115,51 @@ class DeepmindToFusionGalleryConverter():
             itertools.repeat(True)
         )
         objs_iter = Pool(self.threads).starmap(self.convert_data, iter_data)
-        for count, converted_count in objs_iter:
+        for stats in objs_iter:
             # Add the per file counts to the global counts
-            self.count += count
-            self.converted_count += converted_count            
+            self.update_global_stats(stats)
         print(f"\n\nConverted {self.converted_count}/{self.count} sketches!")
     
     def convert_serial(self):
         """Convert all of the input files in sequence"""
         for i, input_file in enumerate(self.input_files):
             print(f"Converting {i}/{len(self.input_files)} data files")
-            count, converted_count = self.convert_data(input_file, self.output_path)
+            stats = self.convert_data(input_file, self.output_path)
             # Add the per file counts to the global counts
-            self.count += count
-            self.converted_count += converted_count
+            self.update_global_stats(stats)
             if args.limit is not None and self.converted_count >= args.limit:
                 break    
         print(f"\nConverted {self.converted_count}/{self.count} sketches!")
 
+    def create_empty_stats(self):
+        """Create an empty stats structure"""
+        return {
+            "count": 0,
+            "converted_count": 0,
+            "perfect_sketch_converted_count": 0,
+            "constraint_count": 0,
+            "constraint_converted_count": 0,
+            "dimension_count": 0,
+            "dimension_converted_count": 0
+        }
+
+    def update_global_stats(self, stats):
+        """Update the global stats outside of multiprocessing"""
+        self.count += stats["count"]
+        self.converted_count += stats["converted_count"]
+        self.perfect_sketch_converted_count += stats["perfect_sketch_converted_count"]
+        self.constraint_count += stats["constraint_count"]
+        self.constraint_converted_count += stats["constraint_converted_count"]
+        self.dimension_count += stats["dimension_count"]
+        self.dimension_converted_count += stats["dimension_converted_count"]
+    
+    def update_local_stats(self, stats, new_stats):
+        """Update the local stats"""
+        stats["perfect_sketch_converted_count"] += new_stats["perfect_sketch_converted_count"]
+        stats["constraint_count"] += new_stats["constraint_count"]
+        stats["constraint_converted_count"] += new_stats["constraint_converted_count"]
+        stats["dimension_count"] += new_stats["dimension_count"]
+        stats["dimension_converted_count"] += new_stats["dimension_converted_count"]
 
     def convert_data(self, input_file, output_path, parallel=False):
         """Convert all the sketches in a single data file and save them as multiple json files"""
@@ -155,10 +182,12 @@ class DeepmindToFusionGalleryConverter():
             position = 0
         pbar = tqdm(dm_data, total=total, position=position, leave=False)
         pbar.set_description(f"[{position}] {input_file.stem}")
+        all_stats = self.create_empty_stats()
         for index, dm_sketch in enumerate(pbar):
-            fg_sketch = self.convert_sketch(dm_sketch, index)
+            fg_sketch, con_dim_stats = self.convert_sketch(dm_sketch, index)
             # pbar.update(1)
             if fg_sketch is not None:
+                self.update_local_stats(all_stats, con_dim_stats)
                 # BATCH SAVING
                 fg_sketches.append(fg_sketch) 
                 converted_count += 1
@@ -183,7 +212,10 @@ class DeepmindToFusionGalleryConverter():
         with open(json_file, "w") as f:
             json.dump(fg_sketches, f, indent=4)
         print(f"Finished writing {json_file.name}")
-        return count, converted_count
+        
+        all_stats["count"] = count
+        all_stats["converted_count"] = converted_count
+        return all_stats
 
     def convert_sketch(self, dm_sketch, index):
         """Convert a single sketch in the deepmind sketch format into a Fusion Gallery sketch dict"""
@@ -196,7 +228,7 @@ class DeepmindToFusionGalleryConverter():
             self.is_sketch_good(dm_entities)
             points, point_map = self.create_sketch_points(dm_entities)
             curves, constraint_entity_map = self.create_sketch_curves(dm_entities, point_map)
-            constraints, dimensions = self.create_constraints_and_dimensions(dm_constraints, points, curves, constraint_entity_map)
+            constraints, dimensions, con_dim_stats = self.create_constraints_and_dimensions(dm_constraints, points, curves, constraint_entity_map)
             # Give the sketch a name mapping to the index position in the original deepmind json file
             fusion_gallery_sketch = {
                 "name": f"Sketch_{index:06d}",
@@ -212,8 +244,8 @@ class DeepmindToFusionGalleryConverter():
 
         except Exception as ex:
             self.log_failure(ex)
-            return None
-        return fusion_gallery_sketch
+            return None, None
+        return fusion_gallery_sketch, con_dim_stats
 
     def is_sketch_good(self, dm_entities):
         """Check that a sketch is valid and supported conversion"""
@@ -411,31 +443,32 @@ class DeepmindToFusionGalleryConverter():
         """Create the constraints and dimensions data structure"""
         constraints_data = {}
         dimensions_data = {}
+        con_dim_stats = self.create_empty_stats()
         # Whether all constraints converted sucessfully
         all_convert_success = True
         for constraint in dm_constraints:
             if FusionGalleryDimension.is_dimension(constraint):
-                convert_success = self.create_dimension(constraint, points, curves, constraint_entity_map, dimensions_data)
+                convert_success = self.create_dimension(constraint, points, curves, constraint_entity_map, dimensions_data, con_dim_stats)
             else:
-                convert_success = self.create_constraint(constraint, points, curves, constraint_entity_map, constraints_data)
+                convert_success = self.create_constraint(constraint, points, curves, constraint_entity_map, constraints_data, con_dim_stats)
             if not convert_success:
                 all_convert_success = False
         # If all constraints converted, log it
         if all_convert_success:
-            self.perfect_sketch_converted_count += 1
-        return constraints_data, dimensions_data
+            con_dim_stats["perfect_sketch_converted_count"] += 1
+        return constraints_data, dimensions_data, con_dim_stats
 
-    def create_constraint(self, constraint, points, curves, constraint_entity_map, constraints_data):
+    def create_constraint(self, constraint, points, curves, constraint_entity_map, constraints_data, con_dim_stats):
         """Create a constraint and add it to the provided constraints_data dictionary"""
         constraint = FusionGalleryConstraint(constraint, points, curves, constraint_entity_map, converter=self)
         cst_dict_or_list = constraint.to_dict()
         # Don't count merged points as conversion failures
         # or fix constraints that aren't constraints in Fusion
         if cst_dict_or_list != "Merge" or cst_dict_or_list != "Fix":
-            self.constraint_count += 1
+            con_dim_stats["constraint_count"] += 1
             if cst_dict_or_list is not None:
                 # Ignore multiple constraint counts
-                self.constraint_converted_count += 1
+                con_dim_stats["constraint_converted_count"] += 1
                 # Single constraint
                 if isinstance(cst_dict_or_list, dict):
                     constraints_data[constraint.uuid] = cst_dict_or_list
@@ -447,14 +480,14 @@ class DeepmindToFusionGalleryConverter():
                             constraints_data[cst_uuid] = cst_dict
         return cst_dict_or_list is not None
 
-    def create_dimension(self, dimension, points, curves, constraint_entity_map, dimensions_data):
+    def create_dimension(self, dimension, points, curves, constraint_entity_map, dimensions_data, con_dim_stats):
         """Create a constraint and add it to the provided constraints_data dictionary"""
-        self.dimension_count += 1
+        con_dim_stats["dimension_count"] += 1
         dimension = FusionGalleryDimension(dimension, points, curves, constraint_entity_map, converter=self)
         dimension_dict = dimension.to_dict()
         if dimension_dict is not None:
             dimensions_data[dimension.uuid] = dimension_dict
-            self.dimension_converted_count += 1
+            con_dim_stats["dimension_converted_count"] += 1
         return dimension_dict is not None
 
 def main(args):
