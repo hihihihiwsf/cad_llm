@@ -51,6 +51,7 @@ def main():
 
     # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
+    torch.set_float32_matmul_precision('medium')
 
     print("Loading model...")
 

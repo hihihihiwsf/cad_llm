@@ -24,8 +24,8 @@ from pathlib import Path
 from PIL import Image
 # import clip
 import numpy as np
-from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
-from models.modeling_vlt5 import T5ForConditionalGeneration
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor, T5ForConditionalGeneration
+#from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
 #from geometry.attention_map import draw_attention_map
 
@@ -72,6 +72,7 @@ class ByT5Model(pl.LightningModule):
             m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt') #patch_size 16
             #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt') #patch size 32
             self.vit_mae = m.model 
+            del m
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
@@ -114,20 +115,6 @@ class ByT5Model(pl.LightningModule):
         #pooled_output= last_hidden_state[:, 0, :]
         image_embeds = self.post_layernorm(last_hidden_state)
         
-        # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
-        # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
-
-        # # Merge image embedding with class tokens
-        # image_embeds = image_embeds[:, 1:, :] * class_token_out
-        # image_embeds = self.layer_norm(image_embeds)
-
-        # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        # new_size = (
-        #     image_embeds.shape[0],
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     image_embeds.shape[-1],
-        # )
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
@@ -160,7 +147,7 @@ class ByT5Model(pl.LightningModule):
         self.label_string = batch['string_labels']
         
         
-        self.log("train_loss", loss, on_step=True, on_epoch=False, prog_bar=False, logger=True,
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
@@ -181,21 +168,7 @@ class ByT5Model(pl.LightningModule):
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
         image_embeds = self.post_layernorm(last_hidden_state)
-        
-        # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
-        # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
 
-        # # Merge image embedding with class tokens
-        # image_embeds = image_embeds[:, 1:, :] * class_token_out
-        # image_embeds = self.layer_norm(image_embeds)
-
-        # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        # new_size = (
-        #     image_embeds.shape[0],
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     image_embeds.shape[-1],
-        # )
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
@@ -222,7 +195,7 @@ class ByT5Model(pl.LightningModule):
 
         outputs = self.model(**model_batch, output_attentions=True)
         loss = outputs.loss
-        self.log("val_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
         # '''draw attention maps'''
@@ -240,10 +213,9 @@ class ByT5Model(pl.LightningModule):
         m_top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
         m_top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        try:
-            m_f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
-        except:
-            embed()
+        
+        m_f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        
 
         self.log("first_ent", m_top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
@@ -307,7 +279,7 @@ class ByT5Model(pl.LightningModule):
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']
 
-        outputs = self.model(**model_batch, output_attentions=True)
+        outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
