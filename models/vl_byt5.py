@@ -74,6 +74,14 @@ class ByT5Model(pl.LightningModule):
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
         self.fusion_image = torch.nn.Transformer(nhead=8, num_encoder_layers=1, d_model=self.vis_model.config.hidden_size)
 
+        self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
+        self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
+
+        self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
+
+        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
+        self.gelu = torch.nn.GELU()
+        
     def training_step(self, batch, batch_idx):
         cols = ["labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
@@ -81,14 +89,23 @@ class ByT5Model(pl.LightningModule):
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
-        input_image_features = torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1)       # oi = self.clip_model(**batch['images'])
-        # image_features = oi.image_embeds
-        # image_features = oi['pooler_output']
-        retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
-        icl_image_features =  torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1)
+        with torch.no_grad():
+            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
+            input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
+            # image_features = oi.image_embeds
+            # image_features = oi['pooler_output']
+            retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
+            icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
+            
+        src = torch.cat((input_image_features, icl_image_features), 1)
+        src = self.post_layernorm(src)
+        image_features = self.post_layernorm(self.fusion_image.encoder(src))  #shape (bsz, 2, 768)
+        
+        image_for_llm = self.layernorm(self.gelu(self.mapper(image_features)))
+            
         
         src = torch.cat((input_image_features, icl_image_features), 1)
+        
         image_features = self.fusion_image.encoder(src)  #shape (bsz, 2, vis_dim 768)
         
         image_for_llm = self.mapper(image_features)
@@ -131,16 +148,17 @@ class ByT5Model(pl.LightningModule):
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
-        input_image_features = torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1)       # oi = self.clip_model(**batch['images'])
+        input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
         # image_features = oi.image_embeds
         # image_features = oi['pooler_output']
         retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
-        icl_image_features =  torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1)
+        icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
         
         src = torch.cat((input_image_features, icl_image_features), 1)
-        image_features = self.fusion_image.encoder(src)  #shape (bsz, 2, 768)
+        src = self.post_layernorm(src)
+        image_features = self.post_layernorm(self.fusion_image.encoder(src))  #shape (bsz, 2, 768)
         
-        image_for_llm = self.mapper(image_features)
+        image_for_llm = self.layernorm(self.gelu(self.mapper(image_features)))
         
         
         #equence_output = image_features
