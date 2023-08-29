@@ -1,5 +1,5 @@
 import torch
-
+import numpy as np
 
 def calculate_accuracy(labels, samples):
     """
