@@ -15,7 +15,7 @@ from transformers.modeling_utils import unwrap_model
 import sys
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
+from metrics import calculate_f1, calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
@@ -111,6 +111,10 @@ class ByT5Model(pl.LightningModule):
         self.generate_samples(batch)
 
         # Calculate metrics
+        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        self.log("f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+	
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
