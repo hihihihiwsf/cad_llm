@@ -83,7 +83,8 @@ class SketchGraphsRetrievalCollator:
             "icl_image": icl_batch_images,
         }
         return batch 
-
+    
+    
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
@@ -182,15 +183,7 @@ class SketchGraphsCollator:
 
         # batch_images = self.clip_preprocess(list_of_img, return_tensors="pt")
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
-        #batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
-        # images = []
-        # for img in list_of_img:
-        #     images.append(self.clip_preprocess(img))
-        #     batch_images = torch.tensor(np.stack(images))
 
-        # for im in list_of_img:
-        #     im.close()
-        
               
         batch = {
             "input_ids": tokenized_input.input_ids,
@@ -204,7 +197,7 @@ class SketchGraphsCollator:
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     
-    dataset = SketchGraphsDataset(split=split, args=args)
+    dataset = sketchGraphRetrievalDataset(split=split, args=args)
     
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,

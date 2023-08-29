@@ -91,11 +91,13 @@ class ByT5Model(pl.LightningModule):
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         with torch.no_grad():
             oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
-            input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
+            #input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
+            input_image_features = self.post_layernorm(oi['last_hidden_state'])
             # image_features = oi.image_embeds
             # image_features = oi['pooler_output']
             retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
-            icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
+            #icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
+            icl_image_features = self.post_layernorm(retrieve_image['last_hidden_state'])
             
         src = torch.cat((input_image_features, icl_image_features), 1)
         src = self.post_layernorm(src)

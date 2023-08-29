@@ -9,7 +9,9 @@ except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader, get_icl_sketchgraphs_dataloader
-from models.vl_byt5 import ByT5Model
+
+from models import vl_byt5, byt5
+
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks, EmbeddingCallback
@@ -53,10 +55,14 @@ def main():
     pl.seed_everything(args.seed)
 
     print("Loading model...")
+    
+    print("Loading model...")
 
+    architecture = vl_byt5
+    
     from transformers import ViTMAEForPreTraining 
     # vitmae_model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
-    tokenizer = ByT5Model.get_tokenizer(args.model_name)
+    tokenizer = architecture.ByT5Model.get_tokenizer(args.model_name)
 
     print("Loading data...")
     train_dataloader = get_icl_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
@@ -64,11 +70,10 @@ def main():
 
     num_train_batches = len(train_dataloader)
     num_gpus = torch.cuda.device_count()
-    total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, num_gpus, args.epochs)
+    total_train_steps = architecture.ByT5Model.get_total_train_steps(num_train_batches, num_gpus, args.epochs)
 
-    print("Loading model...")
-    model = ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
-
+    model = architecture.ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps, vit_mae=None)
+    
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
 
