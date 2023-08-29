@@ -72,7 +72,7 @@ class ByT5Model(pl.LightningModule):
             self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
-        self.fusion_image = torch.nn.Transformer(nhead=8, num_encoder_layers=1, d_model=self.vis_model.config.hidden_size)
+        self.fusion_image = torch.nn.Transformer(nhead=8, num_encoder_layers=1, dropout=0.2, d_model=self.vis_model.config.hidden_size)
 
         self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
         self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)

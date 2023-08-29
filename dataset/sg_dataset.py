@@ -15,6 +15,8 @@ class sketchGraphRetrievalDataset(Dataset):
         path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
+        if split=='val':
+            self.data = self.data[:1700]
     
     def __len__(self):
         return len(self.data)
