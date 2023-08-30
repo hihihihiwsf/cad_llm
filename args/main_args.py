@@ -8,7 +8,7 @@ def get_parser():
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="/home/ubuntu/sifan/results", help="Directory to save checkpoints and logs")
     #parser.add_argument("--dataset", type=str, default="/home/ubuntu/sifan/data/deepmind_strings_v1_ascii1_max64", help="Dataset path")
-    parser.add_argument("--dataset", type=str, default="/home/ubuntu/sifan/data/icl_pred/icl_pred_filtered", help="Dataset path")   #icl_pred   #deepmind_strings_v1_ascii1_max64
+    parser.add_argument("--dataset", type=str, default="/home/ubuntu/sifan/data/filter_sg_retrieved", help="Dataset path")   #icl_pred   #deepmind_strings_v1_ascii1_max64
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
@@ -25,7 +25,7 @@ def get_parser():
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=0.8,
                         help="Maximal percentage of sketch entities to choose as input")
-    parser.add_argument("--max_length", type=int, default=192,
+    parser.add_argument("--max_length", type=int, default=96,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")

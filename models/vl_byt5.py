@@ -6,6 +6,8 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
+from typing import Any, Optional
+from pytorch_lightning.utilities.types import STEP_OUTPUT
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -93,113 +95,118 @@ class ByT5Model(pl.LightningModule):
             oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
             #input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
             input_image_features = self.post_layernorm(oi['last_hidden_state'])
-            # image_features = oi.image_embeds
-            # image_features = oi['pooler_output']
+            input_image_features = input_image_features.permute(0,2,1)
+            input_image_features = self.gelu(self.embed_patch(input_image_features).permute(0,2,1))
+            del oi
+
             retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
             #icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
             icl_image_features = self.post_layernorm(retrieve_image['last_hidden_state'])
+            icl_image_features = icl_image_features.permute(0,2,1)
+            icl_image_features = self.gelu(self.embed_patch(icl_image_features).permute(0,2,1))
+            del retrieve_image
             
-        src = torch.cat((input_image_features, icl_image_features), 1)
-        src = self.post_layernorm(src)
-        image_features = self.post_layernorm(self.fusion_image.encoder(src))  #shape (bsz, 2, 768)
+        '''fuse input image features and icl image features'''
+        image_features = self.post_layernorm(torch.cat((input_image_features, icl_image_features), 1))
+        image_features = self.post_layernorm(self.fusion_image.encoder(image_features))  #shape (bsz, 2, 768)
+        image_features = self.layernorm(self.gelu(self.mapper(image_features)))
+        del input_image_features
+        del icl_image_features
         
-        image_for_llm = self.layernorm(self.gelu(self.mapper(image_features)))
+
+        txt_embeddings = self.model.shared(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        model_batch['inputs_embeds']  = torch.concatenate((image_features, txt_embeddings), dim=1)
         
-        #equence_output = image_features
-        # self.image_embeddings = image_features #self.model.vit.layernorm(sequence_output)
-        
-        #self.fulltext = [sketch["full_text"] for sketch in batch['sketches']]
-        # self.intext = [sketch["input_text"] for sketch in batch['sketches']]
-        
-        txt_embedder = self.model.get_input_embeddings()
-        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
-        
-        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
-        model_batch['inputs_embeds'] = input_embed #txt_embeddings
 
-        att = torch.ones(input_embed.shape[0], image_for_llm.shape[1]).to(self.device)
+        att = torch.ones(model_batch['inputs_embeds'].shape[0], image_features.shape[1]).to(self.device)
         model_batch['attention_mask'] = torch.cat((att, batch['attention_mask']), dim=1)
+        del att
 
-        try:
-            assert not contains_nan_or_inf(model_batch['inputs_embeds']) 
-
-        except:
-            print("contains nan................")
-            print(model_batch)
         outputs = self.model(**model_batch)
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
+
     def validation_step(self, batch, batch_idx):
+        loss = self.validation(batch,batch_idx,val='val')
+        return loss
+    
+    def test_step(self, batch, batch_idx):
+        loss = self.validation(batch,batch_idx,val='test')
+        return loss
         
+    def validation(self, batch, batch_idx,val):
         cols = ["labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
-        input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
-        # image_features = oi.image_embeds
-        # image_features = oi['pooler_output']
-        retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
-        icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
+        with torch.no_grad():
+            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
+            #input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
+            input_image_features = self.post_layernorm(oi['last_hidden_state'])
+            input_image_features = input_image_features.permute(0,2,1)
+            input_image_features = self.gelu(self.embed_patch(input_image_features).permute(0,2,1))
+            del oi
+
+            retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
+            #icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
+            icl_image_features = self.post_layernorm(retrieve_image['last_hidden_state'])
+            icl_image_features = icl_image_features.permute(0,2,1)
+            icl_image_features = self.gelu(self.embed_patch(icl_image_features).permute(0,2,1))
+            del retrieve_image
+            
+        '''fuse input image features and icl image features'''
+        image_features = self.post_layernorm(torch.cat((input_image_features, icl_image_features), 1))
+        image_features = self.post_layernorm(self.fusion_image.encoder(image_features))  #shape (bsz, 2, 768)
+        image_features = self.layernorm(self.gelu(self.mapper(image_features)))
+        del input_image_features
+        del icl_image_features
         
-        src = torch.cat((input_image_features, icl_image_features), 1)
-        src = self.post_layernorm(src)
-        image_features = self.post_layernorm(self.fusion_image.encoder(src))  #shape (bsz, 2, 768)
+
+        txt_embeddings = self.model.shared(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        model_batch['inputs_embeds']  = torch.concatenate((image_features, txt_embeddings), dim=1)
         
-        image_for_llm = self.layernorm(self.gelu(self.mapper(image_features)))
-        
-        
-        #equence_output = image_features
-        self.image_embeddings = image_features #self.model.vit.layernorm(sequence_output)
-        
-        #self.fulltext = [sketch["full_text"] for sketch in batch['sketches']]
-        self.intext = [sketch["input_text"] for sketch in batch['sketches']]
-        
-        txt_embedder = self.model.get_input_embeddings()
-        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
-        
-        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
-        model_batch['inputs_embeds'] = input_embed #txt_embeddings
 
-        # adding ones to attention_mask
-        att = torch.ones(input_embed.shape[0], image_for_llm.shape[1]).to(self.device)
+        att = torch.ones(model_batch['inputs_embeds'].shape[0], image_features.shape[1]).to(self.device)
         model_batch['attention_mask'] = torch.cat((att, batch['attention_mask']), dim=1)
+        del att
 
+        outputs = self.model(**model_batch)
+        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']
 
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
+        del model_batch
         
         # Generate and process samples
         self.generate_samples(batch)
 
         f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log("f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         # Convert string entities to curves and check validity
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
 
