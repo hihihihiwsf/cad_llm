@@ -23,11 +23,11 @@ from dataset.sketch_strings_collator import SketchStringsCollator
 
 
 
-def get_model(args):
+def get_model(args, total_train_steps):
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name)
 
-    return ByT5Model(args=args)
+    return ByT5Model(args=args, total_train_steps=total_train_steps)
 
 lengths = []
 
@@ -75,10 +75,16 @@ def main():
 
     # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
+    
+    sketchdata = SketchDataModule(model.tokenizer, args)
 
     print("Loading model...")
+    
+    num_train_batches = len(sketchdata.train_dataloader)
+    num_gpus = torch.cuda.device_count()
+    total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, num_gpus, args.epochs)
 
-    model = get_model(args)
+    model = get_model(args, total_train_steps)
 
     print("Loading data...")
     #train_dataloader = get_dataloader(min_input_percent, max_input_ercent,args=args, split="train", shuffle=True, model=model)
@@ -115,7 +121,7 @@ def main():
         #limit_train_batches=0.1,
         # limit_val_batches=0.001,
     )
-    sketchdata = SketchDataModule(model.tokenizer, args)
+    
     if not args.eval: 
         # for epoch in range(0,40,10):
         #     dataloader = train_dataloader[epoch//10]

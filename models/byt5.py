@@ -25,8 +25,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 class ByT5Model(pl.LightningModule):
-    total_train_steps = None
-    def __init__(self, args):
+    
+    def __init__(self, args, total_train_steps):
         super().__init__()
         self.save_hyperparameters()
 
@@ -43,7 +43,7 @@ class ByT5Model(pl.LightningModule):
 
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
-        self.total_train_steps = None  # should be set later for lr scheduler
+        self.total_train_steps = total_train_steps  # should be set later for lr scheduler
 
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
@@ -156,11 +156,13 @@ class ByT5Model(pl.LightningModule):
         fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
         fig.savefig(fig_path)
 
-    def set_total_train_steps(self, num_train_batches):
+    @staticmethod
+    def get_total_train_steps(num_train_batches, num_gpus, epochs):
         # Assumes running on gpus, one node and no accumulate_grad_batches
-        n_gpus = torch.cuda.device_count()
-        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
-        self.total_train_steps = train_batches * self.args.epochs
+        train_batches = num_train_batches // num_gpus if num_gpus else num_train_batches
+        total_train_steps = train_batches * epochs
+
+        return total_train_steps
     
     @staticmethod
     def set_total_train_steps_ray(num_train_batches, n_gpus, epochs):
