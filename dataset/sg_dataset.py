@@ -91,7 +91,7 @@ class SketchDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         current_epoch = self.trainer.current_epoch //10
         return get_sketchgraphs_dataloader(
-                min_input_percent=self.args.min_input_percent,
+                min_input_percent=(self.args.max_input_percent-0.2-current_epoch*0.2),
                 max_input_percent=self.args.max_input_percent,
                 tokenizer=self.tokenizer,
                 args=self.args,
