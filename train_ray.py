@@ -67,7 +67,7 @@ def train_on_ray_cluster():
     num_workers = ray_args.num_gpus
     num_cpus_per_worker = ray_args.num_cpus_per_worker
     strategy = ray_args.strategy
-    model_class_kwargs = {"args": main_args}
+    model_class_kwargs = {"args": main_args, "total_train_steps":0}
     data_class_kwargs = {
         "tokenizer": model.tokenizer,
         "args": main_args,
