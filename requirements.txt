@@ -4,7 +4,7 @@
 # We target a framework_version='1.9'
 # # which should use cuda 11.1
 # which should use cuda 11.7
-
+accelerate==0.22.0
 pytorch-lightning==1.9.4
 torchmetrics==0.11.3
 comet_ml
