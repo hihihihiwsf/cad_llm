@@ -427,13 +427,18 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "entity_two": "cdcf11a4-b830-11ea-bfa8-180373af3277",
             "symmetry_line": "b93bf2dc-b830-11ea-a8ed-180373af3277",
             "type": "SymmetryConstraint"
-        },
+        }
         """
+        if not self.is_entity_line(0):
+            self.converter.log_failure(f"mirrorConstraint has non-line mirror entity type {self.entities[0]['type']}")
+            return None
+        # The first entity is the mirror line
         symmetry_line = self.entities[0]["uuid"]
         # Loop to handle multiple entity equal constraints
         # e.g.
         # 
         # "mirrorConstraint": {
+        #     "mirror": 13,
         #     "mirroredPairs": [
         #         {
         #             "first": 10,
