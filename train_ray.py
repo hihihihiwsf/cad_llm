@@ -103,7 +103,7 @@ def train_on_ray_cluster():
             model_class=model_class,
             model_class_kwargs=model_class_kwargs,
             data_class=data_class,
-            daat_class_kwargs=data_class_kwargs,
+            data_class_kwargs=data_class_kwargs,
             trainer_kwargs=trainer_kwargs,
             checkpointing_kwargs=checkpointing_kwargs,
             input_s3_bucket=input_s3_bucket,
