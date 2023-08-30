@@ -79,6 +79,7 @@ def train_on_ray_cluster():
             "logger": loggers,
             "max_epochs": main_args.epochs,
             "accelerator": "auto",
+            "reload_dataloaders_every_n_epochs": 10,
             "log_every_n_steps": log_every_n_steps,
             "val_check_interval": main_args.val_check_interval,
     }

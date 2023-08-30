@@ -105,7 +105,9 @@ class SketchGraphsDataModule(pl.LightningDataModule):
         self.aws_s3_sync(f"s3://{self.ray_args.input_s3_bucket}", self.args.dataset)
 
     def train_dataloader(self):
+        current_epoch = self.trainer.current_epoch //10
         return get_sketchgraphs_dataloader(
+                min_input_percent=0.65 - 0.15*current_epoch,
                 tokenizer=self.tokenizer,
                 args=self.args,
                 split="train",
@@ -114,9 +116,18 @@ class SketchGraphsDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return get_sketchgraphs_dataloader(
+                min_input_percent=self.args.min_input_percent,
                 tokenizer=self.tokenizer,
                 args=self.args,
                 split="val",
+                shuffle=False
+        )
+    def test_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                min_input_percent=self.args.min_input_percent,
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="test",
                 shuffle=False
         )
     

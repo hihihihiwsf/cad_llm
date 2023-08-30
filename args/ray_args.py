@@ -36,7 +36,7 @@ def get_ray_args():
     parser.add_argument(
         "--input_s3_bucket", 
         type=str, 
-        default="cad-llm-katzm/dataset/sg_strings_v5/", 
+        default="cad-llm-katzm/dataset/sg_strings_v5_ascii1_max64/", 
         help="Name of the input S3 bucket"
     )
     parser.add_argument(
