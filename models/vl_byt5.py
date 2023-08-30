@@ -104,20 +104,12 @@ class ByT5Model(pl.LightningModule):
         image_features = self.post_layernorm(self.fusion_image.encoder(src))  #shape (bsz, 2, 768)
         
         image_for_llm = self.layernorm(self.gelu(self.mapper(image_features)))
-            
-        
-        src = torch.cat((input_image_features, icl_image_features), 1)
-        
-        image_features = self.fusion_image.encoder(src)  #shape (bsz, 2, vis_dim 768)
-        
-        image_for_llm = self.mapper(image_features)
-        
         
         #equence_output = image_features
-        self.image_embeddings = image_features #self.model.vit.layernorm(sequence_output)
+        # self.image_embeddings = image_features #self.model.vit.layernorm(sequence_output)
         
         #self.fulltext = [sketch["full_text"] for sketch in batch['sketches']]
-        self.intext = [sketch["input_text"] for sketch in batch['sketches']]
+        # self.intext = [sketch["input_text"] for sketch in batch['sketches']]
         
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)

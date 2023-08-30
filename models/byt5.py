@@ -146,8 +146,8 @@ class ByT5Model(pl.LightningModule):
         
         self.generate_samples(batch)
 
-        self.pred_string = batch['string_samples']
-        self.label_string = batch['string_labels']
+        # self.pred_string = batch['string_samples']
+        # self.label_string = batch['string_labels']
         
         
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
@@ -210,8 +210,8 @@ class ByT5Model(pl.LightningModule):
         self.generate_samples(batch)
 
 
-        self.pred_string = batch['string_samples']
-        self.label_string = batch['string_labels']
+        # self.pred_string = batch['string_samples']
+        # self.label_string = batch['string_labels']
         # Calculate metrics
         m_top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
@@ -240,6 +240,7 @@ class ByT5Model(pl.LightningModule):
             self.log_samples(batch=batch, batch_idx=batch_idx)
         
         return loss
+    
 
     def test_step(self, batch, batch_idx):
         
