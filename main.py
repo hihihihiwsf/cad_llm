@@ -81,6 +81,7 @@ def main():
     print("Loading data...")
     train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
     val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
+    test_dataloader = get_dataloader(args=args, split="test", shuffle=False, model=model)
 
     model.set_total_train_steps(num_train_batches=len(train_dataloader))
 
@@ -110,7 +111,8 @@ def main():
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
-        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
+        ckpt_path = '/home/ubuntu/sifan/results/sg_codet5/max_96_sg_string_codet5p/best.ckpt'
+        trainer.validate(model, ckpt_path=ckpt_path, dataloaders=val_dataloader)
 
 
 if __name__ == "__main__":

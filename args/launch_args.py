@@ -28,6 +28,12 @@ def get_launch_args():
         help="s3 bucket name"
     )
     parser.add_argument(
+        "--s3_dataset",
+        type=str,
+        default="sg_strings_v5_ascii1_max64",
+        help="s3 dataset"
+    )
+    parser.add_argument(
         "--instance_type",
         type=str,
         choices=("ml.p3.2xlarge", "ml.p3.8xlarge", "ml.p3.16xlarge", "ml.p3dn.24xlarge", "ml.p4d.24xlarge"),

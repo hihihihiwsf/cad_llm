@@ -91,7 +91,7 @@ def launch_sagemaker():
 
     # We currently just use a single folder for train/valid/test, lets call it train
     dataset_path = {
-        "train": f"s3://{launch_args.s3_bucket}/dataset/{main_args.dataset}"
+        "train": f"s3://{launch_args.s3_bucket}/dataset/{launch_args.s3_dataset}"
     }
     estimator.fit(
         dataset_path,
