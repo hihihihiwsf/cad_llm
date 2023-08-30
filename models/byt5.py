@@ -18,7 +18,7 @@ sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch, visualize_sample
+from geometry.visualization import visualize_batch
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image

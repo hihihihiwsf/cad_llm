@@ -57,8 +57,9 @@ class Arc(Curve):
 
             return
 
-        center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.uint)
-        radius = (self.radius * cell_size).astype(dtype=np.uint)
+        # Round to integers for plotting with cv2.ellipse
+        center = np.rint(self.shift_point(self.center, cell_size=cell_size)).astype(np.int32)
+        radius = np.rint(self.radius * cell_size).astype(np.int32)
 
         start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
         end_angle = geom_utils.rads_to_degs(self.end_angle_rads)
@@ -67,16 +68,32 @@ class Arc(Curve):
         if end_angle < start_angle:
             end_angle += 360
 
-        try:
-            cv2.ellipse(np_image, center=center, axes=(radius, radius), angle=0, startAngle=start_angle, endAngle=end_angle,
-                        color=CV2_COLORS[color], thickness=linewidth)
-        except:
-            print('stop')
+        cv2.ellipse(np_image, center=center, axes=(radius, radius), angle=0, startAngle=start_angle, endAngle=end_angle,
+                    color=CV2_COLORS[color], thickness=linewidth)
 
         if draw_points:
             self.draw_points_np(np_image, cell_size)
 
         return np_image
+
+    def draw_pil(self, img_draw, draw_points=True, linewidth=1, color="green", transform=None):
+        assert self.good, "The curve is not in the good state"
+
+        lower_left = self.center - self.radius
+        upper_right = self.center + self.radius
+
+        bounding_box_points = [(lower_left[0], lower_left[1]), (upper_right[0], upper_right[1])]
+        if transform:
+            bounding_box_points = [(transform(x), transform(y)) for x, y in bounding_box_points]
+
+        start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
+        end_angle = geom_utils.rads_to_degs(self.end_angle_rads)
+        img_draw.arc(bounding_box_points, start=start_angle, end=end_angle, fill=color, width=linewidth)
+
+        if draw_points:
+            self.draw_points_pil(img_draw=img_draw, transform=transform)
+
+        return img_draw
 
 
     def find_arc_geometry(self):

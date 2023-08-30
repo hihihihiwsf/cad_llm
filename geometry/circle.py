@@ -21,12 +21,12 @@ class Circle(Curve):
     def draw_np(self, np_image, draw_points=True, linewidth=2, color="red", cell_size=4):
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
 
-        shifted_center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.uint)
-        radius = (self.radius * cell_size).astype(dtype=np.uint)
+        shifted_center = np.rint(self.shift_point(self.center, cell_size=cell_size)).astype(dtype=np.int32)
+        radius = np.rint(self.radius * cell_size).astype(dtype=np.uint)
 
         cv2.circle(
             np_image,
-            center=shifted_center.astype(dtype=np.uint),
+            center=shifted_center,
             radius=radius,
             color=CV2_COLORS[color],
             thickness=linewidth,
@@ -36,6 +36,23 @@ class Circle(Curve):
             self.draw_points_np(np_image, cell_size=cell_size)
 
         return np_image
+
+    def draw_pil(self, img_draw, draw_points=True, linewidth=1, color="red", transform=None):
+        assert self.good, "The curve is not in the good state"
+
+        lower_left = self.center - self.radius
+        upper_right = self.center + self.radius
+
+        bounding_box_points = [(lower_left[0], lower_left[1]), (upper_right[0], upper_right[1])]
+        if transform:
+            bounding_box_points = [(transform(x), transform(y)) for x, y in bounding_box_points]
+
+        img_draw.arc(bounding_box_points, fill=color, width=linewidth, start=0, end=360)
+
+        if draw_points:
+            self.draw_points_pil(img_draw=img_draw, transform=transform)
+
+        return img_draw
 
     def find_circle_geometry(self):
         mid = np.mean(self.points, axis=0)
