@@ -100,6 +100,7 @@ class SketchGraphsDataModule(pl.LightningDataModule):
         self.tokenizer = tokenizer
         self.args = args
         self.ray_args = ray_args
+        self.num_train_batches = 0
 
     def setup(self, stage):
         self.aws_s3_sync(f"s3://{self.ray_args.input_s3_bucket}", self.args.dataset)
@@ -113,7 +114,7 @@ class SketchGraphsDataModule(pl.LightningDataModule):
                 split="train",
                 shuffle=True
         )
-
+    
     def val_dataloader(self):
         return get_sketchgraphs_dataloader(
                 min_input_percent=self.args.min_input_percent,

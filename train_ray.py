@@ -41,13 +41,13 @@ def train_on_ray_cluster():
     )
     # Prepere dataset to get the number of train batches
     datamodule.setup("fit")
-    num_train_batches = len(datamodule.train_dataloader())
-
-    ByT5Model.set_total_train_steps_ray(
-        num_train_batches=num_train_batches,
-        n_gpus=ray_args.num_gpus,
-        epochs=main_args.epochs
-    )
+    
+    # num_train_batches = len(datamodule.train_dataloader())
+    # ByT5Model.set_total_train_steps_ray(
+    #     num_train_batches=num_train_batches,
+    #     n_gpus=ray_args.num_gpus,
+    #     epochs=main_args.epochs
+    # )
 
     checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min", dirpath="checkpoints", filename=f"best",
                                           save_last=True)
