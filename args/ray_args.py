@@ -42,7 +42,7 @@ def get_ray_args():
     parser.add_argument(
         "--output_s3_bucket", 
         type=str, 
-        default="ray-training-output", 
+        default="ray-training-out-sifan", 
         help="Name of the output S3 bucket"
     )
     ray_args, _ = parser.parse_known_args()

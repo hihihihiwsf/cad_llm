@@ -96,20 +96,20 @@ def train_on_ray_cluster():
 
     # Define an Experiment
     experiment = RayLightningExperiment(
-            exp_name,
-            num_workers,
-            num_cpus_per_worker,
-            strategy,
-            model_class,
-            model_class_kwargs,
-            data_class,
-            data_class_kwargs,
-            trainer_kwargs,
-            checkpointing_kwargs,
-            input_s3_bucket,
-            output_s3_bucket,
-            local_data_dir,
-            local_results_dir
+            exp_name=exp_name,
+            num_workers=num_workers,
+            num_cpus_per_worker=num_cpus_per_worker,
+            strategy=strategy,
+            model_class=model_class,
+            model_class_kwargs=model_class_kwargs,
+            data_class=data_class,
+            daat_class_kwargs=data_class_kwargs,
+            trainer_kwargs=trainer_kwargs,
+            checkpointing_kwargs=checkpointing_kwargs,
+            input_s3_bucket=input_s3_bucket,
+            output_s3_bucket=output_s3_bucket,
+            local_data_dir=local_data_dir,
+            local_results_dir=local_results_dir
     )
 
     # Run the experiment on the Ray cluster
