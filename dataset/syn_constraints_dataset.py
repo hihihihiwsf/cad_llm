@@ -63,7 +63,8 @@ class SynConstraintsBaseDataModule(pl.LightningDataModule):
         return DataLoader(ds, batch_size=self.batch_size, shuffle=shuffle, collate_fn=self.collator,
                           num_workers=self.num_workers)
 
-    def get_tokenizer(self, num_coords=64):
+    @staticmethod
+    def get_tokenizer(model_name, num_coords=64):
         raise NotImplementedError
 
     @staticmethod
@@ -88,9 +89,10 @@ class SynConstraintsDataModule(SynConstraintsBaseDataModule):
 
         return example
 
-    def get_tokenizer(self, num_coords=64):
+    @staticmethod
+    def get_tokenizer(model_name, num_coords=64):
         num_ent_names = 62
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
         new_tokens = [f"<{i}>" for i in range(num_coords)] + [f"<ent_{i}>" for i in range(num_ent_names)]
         new_tokens += ["<constraint_sep>", "<parallel_sep>"]
         tokenizer.add_tokens(new_tokens)
@@ -115,8 +117,9 @@ class SynConstraintsPPDataModule(SynConstraintsBaseDataModule):
         example["output_text"] = pp_constraints_to_string(example["constraints"], example["mid_points"])
         return example
 
-    def get_tokenizer(self, num_coords=64):
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+    @staticmethod
+    def get_tokenizer(model_name, num_coords=64):
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
         new_tokens = [f"<{i}>" for i in range(num_coords)]
         new_tokens += ["<ent_sep>", "<constraint_sep>", "<parallel_sep>"]
         tokenizer.add_tokens(new_tokens)
@@ -145,9 +148,10 @@ class SynConstraintsSchema2DataModule(SynConstraintsBaseDataModule):
         example["output_text"] = constraints_to_string_schema2(example["constraints"])
         return example
 
-    def get_tokenizer(self, num_coords=64):
+    @staticmethod
+    def get_tokenizer(model_name="google/byt5-small", num_coords=64):
         num_ent_names = 62
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
         new_tokens = [f"<{i}>" for i in range(num_coords)] + [f"<ent_{i}>" for i in range(num_ent_names)]
         new_tokens += ["<horizontal>", "<vertical>", "<parallel>", "<perpendicular>", "<parallel_sep>"]
         tokenizer.add_tokens(new_tokens)
