@@ -48,7 +48,7 @@ def train_on_ray_cluster():
     #     n_gpus=ray_args.num_gpus,
     #     epochs=main_args.epochs
     # )
-
+    
     checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min", dirpath="checkpoints", filename=f"best",
                                           save_last=True)
     checkpoint_callback.CHECKPOINT_NAME_LAST = "last"
@@ -93,7 +93,7 @@ def train_on_ray_cluster():
 
     local_data_dir = main_args.dataset
     local_results_dir = main_args.results_dir
-
+    
     # Define an Experiment
     experiment = RayLightningExperiment(
             exp_name=exp_name,
