@@ -468,8 +468,11 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
         """
         for index, entity in enumerate(self.entities):
             entity_uuid = entity["uuid"]
-            # In Fusion, only curves are fixed
-            if not self.is_entity_point(index):
+            # Fix points
+            if self.is_entity_point(index):
+                # Set the curve to be fixed in place
+                self.points[entity_uuid]["fixed"] = True
+            elif self.is_entity_curve(index):
                 # Set the curve to be fixed in place
                 self.curves[entity_uuid]["fixed"] = True
         # Special case flag to indicate we fixed a curve

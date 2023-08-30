@@ -60,5 +60,10 @@ class FusionGalleryPoint(FusionGalleryBase):
             "type": "Point3D",
             "x": self.x,
             "y": self.y,
-            "z": 0.0
+            "z": 0.0,
+            "fixed": False,
+            "fully_constrained": False,
+            "linked": False,
+            "reference": False,
+            "visible": False            
         }

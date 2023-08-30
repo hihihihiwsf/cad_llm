@@ -298,6 +298,11 @@ class TestFusionGalleryConstraint(unittest.TestCase):
                 self.assertIn(entity["uuid"], self.curves11)
                 curve = self.curves11[entity["uuid"]]
                 self.assertTrue(curve["fixed"])
+            elif entity["type"] == "point":
+                self.assertIn(entity["uuid"], self.points11)
+                point = self.points11[entity["uuid"]]
+                self.assertTrue(point["fixed"])
+
 
 
 
