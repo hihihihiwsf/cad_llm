@@ -100,6 +100,7 @@ def train_on_ray_cluster():
             num_workers=num_workers,
             num_cpus_per_worker=num_cpus_per_worker,
             strategy=strategy,
+            strategy_kwargs={},
             model_class=model_class,
             model_class_kwargs=model_class_kwargs,
             data_class=data_class,
