@@ -167,7 +167,7 @@ class ByT5Model(pl.LightningModule):
         ByT5Model.total_train_steps = train_batches * epochs
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
 
