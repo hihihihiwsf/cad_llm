@@ -65,8 +65,10 @@ def launch_sagemaker():
     max_wait = 5 * 24 * 60 * 60 if launch_args.use_spot_instances else None
 
     hyperparameters = vars(main_args)
+    launch_par = vars(launch_args)
     print("Hyperparameters:")
     print(json.dumps(hyperparameters, indent=4, sort_keys=True))
+    print(json.dumps(launch_par, indent=4, sort_keys=True))
 
     estimator = PyTorch(
         entry_point=entry_point,
