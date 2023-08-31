@@ -28,9 +28,9 @@ def get_launch_args():
         help="s3 bucket name"
     )
     parser.add_argument(
-        "--dataset",
+        "--s3_dataset",
         type=str,
-        default="deepmind_strings_v1_ascii1_max64",
+        default="sg_strings_v5_ascii1_max64",
         help="s3 bucket name"
     )
     parser.add_argument(
