@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytorch_lightning as pl
 from datasets import load_dataset
+from pytorch_lightning.utilities.types import EVAL_DATALOADERS
 from torch.utils.data import Dataset, DataLoader
 
 from dataset.dataset_utils import split_list
@@ -40,12 +41,13 @@ class SketchGraphsDataset(Dataset):
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
-
+        
     def __getitem__(self, index):
         """
         Applies a random mask to the entities of sketch
         Returns (input_text, output_text)
         """
+        
         sketch_dict = self.data[index]
         entities = sketch_dict[self.entities_col]
         if self.order == "random":
@@ -93,7 +95,43 @@ class SketchGraphsDataModule(pl.LightningDataModule):
                 split="val",
                 shuffle=False
         )
-    
+    def test_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="test",
+                shuffle=False
+        )
+        
+class SketchDataModule(pl.LightningDataModule):
+    def __init__(self, tokenizer, args):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.args = args
+
+    def train_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="train",
+                shuffle=True
+        )
+
+    def val_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="val",
+                shuffle=False
+        )
+    def test_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="test",
+                shuffle=False
+        )
+        
     @staticmethod
     def aws_s3_sync(source, destination):
         cmd = ["aws", "s3", "sync", "--quiet", source, destination]

@@ -7,7 +7,7 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-from dataset.sg_dataset import get_sketchgraphs_dataloader
+from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchGraphsDataModule, SketchDataModule
 from models.byt5 import ByT5Model
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
@@ -22,25 +22,20 @@ from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
 
 
-def get_model(args):
+def get_model(args, total_steps):
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name)
 
-    return ByT5Model(args=args)
+    return ByT5Model(args=args, total_train_steps=total_steps)
 
 
-def get_dataloader(args, split, shuffle, model):
-    if "segformer" in args.model_name:
-        datasets = get_rendered_sketch_dataset(path=args.dataset)
-        dataloader = DataLoader(datasets[split], batch_size=args.batch_size, shuffle=shuffle,
-                                num_workers=args.num_workers)
-        return dataloader
-
+def get_dataloader(args, split, shuffle):
+    tokenizer = ByT5Model.get_tokenizer(args.model_name)
     if "entities" in args.dataset:  # Hack to select dataset loader based on dataset name
         datasets = get_sketch_strings_dataset(path=args.dataset, min_split_ratio=args.min_input_percent,
                                              max_split_ratio=args.max_input_percent)
 
-        collator = SketchStringsCollator(tokenizer=model.tokenizer, max_length=args.max_length)
+        collator = SketchStringsCollator(tokenizer=tokenizer, max_length=args.max_length)
 
         if args.limit_data != 1 and split == "train":
             n = int(args.limit_data * len(datasets["train"]))
@@ -49,7 +44,7 @@ def get_dataloader(args, split, shuffle, model):
         return DataLoader(datasets[split], batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                           num_workers=args.num_workers)
 
-    return get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split=split, shuffle=shuffle)
+    return get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split=split, shuffle=shuffle)
 
 
 def main():
@@ -76,14 +71,15 @@ def main():
 
     print("Loading model...")
 
-    model = get_model(args)
-
+    tokenizer = ByT5Model.get_tokenizer(args.model_name)
     print("Loading data...")
-    train_dataloader = get_dataloader(args=args, split="train", shuffle=True, model=model)
-    val_dataloader = get_dataloader(args=args, split="val", shuffle=False, model=model)
-    test_dataloader = get_dataloader(args=args, split="test", shuffle=False, model=model)
-
-    model.set_total_train_steps(num_train_batches=len(train_dataloader))
+    sketchdata = SketchDataModule(tokenizer, args)
+    
+    num_train_batches = len(sketchdata.train_dataloader())
+    num_gpus = torch.cuda.device_count()
+    train_batches = num_train_batches // num_gpus
+    total_train_steps = train_batches * args.epochs
+    model = get_model(args, total_train_steps)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -99,6 +95,7 @@ def main():
         strategy=args.strategy,
         logger=loggers,
         max_epochs=args.epochs,
+        reload_dataloaders_every_n_epochs=5,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
         # check_val_every_n_epoch=args.val_every_n_epoch,
@@ -107,12 +104,13 @@ def main():
         # limit_val_batches=0.01,
     )
     if not args.eval: 
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        trainer.fit(model, datamodule=sketchdata)
+        trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
         ckpt_path = '/home/ubuntu/sifan/results/sg_codet5/max_96_sg_string_codet5p/best.ckpt'
-        trainer.validate(model, ckpt_path=ckpt_path, dataloaders=val_dataloader)
+        trainer.validate(model, ckpt_path=ckpt_path, dataloaders=sketchdata.val_dataloader())
 
 
 if __name__ == "__main__":

@@ -25,8 +25,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 class ByT5Model(pl.LightningModule):
-    total_train_steps = None
-    def __init__(self, args):
+    
+    def __init__(self, args, total_train_steps):
         super().__init__()
         self.save_hyperparameters()
 
@@ -43,7 +43,7 @@ class ByT5Model(pl.LightningModule):
 
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
-        self.total_train_steps = None  # should be set later for lr scheduler
+        self.total_train_steps = total_train_steps # should be set later for lr scheduler
 
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
@@ -129,8 +129,8 @@ class ByT5Model(pl.LightningModule):
                  batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
-        if batch_idx < 5:
-            self.log_samples(batch=batch, batch_idx=batch_idx)
+        # if batch_idx < 5:
+        #     self.log_samples(batch=batch, batch_idx=batch_idx)
 
         return loss
 
@@ -152,16 +152,11 @@ class ByT5Model(pl.LightningModule):
         batch["point_inputs"] = [get_point_entities(string_label) for string_label in batch["input_text"]]
         input_curves = [get_curves(point_input) for point_input in batch["point_inputs"]]
 
-        fig = visualize_batch(input_curves=input_curves, label_curves=label_curves,
-                              sample_curves=batch["sample_curves"], box_lim=self.box_lim + 3)
-        fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
-        fig.savefig(fig_path)
+        # fig = visualize_batch(input_curves=input_curves, label_curves=label_curves,
+        #                       sample_curves=batch["sample_curves"], box_lim=self.box_lim + 3)
+        # fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
+        # fig.savefig(fig_path)
 
-    def set_total_train_steps(self, num_train_batches):
-        # Assumes running on gpus, one node and no accumulate_grad_batches
-        n_gpus = torch.cuda.device_count()
-        train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
-        self.total_train_steps = train_batches * self.args.epochs
     
     @staticmethod
     def set_total_train_steps_ray(num_train_batches, n_gpus, epochs):
@@ -169,14 +164,20 @@ class ByT5Model(pl.LightningModule):
         n_gpus = torch.cuda.device_count()
         train_batches = num_train_batches // n_gpus if n_gpus else num_train_batches
         ByT5Model.total_train_steps = train_batches * epochs
+        
+    @staticmethod
+    def get_tokenizer(model_name):
+        return AutoTokenizer.from_pretrained(model_name)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.model.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
 
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+        #scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
+        from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
+        scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=10, max_epochs=40)
+        #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, warmup_epochs=10, max_epochs=40)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
