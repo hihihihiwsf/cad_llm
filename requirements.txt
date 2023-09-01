@@ -12,3 +12,5 @@ transformers
 tensorboardX
 peft
 opencv-python-headless
+lightning-bolts
+opencv-python
