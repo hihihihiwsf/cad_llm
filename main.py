@@ -106,7 +106,7 @@ def main():
     if not args.eval: 
         trainer.fit(model, datamodule=sketchdata)
         print("=======test results============")
-        trainer.validate(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
+        trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
