@@ -6,6 +6,8 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
+from typing import Any, Optional
+from pytorch_lightning.utilities.types import STEP_OUTPUT
 import torch
 import torch.optim as optim
 # import lightning.pytorch as pl
@@ -100,11 +102,18 @@ class ByT5Model(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        
+        return self.validation(batch,batch_idx,'val')
+    
+    def test_step(self, batch,batch_idx):
+        return self.validation(batch,batch_idx,'test')
+    
+    def validation(self, batch, batch_idx, val):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         outputs = self.model(**model_batch)
         loss = outputs.loss
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         # Generate and process samples
@@ -112,20 +121,20 @@ class ByT5Model(pl.LightningModule):
 
         # Calculate metrics
         f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log("f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 	
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         # Convert string entities to curves and check validity
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{val}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
