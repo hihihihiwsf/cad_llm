@@ -21,6 +21,10 @@ class TestFusionGalleryDimension(unittest.TestCase):
         cls.load_data(cls, Path("tests/test_data/dm_sketch_6.json"), 6)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_7.json"), 7)
         cls.load_data(cls, Path("tests/test_data/dm_sketch_8.json"), 8)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_9.json"), 9)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_10.json"), 10)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_11.json"), 11)
+        cls.load_data(cls, Path("tests/test_data/dm_sketch_12.json"), 12)
     
     def load_data(self, dm_sketch_file, index):
         with open(dm_sketch_file) as f:
@@ -37,7 +41,7 @@ class TestFusionGalleryDimension(unittest.TestCase):
         setattr(self, f"curves{index}", curves)
         setattr(self, f"entity_map{index}", entity_map)
 
-    def test_distance_dimension(self):
+    def test_distance_dimension_points(self):
         cst = self.dm_constraints0[16]
         fg_cst = FusionGalleryDimension(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
@@ -45,12 +49,50 @@ class TestFusionGalleryDimension(unittest.TestCase):
         self.assertEqual(fg_cst_dict["type"], "SketchLinearDimension")
         self.assertIn("entity_one", fg_cst_dict)
         self.assertIn("entity_two", fg_cst_dict)
-        entity_one_found = fg_cst_dict["entity_one"] in self.curves0 or fg_cst_dict["entity_one"] in self.points0
-        entity_two_found = fg_cst_dict["entity_two"] in self.curves0 or fg_cst_dict["entity_two"] in self.points0
+        entity_one_found = fg_cst_dict["entity_one"] in self.points0
+        entity_two_found = fg_cst_dict["entity_two"] in self.points0
         self.assertTrue(entity_one_found)
         self.assertTrue(entity_two_found)
         self.assertEqual(fg_cst_dict["orientation"], "AlignedDimensionOrientation")
         self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 1.1956196943234358)
+
+    def test_distance_dimension_lines(self):
+        cst = self.dm_constraints4[-1]
+        fg_cst = FusionGalleryDimension(cst, self.points4, self.curves4, self.entity_map4)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "SketchOffsetDimension")
+        self.assertIn("line", fg_cst_dict)
+        self.assertIn("entity_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["line"], self.curves4)
+        self.assertIn(fg_cst_dict["entity_two"], self.curves4)
+        self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 0.29999969997030007)
+    
+    def test_distance_dimension_point_line(self):
+        cst = self.dm_constraints12[-2]
+        fg_cst = FusionGalleryDimension(cst, self.points12, self.curves12, self.entity_map12)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "SketchOffsetDimension")
+        self.assertIn("line", fg_cst_dict)
+        self.assertIn("entity_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["line"], self.curves12)
+        self.assertIn(fg_cst_dict["entity_two"], self.points12)
+        self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 0.06152537239847767)
+
+    @unittest.skip("Distance dimension between arcs isn't supported yet")
+    def test_distance_dimension_arcs(self):
+        cst = self.dm_constraints10[-1]
+        fg_cst = FusionGalleryDimension(cst, self.points10, self.curves10, self.entity_map10)
+        fg_cst_dict = fg_cst.to_dict()
+        self.assertIsInstance(fg_cst_dict, dict)
+        self.assertEqual(fg_cst_dict["type"], "SketchLinearDimension")
+        self.assertIn("entity_one", fg_cst_dict)
+        self.assertIn("entity_two", fg_cst_dict)
+        self.assertIn(fg_cst_dict["entity_one"], self.curves10)
+        self.assertIn(fg_cst_dict["entity_two"], self.curves10)
+        self.assertEqual(fg_cst_dict["orientation"], "AlignedDimensionOrientation")
+        self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 0.4658581065527947)
 
     def test_length_dimension(self):
         cst = self.dm_constraints0[18]

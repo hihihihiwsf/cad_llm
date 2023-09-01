@@ -25,14 +25,14 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
         "PerpendicularConstraint",
         "MidPointConstraint",
         "EqualConstraint",
-        "ConcentricConstraint"
+        "ConcentricConstraint",
+        "SymmetryConstraint"
     }
     # Currently these constraint types are not supported
     # 
     # Offset = 13   
     # Fix = 16
     # Projected = 1
-    # Mirror = 2
     # Circular_Pattern = 18
     # Pierce = 19
     # Linear_Pattern = 20
@@ -68,6 +68,10 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             constraint_dict = self.make_equal_constraint_dict()
         elif self.type == "concentricConstraint":
             constraint_dict = self.make_concentric_constraint_dict()
+        elif self.type == "mirrorConstraint":
+            constraint_dict = self.make_symmetry_constraint_dict()
+        elif self.type == "fixConstraint":
+            constraint_dict = self.apply_fix_constraint()
         else:
             self.converter.log_failure(f"{self.type} constraint not supported")
             return None
@@ -76,32 +80,33 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
     def make_coincident_constraint_cases(self):
         if self.is_entity_line(0) and self.is_entity_line(1):
             return self.make_collinear_constraint_dict()
-        if self.is_entity_point(0) or self.is_entity_point(1):
-            # In the OnShape world geometric entities own their points.
-            # For example a line owns its start and end point.
-            # Coincident constraints are then used to hold the end points together.
+        
+        # In the OnShape world geometric entities own their points.
+        # For example a line owns its start and end point.
+        # Coincident constraints are then used to hold the end points together.
 
-            # In the Fusion Gallery world things are a little different.
-            # Fusion Gallery has SketchPoints which are geometric entities all by themselves.
-            # Geometric entities like lines will then reference the point entities
-            # and conicindent constraints are not required to hold them together.
+        # In the Fusion Gallery world things are a little different.
+        # Fusion Gallery has SketchPoints which are geometric entities all by themselves.
+        # Geometric entities like lines will then reference the point entities
+        # and conicindent constraints are not required to hold them together.
 
-            # Basically this means we need to remove some points and coincident constraints
-            # from the data.
+        # Basically this means we need to remove some points and coincident constraints
+        # from the data.
 
-            # Check if both entities refer to the same merged point to skip 
-            # if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
-            if self.entity_points_identical():
-                # Return a special flag to indicate the points have been merged
-                return "Merge"
-            return self.make_coincident_constraint_dict()
-        if self.is_entity_arc(0) or self.is_entity_arc(1):
-            self.converter.log_failure("SketchArc, SketchArc coincident constraint not supported")
-            return None
-        if self.is_entity_circle(0) or self.is_entity_circle(1):
-            self.converter.log_failure("SketchCircle, SketchCircle coincident constraint not supported")
-            return None
-        self.converter.log_failure("Unknown constraint case")
+        # Check if both entities refer to the same merged point to skip 
+        # if self.entities[0]["uuid"] == self.entities[1]["uuid"]:
+        if self.entity_points_identical():
+            # Return a special flag to indicate the points have been merged
+            return "Merge"
+        
+        # Handle the standard case of a constraint between a point and a line
+        cst_dict = self.make_coincident_constraint_dict()
+        if cst_dict is not None:
+            return cst_dict
+
+        # Report the constraint entities failing
+        entity_types = sorted([self.entities[0]['type'], self.entities[1]['type']])
+        self.converter.log_failure(f"coincidentConstraint has unsupported entities {entity_types[0]} and {entity_types[1]}")
         return None
 
     def make_coincident_constraint_dict(self):
@@ -114,21 +119,18 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
         """
         point = None
         entity = None
-        if self.is_entity_point(0):
+        # Fusion expects a coincident constraint between a point and a point/curve
+        if self.is_entity_point(0) and self.is_entity_point(1):
             point = self.entities[0]
             entity = self.entities[1]
-        elif self.is_entity_point(1):
+        elif self.is_entity_point(0) and self.is_entity_curve(1):
+            point = self.entities[0]
+            entity = self.entities[1]
+        elif self.is_entity_point(1) and self.is_entity_curve(0):
             point = self.entities[1]
             entity = self.entities[0]
         if point is None:
-            # Unhandled case.  Coincident lines.  Should this be a colinear constraint?
-            # {
-            # "type": "CollinearConstraint",
-            # "line_one": "d7852898-b74c-11ea-b79f-180373af3277",
-            # "line_two": "d7854f9e-b74c-11ea-9502-180373af3277"
-            # }
-            self.converter.log_failure("Collinear constraint not implemented")
-            return
+            return None
         return {
             "type": "CoincidentConstraint",
             "entity": entity["uuid"],
@@ -168,7 +170,7 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 "type": "HorizontalConstraint"
             }
         elif self.entity_count > 1 and self.are_entities_lines():
-            # Handle multiple separate constraints
+            # Handle multiple separate line constraints
             multi_cst = []
             for ent in self.entities:
                 multi_cst.append({
@@ -176,8 +178,19 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                     "type": "HorizontalConstraint"
                 })
             return multi_cst
+        elif self.entity_count > 1 and self.are_entities_points():
+            # Handle multiple separate point constraints
+            multi_cst = []
+            for index in range(self.entity_count - 1):
+                multi_cst.append({
+                    "point_one": self.entities[index]["uuid"],
+                    "point_two": self.entities[index + 1]["uuid"],
+                    "type": "HorizontalPointsConstraint"
+                })
+            return multi_cst
         else:
-            self.converter.log_failure("Unknown horizontal constraint entities")
+            entity_types = sorted([self.entities[0]['type'], self.entities[1]['type']])
+            self.converter.log_failure(f"horizontalConstraint has unsupported entities {entity_types[0]} and {entity_types[1]}")
             return None
     
     def make_parallel_constraint_dict(self):
@@ -225,9 +238,15 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
                 })
             return multi_cst
         elif self.entity_count > 1 and self.are_entities_points():
-            # TODO: Handle this case where we have 2+ points
-            self.converter.log_failure("Multiple vertical constraint point entities not implemented")
-            return None
+            # Handle multiple separate point constraints
+            multi_cst = []
+            for index in range(self.entity_count - 1):
+                multi_cst.append({
+                    "point_one": self.entities[index]["uuid"],
+                    "point_two": self.entities[index + 1]["uuid"],
+                    "type": "VerticalPointsConstraint"
+                })
+            return multi_cst
         else:
             self.converter.log_failure("Unknown vertical constraint entities")
             return None
@@ -386,13 +405,13 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             if "parent" in self.entities[0]:
                 curve_one = self.entities[0]["parent"]
             else:
-                self.converter.log_failure("Concentric constraint entity is not a curve")
+                self.converter.log_failure(f"concentricConstraint has unsupported entity {self.entities[0]['type']}")
                 return None 
         if self.is_entity_point(1):
             if "parent" in self.entities[1]:
                 curve_two = self.entities[1]["parent"]
             else:
-                self.converter.log_failure("Concentric constraint entity is not a curve")
+                self.converter.log_failure(f"concentricConstraint has unsupported entity {self.entities[1]['type']}")
                 return None 
 
         return {
@@ -400,3 +419,62 @@ class FusionGalleryConstraint(FusionGalleryBaseConstraint):
             "curve_two": curve_two,
             "type": "ConcentricConstraint"
         }
+    
+    def make_symmetry_constraint_dict(self):
+        """
+        {
+            "entity_one": "cd825d62-b830-11ea-9e77-180373af3277",
+            "entity_two": "cdcf11a4-b830-11ea-bfa8-180373af3277",
+            "symmetry_line": "b93bf2dc-b830-11ea-a8ed-180373af3277",
+            "type": "SymmetryConstraint"
+        }
+        """
+        if not self.is_entity_line(0):
+            self.converter.log_failure(f"mirrorConstraint has non-line mirror entity type {self.entities[0]['type']}")
+            return None
+        # The first entity is the mirror line
+        symmetry_line = self.entities[0]["uuid"]
+        # Loop to handle multiple entity equal constraints
+        # e.g.
+        # 
+        # "mirrorConstraint": {
+        #     "mirror": 13,
+        #     "mirroredPairs": [
+        #         {
+        #             "first": 10,
+        #             "second": 13
+        #         },
+        #         {
+        #             "first": 11,
+        #             "second": 14
+        #         }
+        #     ]
+        # }
+        multi_cst = []
+        for index in range(1, self.entity_count - 1, 2):
+            multi_cst.append({
+                "entity_one": self.entities[index]["uuid"],
+                "entity_two": self.entities[index + 1]["uuid"],
+                "symmetry_line": symmetry_line,
+                "type": "SymmetryConstraint"
+            })
+        if len(multi_cst) == 1:
+            return multi_cst[0]
+        return multi_cst
+
+    def apply_fix_constraint(self):
+        """
+        Apply a fix constraint, i.e. fix, to existing curves
+        """
+        for index, entity in enumerate(self.entities):
+            entity_uuid = entity["uuid"]
+            # Fix points
+            if self.is_entity_point(index):
+                # Set the curve to be fixed in place
+                self.points[entity_uuid]["fixed"] = True
+            elif self.is_entity_curve(index):
+                # Set the curve to be fixed in place
+                self.curves[entity_uuid]["fixed"] = True
+        # Special case flag to indicate we fixed a curve
+        # rather than a constraint failure
+        return "Fix"
