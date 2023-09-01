@@ -17,6 +17,7 @@ import uuid
 import itertools
 from pathlib import Path
 from tqdm import tqdm
+from collections import Counter
 from multiprocessing import Pool, current_process
 
 from preprocess.deepmind_geometry import *
@@ -35,24 +36,8 @@ class DeepmindToFusionGalleryConverter():
         self.limit = limit
         self.threads = threads
 
-        # Count of how many sketch conversions have been attempted
-        self.count = 0
-        # Count of how many successful (non fatal) conversions
-        self.converted_count = 0
-
-        # Count of the total sketch constraints
-        self.constraint_count = 0
-        # Count of the converted sketch constraints
-        self.constraint_converted_count = 0
-
-        # Count of the total sketch dimensions
-        self.dimension_count = 0
-        # Count of the converted sketch dimensions
-        self.dimension_converted_count = 0
-
-        # Count of the number of perfect sketch conversions without dropping constraints
-        self.perfect_sketch_converted_count = 0
-
+        # Counter to log stats
+        self.stats = self.create_empty_stats()
         # Log of the failures
         self.failures = {}
     
@@ -87,12 +72,12 @@ class DeepmindToFusionGalleryConverter():
                 print(f" - {failure}: {failure_dict['count']}")
         print("---------------------")  
         print("Conversion Stats")
-        constraint_converted_percentage = (self.constraint_converted_count / self.constraint_count) * 100
-        print(f" - {self.constraint_converted_count}/{self.constraint_count} ({constraint_converted_percentage:.2f}%) constraints converted")
-        dimension_converted_percentage = (self.dimension_converted_count / self.dimension_count) * 100
-        print(f" - {self.dimension_converted_count}/{self.dimension_count} ({dimension_converted_percentage:.2f}%) dimensions converted")
-        perfect_sketch_percentage = (self.perfect_sketch_converted_count / self.converted_count) * 100
-        print(f" - {self.perfect_sketch_converted_count}/{self.converted_count} ({perfect_sketch_percentage:.2f}%) sketches converted without removing constraints")
+        constraint_converted_percentage = (self.stats["constraint_converted_count"] / self.stats["constraint_count"]) * 100
+        print(f" - {self.stats['constraint_converted_count']}/{self.stats['constraint_count']} ({constraint_converted_percentage:.2f}%) constraints converted")
+        dimension_converted_percentage = (self.stats["dimension_converted_count"] / self.stats["dimension_count"]) * 100
+        print(f" - {self.stats['dimension_converted_count']}/{self.stats['dimension_count']} ({dimension_converted_percentage:.2f}%) dimensions converted")
+        perfect_sketch_percentage = (self.stats["perfect_sketch_converted_count"] / self.stats["converted_count"]) * 100
+        print(f" - {self.stats['perfect_sketch_converted_count']}/{self.stats['converted_count']} ({perfect_sketch_percentage:.2f}%) sketches converted without removing constraints")
         print("---------------------")
 
     def convert(self):
@@ -104,8 +89,9 @@ class DeepmindToFusionGalleryConverter():
         else:
             if self.limit is not None:
                 print("Error: Cannot set limit when using multiple threads")
-                return
+                return False
             self.convert_parallel()            
+        return True
 
     def convert_parallel(self):
         """Convert all of the input files in parallel"""
@@ -115,59 +101,45 @@ class DeepmindToFusionGalleryConverter():
             itertools.repeat(True)
         )
         objs_iter = Pool(self.threads).starmap(self.convert_data, iter_data)
-        for stats in objs_iter:
-            # Add the per file counts to the global counts
-            self.update_global_stats(stats)
-        print(f"\n\nConverted {self.converted_count}/{self.count} sketches!")
+        for local_stats in objs_iter:
+            # Add the per file stats to the global stats
+            self.stats.update(local_stats)
+        print(f"\n\nConverted {self.stats['converted_count']}/{self.stats['count']} sketches!")
     
     def convert_serial(self):
         """Convert all of the input files in sequence"""
         for i, input_file in enumerate(self.input_files):
             print(f"Converting {i}/{len(self.input_files)} data files")
-            stats = self.convert_data(input_file, self.output_path)
+            local_stats = self.convert_data(input_file, self.output_path)
             # Add the per file counts to the global counts
-            self.update_global_stats(stats)
-            if args.limit is not None and self.converted_count >= args.limit:
+            self.stats.update(local_stats)
+            if args.limit is not None and self.stats["converted_count"] >= args.limit:
                 break    
-        print(f"\nConverted {self.converted_count}/{self.count} sketches!")
+        print(f"\nConverted {self.stats['converted_count']}/{self.stats['count']} sketches!")
 
     def create_empty_stats(self):
-        """Create an empty stats structure"""
-        return {
+        """Create an empty stats Counter"""
+        return Counter({
+            # Count of how many sketch conversions have been attempted
             "count": 0,
+            # Count of how many successful (non fatal) conversions
             "converted_count": 0,
-            "perfect_sketch_converted_count": 0,
+            # Count of the total sketch constraints
             "constraint_count": 0,
+            # Count of the converted sketch constraints
             "constraint_converted_count": 0,
+            # Count of the total sketch dimensions
             "dimension_count": 0,
-            "dimension_converted_count": 0
-        }
-
-    def update_global_stats(self, stats):
-        """Update the global stats outside of multiprocessing"""
-        self.count += stats["count"]
-        self.converted_count += stats["converted_count"]
-        self.perfect_sketch_converted_count += stats["perfect_sketch_converted_count"]
-        self.constraint_count += stats["constraint_count"]
-        self.constraint_converted_count += stats["constraint_converted_count"]
-        self.dimension_count += stats["dimension_count"]
-        self.dimension_converted_count += stats["dimension_converted_count"]
-    
-    def update_local_stats(self, stats, new_stats):
-        """Update the local stats"""
-        stats["perfect_sketch_converted_count"] += new_stats["perfect_sketch_converted_count"]
-        stats["constraint_count"] += new_stats["constraint_count"]
-        stats["constraint_converted_count"] += new_stats["constraint_converted_count"]
-        stats["dimension_count"] += new_stats["dimension_count"]
-        stats["dimension_converted_count"] += new_stats["dimension_converted_count"]
+            # Count of the converted sketch dimensions
+            "dimension_converted_count": 0,
+            # Count of the number of perfect sketch conversions without dropping constraints
+            "perfect_sketch_converted_count": 0
+        })
 
     def convert_data(self, input_file, output_path, parallel=False):
         """Convert all the sketches in a single data file and save them as multiple json files"""
         with open(input_file) as f:
             dm_data = json.load(f)
-        # Keep a local count (per file) that gets added to the global count (all files)
-        count = 0
-        converted_count = 0
         fg_sketches = []
         total = len(dm_data)
         if not parallel:
@@ -182,15 +154,15 @@ class DeepmindToFusionGalleryConverter():
             position = 0
         pbar = tqdm(dm_data, total=total, position=position, leave=False)
         pbar.set_description(f"[{position}] {input_file.stem}")
+        # Keep a local count (per file) that gets added to the global count (all files)
         all_stats = self.create_empty_stats()
         for index, dm_sketch in enumerate(pbar):
             fg_sketch, con_dim_stats = self.convert_sketch(dm_sketch, index)
-            # pbar.update(1)
             if fg_sketch is not None:
-                self.update_local_stats(all_stats, con_dim_stats)
+                all_stats.update(con_dim_stats)
                 # BATCH SAVING
                 fg_sketches.append(fg_sketch) 
-                converted_count += 1
+                all_stats["converted_count"] += 1
                 # INDIVIDUAL FILE SAVING
                 # # Save the file with the name of the original deepmind data file
                 # # and the index into that file of the sketch
@@ -199,11 +171,11 @@ class DeepmindToFusionGalleryConverter():
                 #     json.dump(fg_sketch, f, indent=4)
                 # if json_file.exists():
                 #    converted_count += 1
-            count += 1
+            all_stats["count"] += 1
             if not parallel:
                 if self.limit is not None:
                     # Get the count for all converted sketches so far
-                    if self.converted_count + converted_count >= self.limit:
+                    if self.stats["converted_count"] + all_stats["converted_count"] >= self.limit:
                         break
 
         # BATCH SAVING
@@ -212,9 +184,6 @@ class DeepmindToFusionGalleryConverter():
         with open(json_file, "w") as f:
             json.dump(fg_sketches, f, indent=4)
         print(f"Finished writing {json_file.name}")
-        
-        all_stats["count"] = count
-        all_stats["converted_count"] = converted_count
         return all_stats
 
     def convert_sketch(self, dm_sketch, index):
@@ -500,8 +469,9 @@ def main(args):
 
     output_path = get_output_dir(args.output)
     converter = DeepmindToFusionGalleryConverter(input_files, output_path, args.limit, args.threads)
-    converter.convert()
-    converter.print_log_results()
+    success = converter.convert()
+    if success:
+        converter.print_log_results()
 
 
 if __name__ == "__main__":
