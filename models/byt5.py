@@ -184,9 +184,9 @@ class ByT5Model(pl.LightningModule):
             return optimizer
 
         #scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
-        from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
-        scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=10, max_epochs=40)
-        #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, warmup_epochs=10, max_epochs=40)
+        #from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
+        #scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=10, max_epochs=40)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50,T_mult=0.9)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
