@@ -8,6 +8,8 @@ try:
 except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchGraphsDataModule, SketchDataModule
+from dataset.visrecon_sg_dataset import get_render_sketchgraphs_dataloader
+
 from models.byt5 import ByT5Model
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
@@ -21,6 +23,7 @@ from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
 from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
 
+from dataset.visrecon_sg_dataset import get_render_sketchgraphs_dataloader
 
 def get_model(args, total_steps):
     if "segformer" in args.model_name:
@@ -44,6 +47,11 @@ def get_dataloader(args, split, shuffle):
         return DataLoader(datasets[split], batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                           num_workers=args.num_workers)
 
+    if args.train_vit:
+        return get_render_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split=split, shuffle=shuffle)
+       
+        
+    
     return get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split=split, shuffle=shuffle)
 
 
