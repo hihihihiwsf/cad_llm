@@ -14,7 +14,7 @@ import argparse
 import importlib
 import json
 from tqdm import tqdm
-from preprocess.sketchgraphs.data import flat_array, sketch_from_sequence
+from sketchgraphs.data import flat_array, sketch_from_sequence
 from preprocess import sketch_sg
 from preprocess.preprocessing import preprocess_sketch
 from preprocess.preprocess_utils import get_files, get_output_dir, load_filter, save_splits
