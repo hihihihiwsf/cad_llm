@@ -5,6 +5,34 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import aws_utils
 
 
+def get_total_train_steps(num_train_batches, num_gpus, epochs):
+    # Assumes running on gpus, one node and no accumulate_grad_batches
+    train_batches = num_train_batches // num_gpus if num_gpus else num_train_batches
+    total_train_steps = train_batches * epochs
+
+    return total_train_steps
+
+
+def get_comet_logger(exp_name):
+    comet_json_path = Path("cometml.json")
+    if not comet_json_path.exists():
+        return
+
+    with open(comet_json_path) as json_file:
+        comet_config = json.load(json_file)
+
+    # Creat a new comet experiment
+    return pl.loggers.CometLogger(
+        api_key=comet_config["api_key"],
+        workspace=comet_config["workspace"],
+        project_name=comet_config["project_name"],
+        experiment_name=exp_name,
+        log_code=False,
+        log_git_metadata=False,
+        log_git_patch=False,
+    )
+
+
 def get_loggers(args, log_dir):
     """Get the loggers to use"""
     args_file = log_dir / "args.json"
@@ -14,22 +42,12 @@ def get_loggers(args, log_dir):
     csv_logger = pl.loggers.CSVLogger(log_dir, name="log")
     tb_logger = pl.loggers.TensorBoardLogger(log_dir, name="tb_log")
     loggers = [csv_logger, tb_logger]
-    comet_json_path = Path("cometml.json")
-    if args.comet and comet_json_path.exists():
-        with open(comet_json_path) as json_file:
-            comet_config = json.load(json_file)
-        # Creat a new comet experiment
-        comet_logger = pl.loggers.CometLogger(
-            api_key=comet_config["api_key"],
-            workspace=comet_config["workspace"],
-            project_name=comet_config["project_name"],
-            experiment_name=args.exp_name,
-            log_code=False,
-            log_git_metadata=False,
-            log_git_patch=False,
-        )
+
+    comet_logger = get_comet_logger(args.exp_name) if args.comet else None
+    if comet_logger:
         args.comet_experiment_key = comet_logger.experiment.get_key()
         loggers.append(comet_logger)
+
     return loggers
 
 

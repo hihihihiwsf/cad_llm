@@ -4,114 +4,89 @@ Train a CAD LLM model on a Ray Cluster
 
 from pathlib import Path
 
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from adsk_ailab_ray.ray_lightning import RayLightningExperiment
 from pytorch_lightning.loggers.csv_logs import CSVLogger
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 
-from adsk_ailab_ray.ray_lightning import RayLightningExperiment
-
-from util import get_checkpoint_callbacks
-from dataset.sg_dataset import get_sketchgraphs_dataloader
-from dataset.sg_dataset import SketchGraphsDataModule
-from models.byt5 import ByT5Model
-
-from args.main_args import get_main_args_for_launch
 from args.ray_args import get_ray_args
+from dataset.byt5_new_tokens_dataset import Byt5NewTokensDataModule
+from models.byt5_v2 import ByT5v2
+from util import get_comet_logger
 
 
-def get_dataloader(args, split, shuffle, model):
+def get_loggers(exp_name, use_comet):
+    loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]
 
-    return get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split=split, shuffle=shuffle)
+    comet_logger = get_comet_logger(exp_name) if use_comet else None
+    if comet_logger:
+        loggers.append(comet_logger)
+
+    return loggers
 
 
 def train_on_ray_cluster():
+    args = get_ray_args()
 
-    ray_args = get_ray_args()
-    main_args = get_main_args_for_launch()  # args to pass to main.py
-
-    main_args.samples_dir = main_args.results_dir
-
-    loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]
-
-    tokenizer = ByT5Model.get_tokenizer(main_args.model_name)
-    datamodule = SketchGraphsDataModule(
-        tokenizer=tokenizer,
-        args=main_args,
-        ray_args=ray_args
-    )
-
-    datamodule.prepare_data() # Prepere dataset to get the number of train batches
-    num_train_batches = len(datamodule.train_dataloader())
-    total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, ray_args.num_gpus, main_args.epochs)
-
-    checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min", dirpath="checkpoints", filename=f"best",
-                                          save_last=True)
-    checkpoint_callback.CHECKPOINT_NAME_LAST = "last"
-    call_backs = [checkpoint_callback]
-
-    call_backs.append(LearningRateMonitor(logging_interval='step'))
-
-    log_every_n_steps = 10000
-
-    # Set your LightningModule and LightningDataModule classes
-    model_class = ByT5Model
-    data_class = SketchGraphsDataModule
-
-    # Configure hyperparameters and other settings
-    exp_name = main_args.exp_name
-    num_workers = ray_args.num_gpus
-    num_cpus_per_worker = ray_args.num_cpus_per_worker
-    strategy = ray_args.strategy
-    strategy_kwargs = {}
-    model_class_kwargs = {
-        "args": main_args,
-        "tokenizer": tokenizer,
-        "total_train_steps": total_train_steps
-    }
+    # Configure LightningModule and LightningDataModule classes and kwargs
+    data_class = Byt5NewTokensDataModule
     data_class_kwargs = {
-        "tokenizer": tokenizer,
-        "args": main_args,
-        "ray_args": ray_args
+        "model_name": args.model_name,
+        "batch_size": args.batch_size,
+        "max_length": args.max_length,
+        "min_ratio": args.min_split_ratio,
+        "max_ratio": args.max_split_ratio,
+        "input_s3_bucket": args.input_s3_bucket,
+        "dataset_path": args.local_dataset_dir,
+        "num_dataloader_workers": min(args.num_dataloader_workers, args.num_cpus_per_worker),
     }
-    
+
+    model_class = ByT5v2
+    tokenizer = Byt5NewTokensDataModule.get_tokenizer(args.model_name)
+    local_samples_path = Path(args.local_results_dir) / args.exp_name / "samples"
+    remote_samples_path = f"s3://{args.output_s3_bucket}/{args.exp_name}/samples"
+    model_class_kwargs = {
+        "model_name": args.model_name,
+        "lr": args.lr,
+        "batch_size": args.batch_size,
+        "max_length": args.max_length,
+        "local_samples_path": local_samples_path,
+        "remote_samples_path": remote_samples_path,
+        "tokenizer_length": len(tokenizer),
+    }
+
+    # Configure lightning trainer kwargs
+    loggers = get_loggers(args.exp_name, args.comet)
     trainer_kwargs = {
-            "callbacks": call_backs,
-            "logger": loggers,
-            "max_epochs": main_args.epochs,
-            "accelerator": "auto",
-            "log_every_n_steps": log_every_n_steps,
-            "val_check_interval": main_args.val_check_interval,
+        "logger": loggers,
+        "max_epochs": args.max_epochs,
+        "accelerator": "auto",
     }
+
+    # Configure ray checkpointing kwargs
     checkpointing_kwargs = {
         "monitor": "val_loss",
         "mode": "min",
         "save_top_k": 1
     }
-    input_s3_bucket = ray_args.input_s3_bucket
-    output_s3_bucket = ray_args.output_s3_bucket
-
-    local_data_dir = main_args.dataset
-    local_results_dir = main_args.results_dir
 
     # Define an Experiment
     experiment = RayLightningExperiment(
-            exp_name,
-            num_workers,
-            num_cpus_per_worker,
-            strategy,
-            strategy_kwargs,
-            model_class,
-            model_class_kwargs,
-            data_class,
-            data_class_kwargs,
-            trainer_kwargs,
-            checkpointing_kwargs,
-            input_s3_bucket,
-            output_s3_bucket,
-            local_data_dir,
-            local_results_dir,
-            max_failures=10
+        exp_name=args.exp_name,
+        num_workers=args.num_gpus,
+        num_cpus_per_worker=args.num_cpus_per_worker,
+        strategy=args.strategy,
+        strategy_kwargs={},
+        model_class=model_class,
+        model_class_kwargs=model_class_kwargs,
+        data_class=data_class,
+        data_class_kwargs=data_class_kwargs,
+        trainer_kwargs=trainer_kwargs,
+        checkpointing_kwargs=checkpointing_kwargs,
+        input_s3_bucket=args.input_s3_bucket,
+        output_s3_bucket=args.output_s3_bucket,
+        local_data_dir=args.local_dataset_dir,
+        local_results_dir=args.local_results_dir,
+        max_failures=args.max_failures,
     )
 
     # Run the experiment on the Ray cluster

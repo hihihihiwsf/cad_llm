@@ -28,6 +28,7 @@ from dataset.syn_constraints_dataset import (
     SynConstraintsSchema2DataModule,
 )
 from models.byt5_syn_constraints import ByT5SynConstraintsModel
+from util import get_total_train_steps
 
 
 def get_model(args, tokenizer, total_train_steps):
@@ -120,7 +121,7 @@ def main():
 
     num_train_batches = len(dataloader["train"])
     num_gpus = torch.cuda.device_count()
-    total_train_steps = ByT5Model.get_total_train_steps(num_train_batches, num_gpus, args.epochs)
+    total_train_steps = get_total_train_steps(num_train_batches, num_gpus, args.epochs)
 
     print("Loading model...")
     model = get_model(args, tokenizer=tokenizer, total_train_steps=total_train_steps)

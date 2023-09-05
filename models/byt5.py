@@ -128,14 +128,6 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     @staticmethod
-    def get_total_train_steps(num_train_batches, num_gpus, epochs):
-        # Assumes running on gpus, one node and no accumulate_grad_batches
-        train_batches = num_train_batches // num_gpus if num_gpus else num_train_batches
-        total_train_steps = train_batches * epochs
-
-        return total_train_steps
-
-    @staticmethod
     def get_tokenizer(model_name):
         return AutoTokenizer.from_pretrained(model_name)
 
