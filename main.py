@@ -39,10 +39,10 @@ def get_model(args, tokenizer, total_train_steps):
     if "segformer" in args.model_name:
         return SegformerModel(model_name=args.model_name, checkpoint_dir=args.checkpoint_dir)
 
-    if "byt5" in args.model_name:
-        return ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
+    # if "byt5" in args.model_name:
+    return ByT5Model(args=args, tokenizer=tokenizer, total_train_steps=total_train_steps)
 
-    raise ValueError(f"Unsupported model type {args.model_name}")
+    # raise ValueError(f"Unsupported model type {args.model_name}")
 
 
 def get_dataloader_and_tokenizer(args):
