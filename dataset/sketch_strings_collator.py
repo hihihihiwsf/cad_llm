@@ -17,6 +17,7 @@ class SketchStringsCollator:
         input_entities, single_ents_length = [], []
         output_entities, single_ents_length_out = [], []
         
+        input_text_revised, output_text_revised = [], []
         for example in examples:
             single_ents = []
             for i, x in enumerate(example['input_text'].split(";")):
@@ -36,6 +37,9 @@ class SketchStringsCollator:
             input_entities.extend(single_ents)
             single_ents_length.append(len(single_ents))
 
+            in_txt = ''.join(single_ents).replace('C','')
+            input_text_revised.append(in_txt)
+            
             
         for example in examples:
             single_ents_out = []
@@ -56,7 +60,14 @@ class SketchStringsCollator:
             output_entities.extend(single_ents_out)
             single_ents_length_out.append(len(single_ents_out))
             
-            
+        
+            out_txt = ''.join(single_ents_out).replace('C','')
+            output_text_revised.append(out_txt)
+        
+        
+        input_text = input_text_revised
+        output_text = output_text_revised
+        
         # Encode input and output
         tokenized_input = self.tokenize(input_text)
         tokenized_output = self.tokenize(output_text)
