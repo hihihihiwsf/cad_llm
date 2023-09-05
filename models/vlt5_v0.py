@@ -167,8 +167,8 @@ class ByT5Model(pl.LightningModule):
         # image_embeds = image_embeds.permute(0,2,1)
         # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        image_for_llm = self.gelu(self.mapper(image_embeds))
-        image_for_llm = self.post_batchnorm(image_for_llm.permute(0,2,1)).permute(0,2,1)
+        image_for_llm = self.mapper(image_embeds)
+        image_for_llm = self.gelu(self.post_batchnorm(image_for_llm.permute(0,2,1)).permute(0,2,1))
         
         '''txt features'''
         txt_embedder = self.model.get_input_embeddings()
@@ -225,8 +225,8 @@ class ByT5Model(pl.LightningModule):
         # image_embeds = image_embeds.permute(0,2,1)
         # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        image_for_llm = self.gelu(self.mapper(image_embeds))
-        image_for_llm = self.post_batchnorm(image_for_llm.permute(0,2,1)).permute(0,2,1)
+        image_for_llm = self.mapper(image_embeds)
+        image_for_llm = self.gelu(self.post_batchnorm(image_for_llm.permute(0,2,1)).permute(0,2,1))
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
@@ -320,7 +320,7 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters())
+        params = list(self.trainer.model.parameters()) + list(self.mapper.parameters())
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
