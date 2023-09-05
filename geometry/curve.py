@@ -24,15 +24,6 @@ class Curve:
         for point in self.get_shifted_points(cell_size=cell_size):
             cv2.circle(np_image, point, radius=radius, color=CV2_COLORS["black"], thickness=-1)
 
-    def get_shifted_points(self, cell_size):
-        """
-        Shift points to center of cell in quantized grid
-        """
-        return cell_size * self.points + (cell_size // 2, cell_size // 2)
-
-    def shift_point(self, point, cell_size):
-        return cell_size * point + (cell_size // 2, cell_size // 2)
-    
     def draw_points_pil(self, img_draw, color="black", transform=None):
         r = 1
         points = self.points
@@ -41,3 +32,12 @@ class Curve:
 
         for x, y in points:
             img_draw.ellipse(xy=(x-r, y-r, x+r, y+r), fill=color, outline=None, width=1)
+            
+    def get_shifted_points(self, cell_size):
+        """
+        Shift points to center of cell in quantized grid
+        """
+        return cell_size * self.points + (cell_size // 2, cell_size // 2)
+
+    def shift_point(self, point, cell_size):
+        return cell_size * point + (cell_size // 2, cell_size // 2)

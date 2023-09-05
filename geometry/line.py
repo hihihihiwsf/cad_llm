@@ -18,20 +18,7 @@ class Line(Curve):
             self.good = True
         else:
             self.invalid_reason = "Line has zero length"
-    
-    def draw_pil(self, img_draw, draw_points=True, linewidth=1, color="blue", transform=None):
-        assert self.good, "The curve is not in the good state"
 
-        points = self.points
-        if transform:
-            points = [(transform(x), transform(y)) for x, y in points]
-
-        img_draw.line(xy=points, fill=color, width=linewidth)
-
-        if draw_points:
-            self.draw_points_pil(img_draw, transform=transform)
-
-        return img_draw
 
     def draw(self, ax, draw_points=True, linewidth=1, color="black"):
         pt0, pt1 = self.points
@@ -62,3 +49,17 @@ class Line(Curve):
             self.draw_points_np(np_image, cell_size)
 
         return np_image
+    
+    def draw_pil(self, img_draw, draw_points=True, linewidth=1, color="blue", transform=None):
+        assert self.good, "The curve is not in the good state"
+
+        points = self.points
+        if transform:
+            points = [(transform(x), transform(y)) for x, y in points]
+
+        img_draw.line(xy=points, fill=color, width=linewidth)
+
+        if draw_points:
+            self.draw_points_pil(img_draw, transform=transform)
+
+        return img_draw

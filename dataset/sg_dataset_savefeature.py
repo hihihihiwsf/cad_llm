@@ -14,11 +14,9 @@ from IPython import embed
 
 class sketchGraphRetrievalDataset(Dataset):
     def __init__(self, args, split):
-        #path = Path(args.dataset) / f"{split}.json"
-        # with open(path, "r") as f:
-        #     self.data = json.load(f)
-        path = f'{split}_saved_sketch_dict_features.pt'
-        self.data = torch.load(path)
+        path = Path(args.dataset) / f"{split}.json"
+        with open(path, "r") as f:
+            self.data = json.load(f)
     
     def __len__(self):
         return len(self.data)
@@ -217,12 +215,58 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
                       num_workers=args.num_workers)
 
 
-def get_icl_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
+def save_icl_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = sketchGraphRetrievalDataset(split=split, args=args)
     
-    print(f'{split}_dataset_length:', len(dataset))
+    print(f'{split}_dataset_length:', len(dataset))  
+
+    save_feature(dataset,split=split)
     
-    collator = SketchGraphsRetrievalCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
-    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle, pin_memory=True, 
-                      num_workers=args.num_workers)
-                      #persistent_workers=True,)
+    print("endding.....")
+    
+    #collator = SketchGraphsRetrievalCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
+    # return DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, pin_memory=True, 
+    #                   num_workers=args.num_workers)
+    #                   #persistent_workers=True,)
+
+def save_feature(dataset,split):
+    print(f"saving {split} data and feature")
+    le = len(dataset)
+    vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
+    output = []
+    idx = 0
+    for sketch in dataset:
+        idx += 1
+        print("idx:", idx)
+        
+        st= time.time()
+        point_inputs = get_point_entities(sketch["input_text"])
+        list_of_img = visualize_sample_pil(point_entities=[point_inputs], box_lim=64 + 3)
+        input_images = vitmae_preprocess(list_of_img, return_tensors="pt")
+        input_pixels = input_images.pixel_values[0]
+        
+        
+        point_icls = get_point_entities(sketch["icl_text"])
+        list_of_img = visualize_sample_pil(point_entities=[point_icls], box_lim=64 + 3)
+        icl_images = vitmae_preprocess(list_of_img, return_tensors="pt")
+        icl_pixels = icl_images.pixel_values[0]
+        
+        sketch['input_pixels'] = input_pixels
+        sketch['icl_pixels'] = icl_pixels
+        output.append(sketch)
+        et = time.time()
+        if et-st > 200:
+            embed()
+
+        if idx/10==0:
+            print(idx)
+    try:
+        save_chunk(output, split)
+        torch.save(output, f'{split}_saved_sketch_dict_features.pt')
+    except:
+        embed()
+
+def save_chunk(data, split):
+    le = len(data)
+    k = le/8
+            

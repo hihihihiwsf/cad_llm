@@ -57,7 +57,7 @@ class Arc(Curve):
 
             return
 
-        center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.int)
+        center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.uint)
         radius = (self.radius * cell_size).astype(dtype=np.uint)
 
         start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
@@ -77,7 +77,8 @@ class Arc(Curve):
             self.draw_points_np(np_image, cell_size)
 
         return np_image
-    
+
+
     def draw_pil(self, img_draw, draw_points=True, linewidth=1, color="green", transform=None):
         if not self.good:
             points = self.points
@@ -108,6 +109,7 @@ class Arc(Curve):
             self.draw_points_pil(img_draw=img_draw, transform=transform)
 
         return img_draw
+    
 
     def find_arc_geometry(self):
         #     Subject 1.04: How do I generate a circle through three points?
