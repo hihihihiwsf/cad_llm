@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 class SketchStringsCollator:
     def __init__(self, tokenizer, max_length=None):
@@ -15,12 +16,43 @@ class SketchStringsCollator:
 
         input_entities, single_ents_length = [], []
         output_entities, single_ents_length_out = [], []
+        
         for example in examples:
-            single_ents = ["C"+x+";" for x in example['input_text'].split(";") if x][:30]
+            single_ents = []
+            for i, x in enumerate(example['input_text'].split(";")):
+                if x:
+                    x_token = self.tokenizer.encode(x)[1:-1]
+                    if len(x_token) == 15:
+                        x = self.tokenizer.batch_decode(x_token)
+                        x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
+                        y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
+                        radius = str(int(abs(int(x[10]) - int(x[6]))))
+                        single_ents.append("C"+x_point+","+y_point+","+radius+";")
+                    else:
+                        single_ents.append("C"+x+";")
+            single_ents = single_ents[:30]
+                        
+            # single_ents = ["C"+x+";" for x in example['input_text'].split(";") if x][:30]
             input_entities.extend(single_ents)
             single_ents_length.append(len(single_ents))
 
-            single_ents_out = ["C"+x+";" for x in example['output_text'].split(";") if x][:30]
+            
+        for example in examples:
+            single_ents_out = []
+            for i, x in enumerate(example['output_text'].split(";")):
+                if x:
+                    x_token = self.tokenizer.encode(x)[1:-1]
+                    if len(x_token) == 15:
+                        x = self.tokenizer.batch_decode(x_token)
+                        x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
+                        y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
+                        radius = str(int(abs(int(x[10]) - int(x[6]))))
+                        single_ents_out.append("C"+x_point+","+y_point+","+radius+";")
+                    else:
+                        single_ents_out.append("C"+x+";")
+            single_ents_out = single_ents_out[:30]
+            
+            # single_ents_out = ["C"+x+";" for x in example['output_text'].split(";") if x][:30]
             output_entities.extend(single_ents_out)
             single_ents_length_out.append(len(single_ents_out))
             
