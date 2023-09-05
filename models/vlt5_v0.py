@@ -70,6 +70,7 @@ class ByT5Model(pl.LightningModule):
             #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
             m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
+            del m
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
@@ -140,10 +141,10 @@ class ByT5Model(pl.LightningModule):
 
         #convert to PIL image for CLIP
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-        with torch.no_grad():
+        # with torch.no_grad():
 
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
-            image_features = torch.sum(oi['last_hidden_state'], 1)
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
+        image_features = torch.sum(oi['last_hidden_state'], 1)
 
 
         '''owl vit'''
