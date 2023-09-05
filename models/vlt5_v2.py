@@ -83,9 +83,6 @@ class ByT5Model(pl.LightningModule):
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
 
         self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
-        self.batchnorm = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
-        self.post_batchnorm = torch.nn.BatchNorm1d(self.model.get_input_embeddings().weight.shape[1])
-        
         self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
@@ -147,35 +144,20 @@ class ByT5Model(pl.LightningModule):
 
 
         '''owl vit'''
-        '''layernorm for image features'''
-        # last_hidden_state = oi['last_hidden_state']
-        # #pooled_output= last_hidden_state[:, 0, :]
-        # image_embeds = self.batchnorm(last_hidden_state) #self.post_layernorm(last_hidden_state)
-        
-        # # image_embeds = image_embeds.permute(0,2,1)
-        # # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
-
-        # image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        # image_for_llm = self.layernorm(image_for_llm)
-        
-        '''batchnorm for image features'''
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
-        image_embeds = self.batchnorm(last_hidden_state.permute(0,2,1).float()) #self.post_layernorm(last_hidden_state)
-        image_embeds = image_embeds.permute(0,2,1)
-        '''patch embedding downsample 196 to 14'''
+        image_embeds = self.post_layernorm(last_hidden_state)
+        
         # image_embeds = image_embeds.permute(0,2,1)
         # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        image_for_llm = self.gelu(self.mapper(image_embeds))
-        image_for_llm = self.post_batchnorm(image_for_llm.permute(0,2,1)).permute(0,2,1)
-        
-        '''txt features'''
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
+        image_for_llm = self.layernorm(image_for_llm)
+
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
         
-        '''fuse text embedding and image embeddings by concat directly'''
         input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
@@ -212,21 +194,18 @@ class ByT5Model(pl.LightningModule):
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images'])) 
-        image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
-        # image_features = oi.image_embeds
-        # image_features = oi['pooler_output']
 
         '''owl vit'''
         last_hidden_state = oi['last_hidden_state']
         #pooled_output= last_hidden_state[:, 0, :]
-        image_embeds = self.batchnorm(last_hidden_state.permute(0,2,1).float()) #self.post_layernorm(last_hidden_state)
-        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.post_layernorm(last_hidden_state)
+        
         '''patch embedding downsample 196 to 14'''
         # image_embeds = image_embeds.permute(0,2,1)
         # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        image_for_llm = self.gelu(self.mapper(image_embeds))
-        image_for_llm = self.post_batchnorm(image_for_llm.permute(0,2,1)).permute(0,2,1)
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
+        image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
