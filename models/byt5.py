@@ -67,7 +67,8 @@ class ByT5Model(pl.LightningModule):
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
-            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+            m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
         
         self.vis_model = self.vit_mae
@@ -133,8 +134,6 @@ class ByT5Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-
-
 
         #convert to PIL image for CLIP
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
