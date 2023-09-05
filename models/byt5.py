@@ -441,7 +441,7 @@ class ByT5Model(pl.LightningModule):
         # batch_final['inputs_embeds'] = src
         # # batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
         del model_batch['labels']
-        batch['samples'] = self.model.generate(**model_batch, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=192, early_stopping=True, do_sample=False)
+        batch['samples'] = self.model.generate(**model_batch, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=self.args.max_length+10, early_stopping=True, do_sample=False)
         
         
         # final_seq = []
