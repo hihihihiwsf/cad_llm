@@ -148,20 +148,6 @@ class ByT5Model(pl.LightningModule):
         #pooled_output= last_hidden_state[:, 0, :]
         image_embeds = self.post_layernorm(last_hidden_state)
         
-        # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
-        # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
-
-        # # Merge image embedding with class tokens
-        # image_embeds = image_embeds[:, 1:, :] * class_token_out
-        # image_embeds = self.layer_norm(image_embeds)
-
-        # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        # new_size = (
-        #     image_embeds.shape[0],
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     image_embeds.shape[-1],
-        # )
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
@@ -217,20 +203,6 @@ class ByT5Model(pl.LightningModule):
         #pooled_output= last_hidden_state[:, 0, :]
         image_embeds = self.post_layernorm(last_hidden_state)
         
-        # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
-        # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
-
-        # # Merge image embedding with class tokens
-        # image_embeds = image_embeds[:, 1:, :] * class_token_out
-        # image_embeds = self.layer_norm(image_embeds)
-
-        # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        # new_size = (
-        #     image_embeds.shape[0],
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     image_embeds.shape[-1],
-        # )
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
