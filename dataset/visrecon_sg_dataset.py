@@ -3,8 +3,10 @@ import numpy as np
 import random
 import json
 from pathlib import Path
+import pytorch_lightning as pl
+
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv
+from geometry.visualization import visualize_batch, visualize_sample_pil
 # import clip
 import torch 
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
@@ -94,7 +96,7 @@ class SketchGraphsCollator:
         
         # proc = mp.Process(target=visualize_sample(input_curves=input_curves, box_lim=64 + 3))
         # list_of_img = visualize_sample(input_curves=input_curves, box_lim=64 + 3)
-        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
+        list_of_img = visualize_sample_pil(point_entities=point_inputs, box_lim=64 + 3)
         # proc.daemon=True
         # proc.start()
         # proc.join()
@@ -121,3 +123,33 @@ def get_render_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+    
+        
+class ReconSketchDataModule(pl.LightningDataModule):
+    def __init__(self, tokenizer, args):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.args = args
+
+    def train_dataloader(self):
+        return get_render_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="train",
+                shuffle=True
+        )
+
+    def val_dataloader(self):
+        return get_render_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="val",
+                shuffle=False
+        )
+    def test_dataloader(self):
+        return get_render_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="test",
+                shuffle=False
+        )

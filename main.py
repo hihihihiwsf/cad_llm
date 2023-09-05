@@ -8,9 +8,9 @@ try:
 except ImportError:
     pass
 from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchGraphsDataModule, SketchDataModule
-from dataset.visrecon_sg_dataset import get_render_sketchgraphs_dataloader
 
 from models.byt5 import ByT5Model
+from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
 from args.main_args import get_training_args
@@ -23,7 +23,7 @@ from dataset.rendered_sketch_dataset import get_rendered_sketch_dataset
 from dataset.sketch_strings_dataset import get_sketch_strings_dataset
 from dataset.sketch_strings_collator import SketchStringsCollator
 
-from dataset.visrecon_sg_dataset import get_render_sketchgraphs_dataloader
+from dataset.visrecon_sg_dataset import get_render_sketchgraphs_dataloader, ReconSketchDataModule
 
 def get_model(args, total_steps):
     if "segformer" in args.model_name:
@@ -81,13 +81,14 @@ def main():
 
     tokenizer = ByT5Model.get_tokenizer(args.model_name)
     print("Loading data...")
-    sketchdata = SketchDataModule(tokenizer, args)
+    sketchdata = ReconSketchDataModule(tokenizer, args)#SketchDataModule(tokenizer, args)
     
     num_train_batches = len(sketchdata.train_dataloader())
     num_gpus = torch.cuda.device_count()
     train_batches = num_train_batches // num_gpus
     total_train_steps = train_batches * args.epochs
-    model = get_model(args, total_train_steps)
+    
+    model = VisRecon(args) #get_model(args, total_train_steps)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -114,7 +115,7 @@ def main():
     if not args.eval: 
         trainer.fit(model, datamodule=sketchdata)
         print("=======test results============")
-        trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
+        #trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
     else:
         # loading the model from exp_name/best.ckpt
         ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
