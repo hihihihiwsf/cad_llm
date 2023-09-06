@@ -29,22 +29,22 @@ class SketchStringsCollator:
                     #         x_sep[i] = str(int(j) + 64)
                     # single_ents.append(','.join(x_sep)+";")
                     
-                    # x_token = self.tokenizer.encode(x)[1:-1]
-                    # if len(x_token) == 15:
-                    #     x = self.tokenizer.batch_decode(x_token)
-                    #     x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
-                    #     y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
-                    #     radius = str(int(abs(int(x[10]) - int(x[6]))))
-                    #     single_ents.append(x_point+","+y_point+","+radius+";")
-                    # else:
-                    #     single_ents.append(x+";")
+                    x_token = self.tokenizer.encode(x)[1:-1]
+                    if len(x_token) == 15:
+                        x = self.tokenizer.batch_decode(x_token)
+                        x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
+                        y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
+                        radius = str(int(abs(int(x[10]) - int(x[6]))))
+                        single_ents.append(x_point+","+y_point+","+radius+";")
+                    else:
+                        single_ents.append(x+";")
 
-                    x_sep = x.split(',')
-                    x_out = []
-                    for i in range(len(x_sep) // 2):
-                        idx = i * 2
-                        x_out.append(str(int(x_sep[idx]) * 64 + int(x_sep[idx+1])))
-                    single_ents.append(','.join(x_out)+";")
+                    # x_sep = x.split(',')
+                    # x_out = []
+                    # for i in range(len(x_sep) // 2):
+                    #     idx = i * 2
+                    #     x_out.append(str(int(x_sep[idx]) * 64 + int(x_sep[idx+1])))
+                    # single_ents.append(','.join(x_out)+";")
                       
                     
             in_txt = ''.join(single_ents)
@@ -60,23 +60,23 @@ class SketchStringsCollator:
                     #         x_sep[i] = str(int(j) + 64)
                     # single_ents.append(','.join(x_sep)+";")
                     
-                    # x_token = self.tokenizer.encode(x)[1:-1]
-                    # if len(x_token) == 15:
-                    #     x = self.tokenizer.batch_decode(x_token)
-                    #     x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
-                    #     y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
-                    #     radius = str(int(abs(int(x[10]) - int(x[6]))))
-                    #     single_ents.append(x_point+","+y_point+","+radius+";")
-                    # else:
-                    #     single_ents.append(x+";")
+                    x_token = self.tokenizer.encode(x)[1:-1]
+                    if len(x_token) == 15:
+                        x = self.tokenizer.batch_decode(x_token)
+                        x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
+                        y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
+                        radius = str(int(abs(int(x[10]) - int(x[6]))))
+                        single_ents.append(x_point+","+y_point+","+radius+";")
+                    else:
+                        single_ents.append(x+";")
                             
                     
-                    x_sep = x.split(',')
-                    x_out = []
-                    for i in range(len(x_sep) // 2):
-                        idx = i * 2
-                        x_out.append(str(int(x_sep[idx]) * 64 + int(x_sep[idx+1])))
-                    single_ents.append(','.join(x_out)+";")
+                    # x_sep = x.split(',')
+                    # x_out = []
+                    # for i in range(len(x_sep) // 2):
+                    #     idx = i * 2
+                    #     x_out.append(str(int(x_sep[idx]) * 64 + int(x_sep[idx+1])))
+                    # single_ents.append(','.join(x_out)+";")
                     
         
             out_text = ''.join(single_ents)
