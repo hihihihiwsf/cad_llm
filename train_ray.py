@@ -54,6 +54,10 @@ def train_on_ray_cluster():
         "tokenizer_length": len(tokenizer),
     }
 
+    strategy_kwargs = {}
+    if args.strategy == "fsdp":
+        strategy_kwargs["cpu_offload"] = True
+
     # Configure lightning trainer kwargs
     loggers = get_loggers(args.exp_name, args.comet)
     trainer_kwargs = {
@@ -61,6 +65,9 @@ def train_on_ray_cluster():
         "max_epochs": args.max_epochs,
         "accelerator": "auto",
     }
+
+    if args.mix_precision:
+        trainer_kwargs["precision"] = 16
 
     # Configure ray checkpointing kwargs
     checkpointing_kwargs = {
@@ -75,7 +82,7 @@ def train_on_ray_cluster():
         num_workers=args.num_gpus,
         num_cpus_per_worker=args.num_cpus_per_worker,
         strategy=args.strategy,
-        strategy_kwargs={},
+        strategy_kwargs=strategy_kwargs,
         model_class=model_class,
         model_class_kwargs=model_class_kwargs,
         data_class=data_class,

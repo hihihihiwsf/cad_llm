@@ -34,6 +34,13 @@ def get_ray_args():
         help="The name of distributed strategy used by lightening trainer ('ddp' or 'fsdp')"
     )
     parser.add_argument(
+        "--mix_precision",
+        type=int,
+        default=0,
+        help="Use mixed precision training. 1 for True, 0 for False"
+    )
+
+    parser.add_argument(
         "--max_failures",
         type=int,
         default="0",
