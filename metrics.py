@@ -51,15 +51,20 @@ def calculate_f1(labels, samples):
     f1 = []
     eps = 1e-6
     for label_entities, sample_entities in zip(labels, samples):
-        TP = eps
-        for ent in sample_entities:
-            if ent in label_entities:
-                TP += 1
-        FP = len(sample_entities) - TP
-        FN = len(label_entities) - TP
-        precision = (TP / (TP + FP)) + eps
-        recall = (TP / (TP + FN)) + eps
-        
-        f1.append(2 * precision * recall / (precision + recall))
+        TP = 0.
+        if not sample_entities:
+            f1.append(0.)
+        else:
+            for ent in sample_entities:
+                if ent in label_entities:
+                    TP += 1
+            FP = len(sample_entities) - TP
+            FN = len(label_entities) - TP
+            denom1 = (TP + FP) + eps
+            denom2 = (TP + FN) + eps
+            precision = (TP / denom1 ) + eps
+            recall = (TP / denom2 ) + eps
+            
+            f1.append(2 * precision * recall / (precision + recall))
 
     return np.mean(f1)

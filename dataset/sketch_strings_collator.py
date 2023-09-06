@@ -23,15 +23,22 @@ class SketchStringsCollator:
             single_ents = []
             for i, x in enumerate(example['input_text'].split(";")):
                 if x:
+                    # x_sep = x.split(',')
+                    # for i,j in enumerate(x_sep):
+                    #     if i % 2 != 0: # if y coordinate
+                    #         x_sep[i] = str(int(j) + 64)
+                    # single_ents.append(','.join(x_sep)+";")
+                    
                     x_token = self.tokenizer.encode(x)[1:-1]
-                    if len(x_token) == 15:
-                        x = self.tokenizer.batch_decode(x_token)
-                        x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
-                        y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
-                        radius = str(int(abs(int(x[10]) - int(x[6]))))
-                        single_ents.append(x_point+","+y_point+","+radius+";")
-                    else:
-                        single_ents.append(x+";")
+                    for i,j in enumerate(x_token):
+                        if len(x_token) == 15:
+                            x = self.tokenizer.batch_decode(x_token)
+                            x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
+                            y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
+                            radius = str(int(abs(int(x[10]) - int(x[6]))))
+                            single_ents.append(x_point+","+y_point+","+radius+";")
+                        else:
+                            single_ents.append(x+";")
         
             in_txt = ''.join(single_ents)
             input_text_revised.append(in_txt)
@@ -40,15 +47,22 @@ class SketchStringsCollator:
             single_ents = []
             for i, x in enumerate(example['output_text'].split(";")):
                 if x:
+                    # x_sep = x.split(',')
+                    # for i,j in enumerate(x_sep):
+                    #     if i % 2 != 0: # if y coordinate
+                    #         x_sep[i] = str(int(j) + 64)
+                    # single_ents.append(','.join(x_sep)+";")
+                    
                     x_token = self.tokenizer.encode(x)[1:-1]
-                    if len(x_token) == 15:
-                        x = self.tokenizer.batch_decode(x_token)
-                        x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
-                        y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
-                        radius = str(int(abs(int(x[10]) - int(x[6]))))
-                        single_ents.append(x_point+","+y_point+","+radius+";")
-                    else:
-                        single_ents.append(x+";")
+                    for i,j in enumerate(x_token):
+                        if len(x_token) == 15:
+                            x = self.tokenizer.batch_decode(x_token)
+                            x_point = str(int(np.mean([int(x[0]), int(x[4]), int(x[8]), int(x[12])])))
+                            y_point = str(int(np.mean([int(x[2]), int(x[6]), int(x[10]), int(x[14])])))
+                            radius = str(int(abs(int(x[10]) - int(x[6]))))
+                            single_ents.append(x_point+","+y_point+","+radius+";")
+                        else:
+                            single_ents.append(x+";")
         
             out_text = ''.join(single_ents)
             output_text_revised.append(out_text)
