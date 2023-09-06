@@ -151,8 +151,8 @@ class ByT5Model(pl.LightningModule):
         # image_embeds = image_embeds.permute(0,2,1)
         # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        image_for_llm = self.layernorm(image_for_llm)
+        image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds.float())))
+        #image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
@@ -171,7 +171,9 @@ class ByT5Model(pl.LightningModule):
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']
         
-        outputs = self.model(**model_batch)
+        outputs = self.model(**model_batch, output_hidden_states=True)
+        
+        
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -204,8 +206,8 @@ class ByT5Model(pl.LightningModule):
         # image_embeds = image_embeds.permute(0,2,1)
         # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        image_for_llm = self.layernorm(image_for_llm)
+        image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds.float())))
+        # image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)

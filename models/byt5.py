@@ -88,7 +88,7 @@ class ByT5Model(pl.LightningModule):
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
 
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
-        self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, padding='same')
+        self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, kernel_size=3, padding='same')
         self.bn = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
         self.lkrelu = torch.nn.LeakyReLU()
         self.gelu = torch.nn.GELU()
@@ -153,7 +153,7 @@ class ByT5Model(pl.LightningModule):
         
         #image_embeds = image_embeds.permute(0,2,1)
         #image_embeds = self.gelu(self.conv(image_embeds).permute(0,2,1))
-        image_embeds = self.lkrelu(self.bn(self.conv(image_embeds)))
+        image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
         
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         image_for_llm = self.layernorm(image_for_llm)
@@ -209,7 +209,7 @@ class ByT5Model(pl.LightningModule):
         
         #image_embeds = image_embeds.permute(0,2,1)
         #image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
-        image_embeds = self.lkrelu(self.bn(self.conv(image_embeds)))
+        image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
 
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         image_for_llm = self.layernorm(image_for_llm)
