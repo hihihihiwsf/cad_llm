@@ -24,11 +24,120 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, Ta
 from PIL import Image
 # import clip
 import numpy as np
-from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, AutoImageProcessor
+from models.modeling_vit_mae import ViTMAEForPreTraining
 from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
 
+import torch.nn as nn
 from transformers.optimization import Adafactor, AdafactorSchedule
+from copy import deepcopy
+
+from models.modeling_vit_mae import get_2d_sincos_pos_embed, ViTMAEDecoderOutput
+
+class ImageDecoderModel(pl.LightningModule):
+    def __init__(self, in_hidden_size, ViTMAELayer, config, num_patches):
+        super().__init__()
+        self.decoder_embed = nn.Linear(in_hidden_size, config.decoder_hidden_size, bias=True)
+        #self.mask_token = nn.Parameter(torch.zeros(1, 1, config.decoder_hidden_size))
+        self.decoder_pos_embed = nn.Parameter(
+            torch.zeros(1, num_patches + 1, config.decoder_hidden_size), requires_grad=False
+        )  # fixed sin-cos embedding
+
+        decoder_config = deepcopy(config)
+        decoder_config.hidden_size = config.decoder_hidden_size
+        decoder_config.num_hidden_layers = config.decoder_num_hidden_layers
+        decoder_config.num_attention_heads = config.decoder_num_attention_heads
+        decoder_config.intermediate_size = config.decoder_intermediate_size
+        self.decoder_layers = nn.ModuleList(
+            [ViTMAELayer(decoder_config) for _ in range(config.decoder_num_hidden_layers)]
+        )
+
+        self.decoder_norm = nn.LayerNorm(config.decoder_hidden_size, eps=config.layer_norm_eps)
+        self.decoder_pred = nn.Linear(
+            config.decoder_hidden_size, config.patch_size**2 * config.num_channels, bias=True
+        )  # encoder to decoder
+        self.gradient_checkpointing = False
+        self.config = config
+        self.initialize_weights(num_patches)
+
+    def initialize_weights(self, num_patches):
+        # initialize (and freeze) position embeddings by sin-cos embedding
+        decoder_pos_embed = get_2d_sincos_pos_embed(
+            self.decoder_pos_embed.shape[-1], int(num_patches**0.5), add_cls_token=True
+        )
+        self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
+
+        # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
+        torch.nn.init.normal_(self.mask_token, std=self.config.initializer_range)
+
+    def forward(
+        self,
+        hidden_states,
+        ids_restore,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=True,
+    ):
+        # embed tokens
+        x = self.decoder_embed(hidden_states)
+
+        # append mask tokens to sequence
+        # mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
+        # x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)  # no cls token
+        # x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle
+        # x = torch.cat([x[:, :1, :], x_], dim=1)  # append cls token
+
+        # add pos embed
+        hidden_states = x + self.decoder_pos_embed
+
+        # apply Transformer layers (blocks)
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attentions = () if output_attentions else None
+        for i, layer_module in enumerate(self.decoder_layers):
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (hidden_states,)
+
+            if self.gradient_checkpointing and self.training:
+
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        return module(*inputs, output_attentions)
+
+                    return custom_forward
+
+                layer_outputs = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(layer_module),
+                    hidden_states,
+                    None,
+                )
+            else:
+                layer_outputs = layer_module(hidden_states, head_mask=None, output_attentions=output_attentions)
+
+            hidden_states = layer_outputs[0]
+
+            if output_attentions:
+                all_self_attentions = all_self_attentions + (layer_outputs[1],)
+
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        hidden_states = self.decoder_norm(hidden_states)
+
+        # predictor projection
+        logits = self.decoder_pred(hidden_states)
+
+        # remove cls token
+        logits = logits[:, 1:, :]
+
+        if not return_dict:
+            return tuple(v for v in [logits, all_hidden_states, all_self_attentions] if v is not None)
+        return ViTMAEDecoderOutput(
+            logits=logits,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attentions,
+        )
+
 
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, vit_mae):
@@ -70,25 +179,29 @@ class ByT5Model(pl.LightningModule):
             #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
             m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
+            del m
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
         self.vis_model.requires_grad_(False)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
-       
+        #self.image_decoder = ImageDecoderModel(self.model.config.d_model, self.vis_model.config, num_patches=self.vis_model.vit.embeddings.num_patches)
         
         # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
         # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
         # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
-        self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
+        self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
+        self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
-        self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
-        self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
+        self.post_layernorm = self.vis_model.vit.layernorm
+        self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
 
-        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
+        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num +1, self.patch_num)
         self.gelu = torch.nn.GELU()
+        
+        self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
 
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -135,67 +248,11 @@ class ByT5Model(pl.LightningModule):
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
-        #convert to PIL image for CLIP
-        # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-        with torch.no_grad():
-
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
-            image_features = torch.sum(oi['last_hidden_state'], 1)
-
-
-        '''owl vit'''
-        last_hidden_state = oi['last_hidden_state']
-        #pooled_output= last_hidden_state[:, 0, :]
-        image_embeds = self.post_layernorm(last_hidden_state)
-        
-        # image_embeds = image_embeds.permute(0,2,1)
-        # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
-
-        image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds.float())))
-        #image_for_llm = self.layernorm(image_for_llm)
-
-        txt_embedder = self.model.get_input_embeddings()
-        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
-        
-        
-        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
-        # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
-        model_batch['inputs_embeds'] = input_embed
-
-
-        # adding ones to attention_mask
-        att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
-        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
-
-        batch['attention_mask'] = model_batch['attention_mask']
-        batch['inputs_embeds'] = model_batch['inputs_embeds']
-        
-        outputs = self.model(**model_batch, output_hidden_states=True)
-        
-        
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        loss = self.evaluation_process(batch, batch_idx, validate='val')
-        return loss
-    
-    def test_step(self,batch, batch_idx):
-        loss = self.evaluation_process(batch, batch_idx, validate='test')
-        return loss
-        
-        
-    def evaluation_process(self, batch, batch_idx, validate):
-        cols = ["attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
-
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images'])) 
+        with torch.no_grad():
+            oi = self.vis_model.vit(batch['images'], output_hidden_states=True) 
 
         '''owl vit'''
         last_hidden_state = oi['last_hidden_state']
@@ -203,8 +260,8 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.post_layernorm(last_hidden_state)
         
         '''patch embedding downsample 196 to 14'''
-        # image_embeds = image_embeds.permute(0,2,1)
-        # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
         image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds.float())))
         # image_for_llm = self.layernorm(image_for_llm)
@@ -226,8 +283,96 @@ class ByT5Model(pl.LightningModule):
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']
 
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+        outputs = self.model(**model_batch, output_hidden_states=True)
+        decoder_hidden_state = outputs.decoder_hidden_states
+        
+        encoder_hidden_state = outputs.encoder_last_hidden_state
+        img_hidden_state = self.layernorm(encoder_hidden_state)
+        img_hidden_state = self.post_layernorm(self.back_mapper(img_hidden_state))
+        mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
+        #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        
+        img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
+        img_logits = img_res.logits
+        img_loss = self.forward_loss(batch['output_images'], img_logits)
+        
+        loss = outputs.loss + img_loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        loss = self.evaluation_process(batch, batch_idx, validate='val')
+        return loss
+    
+    def test_step(self,batch, batch_idx):
+        loss = self.evaluation_process(batch, batch_idx, validate='test')
+        return loss
+        
+        
+    def evaluation_process(self, batch, batch_idx, validate):
+        cols = ["attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+
+        
+        # image_features = self.clip_model.encode_image(batch['images'])
+        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
+        oi = self.vis_model.vit(batch['images'], output_hidden_states=True) 
+
+        '''owl vit'''
+        last_hidden_state = oi['last_hidden_state']
+        #pooled_output= last_hidden_state[:, 0, :]
+        image_embeds = last_hidden_state #self.post_layernorm(last_hidden_state)
+        
+        '''patch embedding downsample 196 to 14'''
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
+
+        image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds.float())))
+        # image_for_llm = self.layernorm(image_for_llm)
+
+        txt_embedder = self.model.get_input_embeddings()
+        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        
+        
+        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+        # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        model_batch['inputs_embeds'] = input_embed
+
+
+        # adding ones to attention_mask
+        att = model_batch['attention_mask']
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
+
+        batch['attention_mask'] = model_batch['attention_mask']
+        batch['inputs_embeds'] = model_batch['inputs_embeds']
+
+        outputs = self.model(**model_batch, output_hidden_states=True)
+        txt_logits = outputs.decoder_hidden_states[-1] #(bs, gen_len, t_dim)
+        txt_loss = outputs.loss
+        
+        '''image pixel loss'''
+        encoder_hidden_state = outputs.encoder_last_hidden_state
+        
+        img_hidden_state = self.layernorm(encoder_hidden_state)
+        img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
+        #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        
+        img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
+     
+        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        
+        img_logits = img_res.logits[:,0,:] #(bs,v_dim)
+        
+        # '''contrastive loss'''
+        # logit_scale = self.logit_scale.exp()
+        # logits_per_text = torch.matmul(txt_logits, img_logits.t()) * logit_scale
+        
+        loss = txt_loss + img_loss 
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
@@ -289,6 +434,32 @@ class ByT5Model(pl.LightningModule):
 
         batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
 
+    def forward_loss(self, pixel_values, pred):
+        """
+        Args:
+            pixel_values (`torch.FloatTensor` of shape `(batch_size, num_channels, height, width)`):
+                Pixel values.
+            pred (`torch.FloatTensor` of shape `(batch_size, num_patches, patch_size**2 * num_channels)`:
+                Predicted pixel values.
+            mask (`torch.FloatTensor` of shape `(batch_size, sequence_length)`):
+                Tensor indicating which patches are masked (1) and which are not (0).
+
+        Returns:
+            `torch.FloatTensor`: Pixel reconstruction loss.
+        """
+        target = self.vis_model.patchify(pixel_values)
+        if self.vis_model.config.norm_pix_loss:
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, keepdim=True)
+            target = (target - mean) / (var + 1.0e-6) ** 0.5
+
+        loss = (pred - target) ** 2
+        loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
+
+        #loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
+        loss = loss.mean()
+        return loss
+    
     def log_samples(self, batch, batch_idx):
         label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]
 

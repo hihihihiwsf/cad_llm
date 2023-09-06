@@ -27,6 +27,8 @@ import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEModel, ViTMAEForPreTraining, ViTMAEConfig
 from geometry.visualize_vit import Visualize_VIT
 
+from models.modeling_vit_mae import ViTMAEForPreTraining
+
 
 class VisRecon(pl.LightningModule):
     def __init__(self, args):
