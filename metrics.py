@@ -1,5 +1,5 @@
 import torch
-
+import numpy as np
 
 def calculate_accuracy(labels, samples):
     """
@@ -23,8 +23,10 @@ def calculate_first_ent_accuracy(labels, samples):
         if not sample_entities:
             continue
         first_entity = sample_entities[0]
-        if first_entity and first_entity in label_entities:
-            count_accurate += 1
+        for first_entity in sample_entities:
+            if first_entity and first_entity in label_entities:
+                count_accurate += 1
+                break
     return count_accurate / len(labels)
 
 
@@ -40,3 +42,24 @@ def calculate_validity(batch_sample_curves):
     percent_valid = valid_count / max(curve_count, 1)
 
     return percent_valid
+
+
+def calculate_f1(labels, samples):
+    """
+    Count number of exact matches of decoded and sorted entities
+    """
+    f1 = []
+    eps = 1e-6
+    for label_entities, sample_entities in zip(labels, samples):
+        TP = eps
+        for ent in sample_entities:
+            if ent in label_entities:
+                TP += 1
+        FP = len(sample_entities) - TP
+        FN = len(label_entities) - TP
+        precision = (TP / (TP + FP)) + eps
+        recall = (TP / (TP + FN)) + eps
+        
+        f1.append(2 * precision * recall / (precision + recall))
+
+    return np.mean(f1)

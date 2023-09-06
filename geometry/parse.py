@@ -14,8 +14,8 @@ def get_point_entities(entities_string, sort=True):
     """
     entity_strings = [s.replace(" ", "") + ';' for s in entities_string.split(';') if s]
     point_entities = [get_point_entity(entity_string) for entity_string in entity_strings]
-    if sort:
-        point_entities = [sort_points(points) for points in point_entities]
+    # if sort:
+    #     point_entities = [sort_points(points) for points in point_entities]
     return point_entities
 
 
@@ -25,9 +25,14 @@ def get_point_entity(entity_string):
     If the number of coordinates is odd the entity is invalid and None is returned
     """
     flat_points = tuple(int(match.group()) for match in re.finditer(r'-?\d+', entity_string))
-    if len(flat_points) % 2 != 0:
-        return None
-    points = [(flat_points[i], flat_points[i+1]) for i in range(0, len(flat_points), 2)]
+    # if len(flat_points) % 2 != 0:
+    #     return None
+
+    if len(flat_points) % 2 == 0:
+        points = [(flat_points[i], flat_points[i+1]) for i in range(0, len(flat_points), 2)]
+    else:
+        points = [flat_points]
+        
     return points
 
 
