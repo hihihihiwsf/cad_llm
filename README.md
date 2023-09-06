@@ -112,3 +112,14 @@ Adjust the `--worker_node_types` parameter as needed to specify the desired work
 
 For more detailed instructions and additional information, please refer to the [Distributed ML Ray](https://git.autodesk.com/Research/distributed-ml-ray).
 
+### Examples: Large Scale Distributed Training with Ray 
+
+Create a cluster with P5 workers
+```bash
+python -m adsk_ailab_ray.cluster.create --worker_node_types p5.48xlarge --use_spot_workers --ebs_volume_size 300 --tag_value CADGPT
+```
+
+Submit a job to train `google/byt5-xl` (3.7 billion parameters) the cluster
+```bash
+   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt"}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy fsdp --mix_precession --model_name google/byt5-xl
+```
