@@ -143,7 +143,7 @@ class ByT5Model(pl.LightningModule):
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         # with torch.no_grad():
 
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images']))
         image_features = torch.sum(oi['last_hidden_state'], 1)
 
 
@@ -212,7 +212,7 @@ class ByT5Model(pl.LightningModule):
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images'])) 
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images'])) 
         image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
         # image_features = oi.image_embeds
         # image_features = oi['pooler_output']
@@ -321,7 +321,8 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.trainer.model.parameters()) + list(self.mapper.parameters())
+        params = list(self.trainer.model.parameters()) + list(self.mapper.parameters())+list(self.embed_patch.parameters()) + list(self.vit_mae.parameters())
+        params2 = list(self.post_layernorm.parameters())+list(self.post_batchnorm.parameters()) + list(self.batchnorm.parameters()) 
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
@@ -334,7 +335,7 @@ class ByT5Model(pl.LightningModule):
         #         scale_parameter=True, #
         #         warmup_init=True, #
         #     )
-        optimizer = optim.AdamW(params, lr=self.lr)
+        optimizer = optim.AdamW(params+params2, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             
