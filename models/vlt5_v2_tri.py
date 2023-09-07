@@ -57,109 +57,6 @@ class BlipTextPooler(nn.Module):
         pooled_output = self.activation(pooled_output)
         return pooled_output
     
-    
-class ImageDecoderModel(pl.LightningModule):
-    def __init__(self, in_hidden_size, ViTMAELayer, config, num_patches):
-        super().__init__()
-        self.decoder_embed = nn.Linear(in_hidden_size, config.decoder_hidden_size, bias=True)
-        #self.mask_token = nn.Parameter(torch.zeros(1, 1, config.decoder_hidden_size))
-        self.decoder_pos_embed = nn.Parameter(
-            torch.zeros(1, num_patches + 1, config.decoder_hidden_size), requires_grad=False
-        )  # fixed sin-cos embedding
-
-        decoder_config = deepcopy(config)
-        decoder_config.hidden_size = config.decoder_hidden_size
-        decoder_config.num_hidden_layers = config.decoder_num_hidden_layers
-        decoder_config.num_attention_heads = config.decoder_num_attention_heads
-        decoder_config.intermediate_size = config.decoder_intermediate_size
-        self.decoder_layers = nn.ModuleList(
-            [ViTMAELayer(decoder_config) for _ in range(config.decoder_num_hidden_layers)]
-        )
-
-        self.decoder_norm = nn.LayerNorm(config.decoder_hidden_size, eps=config.layer_norm_eps)
-        self.decoder_pred = nn.Linear(
-            config.decoder_hidden_size, config.patch_size**2 * config.num_channels, bias=True
-        )  # encoder to decoder
-        self.gradient_checkpointing = False
-        self.config = config
-        self.initialize_weights(num_patches)
-
-    def initialize_weights(self, num_patches):
-        # initialize (and freeze) position embeddings by sin-cos embedding
-        decoder_pos_embed = get_2d_sincos_pos_embed(
-            self.decoder_pos_embed.shape[-1], int(num_patches**0.5), add_cls_token=True
-        )
-        self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
-
-        # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
-        torch.nn.init.normal_(self.mask_token, std=self.config.initializer_range)
-
-    def forward(
-        self,
-        hidden_states,
-        ids_restore,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=True,
-    ):
-        # embed tokens
-        x = self.decoder_embed(hidden_states)
-
-        # append mask tokens to sequence
-        # mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
-        # x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)  # no cls token
-        # x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle
-        # x = torch.cat([x[:, :1, :], x_], dim=1)  # append cls token
-
-        # add pos embed
-        hidden_states = x + self.decoder_pos_embed
-
-        # apply Transformer layers (blocks)
-        all_hidden_states = () if output_hidden_states else None
-        all_self_attentions = () if output_attentions else None
-        for i, layer_module in enumerate(self.decoder_layers):
-            if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states,)
-
-            if self.gradient_checkpointing and self.training:
-
-                def create_custom_forward(module):
-                    def custom_forward(*inputs):
-                        return module(*inputs, output_attentions)
-
-                    return custom_forward
-
-                layer_outputs = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(layer_module),
-                    hidden_states,
-                    None,
-                )
-            else:
-                layer_outputs = layer_module(hidden_states, head_mask=None, output_attentions=output_attentions)
-
-            hidden_states = layer_outputs[0]
-
-            if output_attentions:
-                all_self_attentions = all_self_attentions + (layer_outputs[1],)
-
-        if output_hidden_states:
-            all_hidden_states = all_hidden_states + (hidden_states,)
-
-        hidden_states = self.decoder_norm(hidden_states)
-
-        # predictor projection
-        logits = self.decoder_pred(hidden_states)
-
-        # remove cls token
-        logits = logits[:, 1:, :]
-
-        if not return_dict:
-            return tuple(v for v in [logits, all_hidden_states, all_self_attentions] if v is not None)
-        return ViTMAEDecoderOutput(
-            logits=logits,
-            hidden_states=all_hidden_states,
-            attentions=all_self_attentions,
-        )
 
 
 class ByT5Model(pl.LightningModule):
@@ -190,13 +87,6 @@ class ByT5Model(pl.LightningModule):
         self.textpooler = BlipTextPooler(self.text_embed_dim )
         self.text_projection = nn.Linear(self.text_embed_dim, self.projection_dim, bias=False)
         
-        
-        # m = VisRecon(args=args)
-        # #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        # self.vit_mae = m.model 
-        # self.vit_mae.requires_grad_(False)
-        
 
         self.vit_mae = vit_mae
         if vit_mae is not None:
@@ -210,7 +100,7 @@ class ByT5Model(pl.LightningModule):
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
-        self.vis_model.requires_grad_(False)
+        #self.vis_model.requires_grad_(False)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
         self.vision_embed_dim = self.vis_model.config.hidden_size
@@ -219,7 +109,7 @@ class ByT5Model(pl.LightningModule):
         self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
-        self.post_layernorm = self.vis_model.vit.layernorm
+        #self.post_layernorm = self.vis_model.vit.layernorm
         self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
@@ -298,9 +188,10 @@ class ByT5Model(pl.LightningModule):
         
         '''image decoder pixel loss'''
         img_hidden_state = self.layernorm(output_embed)
+        self.post_layernorm=self.vis_model.vit.layernorm
         img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
-        mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-        img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
+        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
@@ -402,6 +293,7 @@ class ByT5Model(pl.LightningModule):
         
         '''image decoder pixel loss'''
         img_hidden_state = self.layernorm(output_embed)
+        self.post_layernorm = self.vis_model.vit.layernorm
         img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
         mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
         img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
@@ -511,7 +403,8 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters())
+        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
+        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())+list(self.vision_projection)
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
@@ -524,7 +417,7 @@ class ByT5Model(pl.LightningModule):
         #         scale_parameter=True, #
         #         warmup_init=True, #
         #     )
-        optimizer = optim.AdamW(params, lr=self.lr)
+        optimizer = optim.AdamW(params+params2, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             

@@ -9,8 +9,8 @@ except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
-#from models.vlt5_v2_tri import ByT5Model
+#from models.byt5 import ByT5Model
+from models.vlt5_v2_tri import ByT5Model
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -92,7 +92,7 @@ def main():
     )
     if not args.eval: 
         print("Start training")
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
+        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader) #ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
         trainer.test(model, dataloaders=test_dataloader, ckpt_path='best')
     else:
         # loading the model from exp_name/best.ckpt

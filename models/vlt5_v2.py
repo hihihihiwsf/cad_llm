@@ -144,15 +144,12 @@ class ByT5Model(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        # if args.untrained_model:
-        #     config = T5Config.from_pretrained(args.model_name)
-        #     model = T5ForConditionalGeneration(config)
-        #     model._init_weights(model)  # maybe redundant
-        # else:
+
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
         # self.tokenizer.add_special_tokens(["<IMAGE>"])
 
         self.args = args
@@ -162,13 +159,6 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-        
-        
-        # m = VisRecon(args=args)
-        # #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        # self.vit_mae = m.model 
-        # self.vit_mae.requires_grad_(False)
         
 
         self.vit_mae = vit_mae
@@ -184,12 +174,8 @@ class ByT5Model(pl.LightningModule):
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
         self.vis_model.requires_grad_(False)
-        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
-        #self.image_decoder = ImageDecoderModel(self.model.config.d_model, self.vis_model.config, num_patches=self.vis_model.vit.embeddings.num_patches)
         
-        # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
+
         self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
@@ -203,46 +189,6 @@ class ByT5Model(pl.LightningModule):
         
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
 
-        # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
-
-        if args.lora:
-            self.add_lora()
-
-    def add_lora(self):
-        lora_config = LoraConfig(
-            r=16,
-            lora_alpha=64,
-            target_modules=["q", "v", "SelfAttention.k", "EncDecAttention.k", "SelfAttention.o", "EncDecAttention.o"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type=TaskType.SEQ_2_SEQ_LM
-        )
-        # prepare int-8 model for training
-        self.model = prepare_model_for_int8_training(self.model)
-        # add LoRA adaptor
-        self.model = get_peft_model(self.model, lora_config)
-        # unfreeze embeddings
-        self.model.get_input_embeddings().weight.requires_grad = True
-        # unfreeze last layer
-        for name, param in self.model.named_parameters():
-            if "decoder.block.5" in name or name in ["decoder.final_layer_norm.weight", "lm_head.weight"]:
-                param.requires_grad = True
-
-        self.model.print_trainable_parameters()
-
-    def adjust_to_use_new_tokens(self):
-        # Add new tokens to the tokenizer
-        new_tokens = [f"<{i}>" for i in self.quantized_range]
-        self.tokenizer.add_tokens(new_tokens)
-
-        # Add new token embeddings and initialize using learned embeddings
-        self.model.resize_token_embeddings(len(self.tokenizer))
-        embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(1, len(new_tokens)+1):
-            # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
         cols = ["attention_mask", "labels"]
@@ -264,6 +210,8 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
         image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds.float())))
+        
+        image_for_llm = self.vision_model(batch['images'])
         # image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
@@ -285,6 +233,7 @@ class ByT5Model(pl.LightningModule):
 
         outputs = self.model(**model_batch, output_hidden_states=True)
         decoder_hidden_state = outputs.decoder_hidden_states
+        
         
         encoder_hidden_state = outputs.encoder_last_hidden_state
         img_hidden_state = self.layernorm(encoder_hidden_state)

@@ -274,7 +274,8 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.vis_model.parameters()) + list(self.embed_patch.parameters) + list(self.layernorm.parameters)+list(self.post_layernorm.parameters)
+        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.vis_model.parameters())
+        params2= list(self.embed_patch.parameters) + list(self.layernorm.parameters)+list(self.post_layernorm.parameters)
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
@@ -287,7 +288,7 @@ class ByT5Model(pl.LightningModule):
         #         scale_parameter=True, #
         #         warmup_init=True, #
         #     )
-        optimizer = optim.AdamW(params, lr=self.lr, weight_decay=0.05)
+        optimizer = optim.AdamW(params+params2, lr=self.lr, weight_decay=0.05)
         if not self.args.cosinedecay:
             return optimizer
             
