@@ -67,13 +67,13 @@ def get_ray_args():
         "--local_results_dir",
         type=str,
         default="/home/ray/ray_results",
-        help="Directory to save checkpoints and logs"
+        help="Local directory to save checkpoints and logs"
     )
     parser.add_argument(
         "--local_dataset_dir",
         type=str,
         default="/home/ray/data",
-        help="Directory to save checkpoints and logs"
+        help="Local directory to save dataset"
     )
     parser.add_argument(
         "--comet",
@@ -128,6 +128,12 @@ def get_ray_args():
         type=int,
         default=3,
         help="Number of training epochs."
+    )
+    parser.add_argument(
+        "--ckpt_path",
+        type=str,
+        default=None,
+        help="Path/URL/S3-Path of the checkpoint from which training is resumed."
     )
 
     ray_args, _ = parser.parse_known_args()

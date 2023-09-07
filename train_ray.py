@@ -2,6 +2,7 @@
 Train a CAD LLM model on a Ray Cluster
 """
 
+import time
 from pathlib import Path
 
 from adsk_ailab_ray.ray_lightning import RayLightningExperiment
@@ -27,6 +28,8 @@ def get_loggers(exp_name, use_comet):
 def train_on_ray_cluster():
     args = get_ray_args()
 
+    exp_name = args.exp_name + "_" + time.strftime("%Y%m%d-%H%M%S")
+
     # Configure LightningModule and LightningDataModule classes and kwargs
     data_class = Byt5NewTokensDataModule
     data_class_kwargs = {
@@ -42,8 +45,8 @@ def train_on_ray_cluster():
 
     model_class = ByT5v2
     tokenizer = Byt5NewTokensDataModule.get_tokenizer(args.model_name)
-    local_samples_path = Path(args.local_results_dir) / args.exp_name / "samples"
-    remote_samples_path = f"s3://{args.output_s3_bucket}/{args.exp_name}/samples"
+    local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
+    remote_samples_path = f"s3://{args.output_s3_bucket}/{exp_name}/samples"
     model_class_kwargs = {
         "model_name": args.model_name,
         "lr": args.lr,
@@ -59,7 +62,7 @@ def train_on_ray_cluster():
         strategy_kwargs["cpu_offload"] = True
 
     # Configure lightning trainer kwargs
-    loggers = get_loggers(args.exp_name, args.comet)
+    loggers = get_loggers(exp_name, args.comet)
     trainer_kwargs = {
         "logger": loggers,
         "max_epochs": args.max_epochs,
@@ -78,7 +81,8 @@ def train_on_ray_cluster():
 
     # Define an Experiment
     experiment = RayLightningExperiment(
-        exp_name=args.exp_name,
+        exp_name=exp_name,
+        timestamp_exp_name=False,
         num_workers=args.num_gpus,
         num_cpus_per_worker=args.num_cpus_per_worker,
         strategy=args.strategy,
@@ -94,6 +98,7 @@ def train_on_ray_cluster():
         local_data_dir=args.local_dataset_dir,
         local_results_dir=args.local_results_dir,
         max_failures=args.max_failures,
+        ckpt_path=args.ckpt_path,
     )
 
     # Run the experiment on the Ray cluster
