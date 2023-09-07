@@ -404,7 +404,7 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
-        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())+list(self.vision_projection)
+        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())+list(self.vision_projection.parameters())
         # optimizer = Adafactor(
         #         params,
         #         lr=None,

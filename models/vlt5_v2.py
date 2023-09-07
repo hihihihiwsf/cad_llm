@@ -173,8 +173,7 @@ class ByT5Model(pl.LightningModule):
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
-        self.vis_model.requires_grad_(False)
-        
+        #self.vis_model.requires_grad_(False)
 
         self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
