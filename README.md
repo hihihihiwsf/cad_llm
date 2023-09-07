@@ -55,16 +55,17 @@ python launch.py --help
    ```
 2.  Login to AWS CLI using the following command:
 
-```bash
-python -m adsk_ailab_ray.tools.aws_cli_login --username YOUR_ADSK_USER_NAME # defaults to $USER
-```
+   ```bash
+   python -m adsk_ailab_ray.tools.aws_cli_login --username YOUR_ADSK_USER_NAME # defaults to $USER
+   ```
 
 3. Create a Ray cluster by running the following command:
 
     ```python
     python3 -m adsk_ailab_ray.cluster.create --worker_node_types p3.16xlarge,p3dn.24xlarge --tag_value CADGPT
     ```
-Adjust the `--worker_node_types` parameter as needed to specify the desired worker node types.
+   Adjust the `--worker_node_types` parameter as needed to specify the desired worker node types.
+
 
 4. Submit a model training job using the provided command:
 
@@ -73,6 +74,14 @@ Adjust the `--worker_node_types` parameter as needed to specify the desired work
    ```
 
    Adjust the command parameters as needed. The `fsdp`, `deepspeed` and `ddp` strategies are supported.
+
+   For comet export your api key:
+   ```bash
+   export COMET_API_KEY="your_comet_key"
+   ```
+   and add env_vars to runtime-env-json: ```--runtime-env-json=
+'{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "$COMET_API_KEY"}}' --comet 1```
+
 
 5. Monitor the cluster and job status using the Ray dashboard. Access the dashboard by opening the following URL in your web browser:
 

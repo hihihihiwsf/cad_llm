@@ -82,6 +82,18 @@ def get_ray_args():
         help="Use comet.ml for experiment tracking"
     )
     parser.add_argument(
+        "--comet_workspace",
+        type=str,
+        default="cad_llm",
+        help="Comet workspace"
+    )
+    parser.add_argument(
+        "--comet_project_name",
+        type=str,
+        default="byt5-ray",
+        help="Comet project name"
+    )
+    parser.add_argument(
         "--model_name",
         type=str,
         default="google/byt5-small",

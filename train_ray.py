@@ -8,6 +8,7 @@ from pathlib import Path
 from adsk_ailab_ray.ray_lightning import RayLightningExperiment
 from pytorch_lightning.loggers.csv_logs import CSVLogger
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
+from pytorch_lightning.loggers import CometLogger
 
 from args.ray_args import get_ray_args
 from dataset.byt5_new_tokens_dataset import Byt5NewTokensDataModule
@@ -15,11 +16,18 @@ from models.byt5_v2 import ByT5v2
 from util import get_comet_logger
 
 
-def get_loggers(exp_name, use_comet):
+def get_loggers(exp_name, use_comet, comet_workspace, comet_project_name):
     loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]
 
-    comet_logger = get_comet_logger(exp_name) if use_comet else None
-    if comet_logger:
+    if use_comet:
+        comet_logger = CometLogger(
+            workspace=comet_workspace,
+            project_name=comet_project_name,
+            experiment_name=exp_name,
+            log_code=False,
+            log_git_metadata=False,
+            log_git_patch=False,
+        )
         loggers.append(comet_logger)
 
     return loggers
@@ -62,7 +70,8 @@ def train_on_ray_cluster():
         strategy_kwargs["cpu_offload"] = True
 
     # Configure lightning trainer kwargs
-    loggers = get_loggers(exp_name, args.comet)
+    loggers = get_loggers(exp_name, args.comet, comet_workspace=args.comet_workspace,
+                          comet_project_name=args.comet_project_name)
     trainer_kwargs = {
         "logger": loggers,
         "max_epochs": args.max_epochs,
