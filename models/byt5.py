@@ -274,7 +274,7 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.vis_model.parameters())
+        params = list(self.model.parameters()) + list(self.mapper.parameters()) #+ list(self.vis_model.parameters())
         params2= list(self.embed_patch.parameters()) + list(self.layernorm.parameters())+list(self.post_layernorm.parameters())
         # optimizer = Adafactor(
         #         params,
