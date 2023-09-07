@@ -88,51 +88,11 @@ class ByT5Model(pl.LightningModule):
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
 
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
-        self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, kernel_size=3, padding='same')
-        self.bn = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
-        self.lkrelu = torch.nn.LeakyReLU()
+        #self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, kernel_size=3, padding='same')
+        #self.bn = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
+        #self.lkrelu = torch.nn.LeakyReLU()
         self.gelu = torch.nn.GELU()
 
-        # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
-
-        if args.lora:
-            self.add_lora()
-
-    def add_lora(self):
-        lora_config = LoraConfig(
-            r=16,
-            lora_alpha=64,
-            target_modules=["q", "v", "SelfAttention.k", "EncDecAttention.k", "SelfAttention.o", "EncDecAttention.o"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type=TaskType.SEQ_2_SEQ_LM
-        )
-        # prepare int-8 model for training
-        self.model = prepare_model_for_int8_training(self.model)
-        # add LoRA adaptor
-        self.model = get_peft_model(self.model, lora_config)
-        # unfreeze embeddings
-        self.model.get_input_embeddings().weight.requires_grad = True
-        # unfreeze last layer
-        for name, param in self.model.named_parameters():
-            if "decoder.block.5" in name or name in ["decoder.final_layer_norm.weight", "lm_head.weight"]:
-                param.requires_grad = True
-
-        self.model.print_trainable_parameters()
-
-    def adjust_to_use_new_tokens(self):
-        # Add new tokens to the tokenizer
-        new_tokens = [f"<{i}>" for i in self.quantized_range]
-        self.tokenizer.add_tokens(new_tokens)
-
-        # Add new token embeddings and initialize using learned embeddings
-        self.model.resize_token_embeddings(len(self.tokenizer))
-        embedding_params = self.model.get_input_embeddings().weight.data
-        for i in range(1, len(new_tokens)+1):
-            # start with the embedding for 'A', ensures no clash with embedding for ';'
-            embedding_params[-i] = embedding_params[67 + i]
 
     def training_step(self, batch, batch_idx):
         cols = ["attention_mask", "labels"]
@@ -141,9 +101,8 @@ class ByT5Model(pl.LightningModule):
         #convert to PIL image for CLIP
         # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         with torch.no_grad():
-
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images']))
-            image_features = torch.sum(oi['last_hidden_state'], 1)
+            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images']))
+            #image_features = torch.sum(oi['last_hidden_state'], 1)
 
 
         '''owl vit'''
@@ -152,8 +111,8 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.post_layernorm(last_hidden_state)
         
         #image_embeds = image_embeds.permute(0,2,1)
-        #image_embeds = self.gelu(self.conv(image_embeds).permute(0,2,1))
-        image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
+        image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
+        #image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
         
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         image_for_llm = self.layernorm(image_for_llm)
@@ -179,6 +138,28 @@ class ByT5Model(pl.LightningModule):
         loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
+        
+        # '''measure training completely'''
+        # self.generate_samples(batch)
+        # # Calculate metrics
+        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+
+        # self.log("train_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
+
+        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+
+        # self.log("train_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #     batch_size=self.batch_size, sync_dist=True)
+        # # # Convert string entities to curves and check validity
+        # validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
+        # self.log("train_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
+
+        # f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        # self.log("train_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #     batch_size=self.batch_size, sync_dist=True)
+        
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -197,7 +178,7 @@ class ByT5Model(pl.LightningModule):
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images'])) 
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images'])) 
         image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
         # image_features = oi.image_embeds
         # image_features = oi['pooler_output']
@@ -208,8 +189,8 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.post_layernorm(last_hidden_state)
         
         #image_embeds = image_embeds.permute(0,2,1)
-        #image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
-        image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
+        image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
+        #image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
 
         image_for_llm = self.gelu(self.mapper(image_embeds.float()))
         image_for_llm = self.layernorm(image_for_llm)
@@ -242,25 +223,12 @@ class ByT5Model(pl.LightningModule):
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-        # mx = 0
-        # for i,j in zip(batch['string_samples'], batch['string_labels']):
-        #     out, l = i.split(";"), j.split(";")
-        #     # label_all_ent = j.split(";")
-        #     if set(out) == set(l):
-        #         mx += 1
-        # top1_full_sketch = mx/len(batch['string_labels'])
+
         self.log(f"{validate}_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        # mx = 0
-        # for i,j in zip(batch['string_samples'], batch['string_labels']):
-        #     label_all_ent = j.split(";")
-        #     first_ent = i.split(";")[0]
-        #     if first_ent in label_all_ent:
-        #         mx += 1
-        # top1_ent = mx/len(batch['string_labels'])
         self.log(f"{validate}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         # # Convert string entities to curves and check validity
@@ -306,7 +274,7 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters())
+        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.vis_model.parameters()) + list(self.embed_patch.parameters) + list(self.layernorm.parameters)+list(self.post_layernorm.parameters)
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
@@ -319,7 +287,7 @@ class ByT5Model(pl.LightningModule):
         #         scale_parameter=True, #
         #         warmup_init=True, #
         #     )
-        optimizer = optim.AdamW(params, lr=self.lr)
+        optimizer = optim.AdamW(params, lr=self.lr, weight_decay=0.05)
         if not self.args.cosinedecay:
             return optimizer
             

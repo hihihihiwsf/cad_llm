@@ -194,7 +194,7 @@ class ByT5Model(pl.LightningModule):
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
         self.post_layernorm = self.vis_model.vit.layernorm
-        self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
+        self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-12)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
 

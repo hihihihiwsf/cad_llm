@@ -19,7 +19,7 @@ def get_parser():
     parser.add_argument("--untrained_model", type=int, default=0, help="Use an untrained model")
     parser.add_argument("--lr", type=float, default=3e-4, help="Initial learning rate")
     parser.add_argument("--batch_size", type=int, default=6, help="Number of sketches in a batch")
-    parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs.")
+    parser.add_argument("--epochs", type=int, default=30, help="Number of training epochs.")
     parser.add_argument("--min_input_percent", type=float, default=0.2,
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=0.8,
