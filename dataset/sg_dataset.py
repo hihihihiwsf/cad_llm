@@ -9,6 +9,7 @@ from geometry.visualization import visualize_batch, visualize_sample, visualize_
 import torch 
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
+import pytorch_lightning as pl
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
@@ -132,3 +133,35 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+
+
+
+
+class SketchDataModule(pl.LightningDataModule):
+    def __init__(self, tokenizer, args):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.args = args
+
+    def train_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="train",
+                shuffle=True
+        )
+
+    def val_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="val",
+                shuffle=False
+        )
+    def test_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="test",
+                shuffle=False
+        )

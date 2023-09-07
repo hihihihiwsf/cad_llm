@@ -93,8 +93,8 @@ class ByT5Model(pl.LightningModule):
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
-            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-            m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
+            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+            #m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
             del m
         
@@ -119,8 +119,11 @@ class ByT5Model(pl.LightningModule):
         
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
 
+        self.automatic_optimization = False
 
     def training_step(self, batch, batch_idx):
+        
+        opt1, opt2 = self.optimizers()
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
@@ -212,6 +215,16 @@ class ByT5Model(pl.LightningModule):
         loss = txt_loss + img_loss + contrastive_loss
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
+        
+        # if batch_idx % 15==0:
+        #     sch1.step()
+        #     sch2.step()
+        opt1.zero_grad()
+        opt2.zero_grad()
+        self.manual_backward(loss)
+        opt1.step()
+        opt2.step()
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -403,8 +416,8 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
-        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())+list(self.vision_projection.parameters())
+        params = list(self.model.parameters()) +list(self.vit_mae.parameters()) 
+        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vision_projection.parameters())+ list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
@@ -417,18 +430,50 @@ class ByT5Model(pl.LightningModule):
         #         scale_parameter=True, #
         #         warmup_init=True, #
         #     )
-        optimizer = optim.AdamW(params+params2, lr=self.lr)
+        optimizer1 = optim.AdamW(params+params2, lr=self.lr, weight_decay=0.05)
+        optimizer2 = optim.AdamW(params2, lr=10*self.lr)
         if not self.args.cosinedecay:
-            return optimizer
+            return optimizer1, optimizer2
             
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
+        scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=int(self.args.epochs * 1.15), verbose=True)
+        scheduler2 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=int(self.args.epochs * 1.15), verbose=True)
+
+        # scheduler_A = {
+        #     "optimizer": optimizer1,
+        #     "lr_scheduler": {
+        #         "scheduler": scheduler,
+        #         "interval": "epoch",
+        #         "frequency": 1,
+        #     }
+        # }
+        # scheduler_B = {
+        #     "optimizer": optimizer2,
+        #     "lr_scheduler": {
+        #         "scheduler": scheduler2,
+        #         "interval": "epoch",
+        #         "frequency": 1,
+        #     }
+        # }
+    
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,verbose=True)
         #lr_scheduler = AdafactorSchedule(optimizer)
-        return {
-            "optimizer": optimizer,
+        return (
+        {
+            "optimizer": optimizer1,
             "lr_scheduler": {
-                "scheduler": scheduler,
+                "scheduler": scheduler1,
                 "interval": "epoch",
                 "frequency": 1,
-            }
-        }
+                "monitor": "metric_to_track",
+            },
+        },
+        {
+            "optimizer": optimizer2,
+            "lr_scheduler": {
+                "scheduler": scheduler2,
+                "interval": "epoch",
+                "frequency": 1,
+                "monitor": "metric_to_track",
+            },
+        },
+    )

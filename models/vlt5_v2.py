@@ -312,8 +312,7 @@ class ByT5Model(pl.LightningModule):
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
      
         img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
-        
-        img_logits = img_res.logits[:,0,:] #(bs,v_dim)
+    
         
         # '''contrastive loss'''
         # logit_scale = self.logit_scale.exp()

@@ -8,9 +8,9 @@ try:
 except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
-from dataset.sg_dataset import get_sketchgraphs_dataloader
+from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models.vlt5_v2 import ByT5Model
+from models.vlt5_v2_tri import ByT5Model
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -24,11 +24,14 @@ import os
 from pytorch_lightning.strategies import DDPStrategy
 
 from transformers import AutoTokenizer
+#from lightning.fabric import Fabric
+from lightning.pytorch.tuner import Tuner
 
 def main():
     """Entry point for our training script"""
     args = get_training_args()
     
+    #fabric = Fabric()
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     # torch.set_float32_matmul_precision('high')
     
@@ -63,9 +66,12 @@ def main():
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
 
     print("Loading data...")
-    train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
-    val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
-    test_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="test", shuffle=False)
+    
+    
+    # train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
+    # val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
+    # test_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="test", shuffle=False)
+    sketchdata = SketchDataModule(tokenizer, args)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)
@@ -90,15 +96,25 @@ def main():
         # limit_train_batches=0.01,
         # limit_val_batches=0.1,
     )
+    
     if not args.eval: 
+        # tuner = Tuner(trainer)
+        # lr_finder=tuner.lr_find(model)
+        # print(lr_finder.results)
+        # fig = lr_finder.plot(suggest=True)
+        # fig.savefig('lr_finder.png')
+        # new_lr = lr_finder.suggestion()
+        # model.hparams.lr = new_lr
+        
         print("Start training")
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader) #ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
-        trainer.test(model, dataloaders=test_dataloader, ckpt_path='best')
+        trainer.fit(model, datamodule=sketchdata) #ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
+        #trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
+       
     else:
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
+        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=sketchdata.val_dataloader())
 
 
 if __name__ == "__main__":
