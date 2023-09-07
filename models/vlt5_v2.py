@@ -210,7 +210,6 @@ class ByT5Model(pl.LightningModule):
 
         image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds.float())))
         
-        image_for_llm = self.vision_model(batch['images'])
         # image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
