@@ -76,6 +76,7 @@ def train_on_ray_cluster():
         "logger": loggers,
         "max_epochs": args.max_epochs,
         "accelerator": "auto",
+        "log_every_n_steps": args.log_every_n_steps,
     }
 
     if args.mix_precision:

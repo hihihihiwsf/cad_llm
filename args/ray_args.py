@@ -147,6 +147,12 @@ def get_ray_args():
         default=None,
         help="Path/URL/S3-Path of the checkpoint from which training is resumed."
     )
+    parser.add_argument(
+        "--log_every_n_steps",
+        type=int,
+        default=100,
+        help="Trainer arg indicating how often to log"
+    )
 
     ray_args, _ = parser.parse_known_args()
     
