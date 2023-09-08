@@ -76,7 +76,7 @@ class ByT5v2(pl.LightningModule):
             loss = outputs.loss
 
             self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                     batch_size=self.batch_size)
+                     batch_size=self.batch_size, add_dataloader_idx=False)
 
         # Generate samples for all validation sets
         # Recursively unwrap the model from potential distributed training containers
