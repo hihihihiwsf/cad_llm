@@ -4,6 +4,7 @@ FusionGalleryDimension represents a sketch dimension in the Fusion 360 Gallery f
 
 """
 
+import math
 from preprocess.fusiongallery_geometry.base_constraint import FusionGalleryBaseConstraint
 
 
@@ -101,8 +102,25 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         elif direction == "VERTICAL":
             return "VerticalDimensionOrientation"
         else:
-            return None            
-
+            return None
+    
+    def calculate_orientation(self, start_point, end_point):
+        """Calculate the orientation for a dimension using the start/end points"""
+        # We calculate the orientation here as one of:
+        # - AlignedDimensionOrientation
+        # - HorizontalDimensionOrientation
+        # - VerticalDimensionOrientation
+        is_horizontal = math.isclose(start_point["x"], end_point["x"])
+        is_vertical = math.isclose(start_point["y"], end_point["y"])
+        if is_vertical and is_horizontal:
+            self.converter.log_failure("Orientation for SketchLinearDimension has coincident start/end points")
+            return None
+        elif is_vertical:
+            return "VerticalDimensionOrientation"
+        elif is_horizontal:
+            return "HorizontalDimensionOrientation"
+        else:
+            return "AlignedDimensionOrientation"
 
     def make_distance_dimension_dict(self):
         """
@@ -251,8 +269,11 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         dimension_dict = self.make_common_dimension_dict()
         dimension_dict["entity_one"] = start_point
         dimension_dict["entity_two"] = end_point
-        # Direction is not provided in the deep mind data
-        # dimension_dict["orientation"]= self.make_orientation_enum(self.constraint[self.type]["direction"])
+        # Direction is not provided in the deep mind data so we calculate it
+        orientation = self.calculate_orientation(self.points[start_point], self.points[end_point])
+        if orientation is None:
+            return None
+        dimension_dict["orientation"] = orientation
         dimension_dict["type"] = "SketchLinearDimension"
         return dimension_dict
     
