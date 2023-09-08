@@ -16,6 +16,8 @@ from transformers import AutoTokenizer
 from dataset.dataset_utils import split_list
 from dataset.sketch_strings_collator import SketchStringsCollator
 
+from functools import partial
+
 
 class Byt5NewTokensDataModule(pl.LightningDataModule):
 
@@ -48,7 +50,8 @@ class Byt5NewTokensDataModule(pl.LightningDataModule):
 
     def setup(self, stage):
         self.tokenizer = self.get_tokenizer(self.model_name)
-        self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.max_length)
+        self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.max_length,
+                                              additional_cols=["entities", "input_entities", "output_entities"])
         self.ds = self.get_dataset()
 
     def get_dataset(self):
@@ -60,7 +63,13 @@ class Byt5NewTokensDataModule(pl.LightningDataModule):
         # Process dataset
         # Add transform to split to input/output text
         # Note that a new random split is generated on each call
-        ds.set_transform(self.batch_split_entities_to_io)
+        transform = partial(self.batch_split_entities, min_ratio=self.min_ratio, max_ratio=self.max_ratio)
+        ds["train"] = ds["train"].with_transform(transform)
+        ds["val"] = ds["val"].with_transform(transform)
+
+        for p in [20, 40, 60, 80]:
+            cur_ratio_transform = partial(self.batch_split_entities, min_ratio=p/100, max_ratio=p/100)
+            ds[f"val_{p}"] = ds["val"].with_transform(cur_ratio_transform)
 
         return ds
 
@@ -68,29 +77,43 @@ class Byt5NewTokensDataModule(pl.LightningDataModule):
         return self._get_dataloader(ds=self.ds["train"], shuffle=True)
 
     def val_dataloader(self):
-        return self._get_dataloader(ds=self.ds["val"], shuffle=False)
+        return [
+            self._get_dataloader(ds=self.ds["val"], shuffle=False),
+            self._get_dataloader(ds=self.ds["val_20"], shuffle=False),
+            self._get_dataloader(ds=self.ds["val_40"], shuffle=False),
+            self._get_dataloader(ds=self.ds["val_60"], shuffle=False),
+            self._get_dataloader(ds=self.ds["val_80"], shuffle=False),
+        ]
 
     def _get_dataloader(self, ds, shuffle):
         return DataLoader(ds, batch_size=self.batch_size, shuffle=shuffle, collate_fn=self.collator,
                           num_workers=self.num_dataloader_workers)
 
-    def batch_split_entities_to_io(self, batch):
+    def batch_split_entities(self, batch, min_ratio, max_ratio):
         """ Wrapper for split_entities_to_io """
-        io_pairs = [self.split_entities_to_io(entities) for entities in batch["entities"]]
+        results = [self.split_entities_to_io(entities, min_ratio, max_ratio) for entities in batch["entities"]]
 
-        batch["input_text"] = [input_text for input_text, _ in io_pairs]
-        batch["output_text"] = [output_text for _, output_text in io_pairs]
+        batch["input_entities"] = [result["input_entities"] for result in results]
+        batch["output_entities"] = [result["output_entities"] for result in results]
+
+        batch["input_text"] = [result["input_text"] for result in results]
+        batch["output_text"] = [result["output_text"] for result in results]
 
         return batch
 
-    def split_entities_to_io(self, entities):
+    def split_entities_to_io(self, entities, min_ratio, max_ratio):
         # Split
-        input_entities, output_entities = split_list(entities, self.min_ratio, self.max_ratio)
+        input_entities, output_entities = split_list(entities, min_ratio, max_ratio)
         # Convert to strings
         input_text = self.get_entities_string(input_entities) + self.END_OF_PROMPT_TOKEN_STR
         output_text = self.get_entities_string(output_entities)
 
-        return input_text, output_text
+        return {
+            "input_entities": input_entities,
+            "output_entities": output_entities,
+            "input_text": input_text,
+            "output_text": output_text,
+        }
 
     def get_entities_string(self, entities):
         entity_string_list = [self.get_entity_string(entity) for entity in entities]

@@ -38,7 +38,8 @@ class ByT5v2(pl.LightningModule):
         self.model = T5ForConditionalGeneration.from_pretrained(model_name)
         self.adjust_model_to_tokenizer()
 
-        self.sample_infos = []
+        self.val_names = ["val", "val_20", "val_40", "val_60", "val_80"]
+        self._reset_sample_infos()
 
     def setup(self, stage):
         self.local_samples_path = Path(self.local_samples_path) / f"rank_{self.global_rank}/"
@@ -66,13 +67,18 @@ class ByT5v2(pl.LightningModule):
                  batch_size=self.batch_size)
         return loss
 
-    def validation_step(self, batch, batch_idx):
-        outputs = self.model(**self._get_model_batch(batch))
-        loss = outputs.loss
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size)
+    def validation_step(self, batch, batch_idx, dataloader_idx):
+        val_name = self.val_names[dataloader_idx]
 
-        # Generate and process samples
+        loss = None
+        if val_name == "val":
+            outputs = self.model(**self._get_model_batch(batch))
+            loss = outputs.loss
+
+            self.log(f"val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                     batch_size=self.batch_size)
+
+        # Generate samples for all validation sets
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
         samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
@@ -80,7 +86,7 @@ class ByT5v2(pl.LightningModule):
 
         # Log all samples for later metric extraction
         for i in range(len(samples)):
-            self.sample_infos.append({
+            self.sample_infos[val_name].append({
                 "samples": samples[i].tolist(),
                 "input_ids": batch["input_ids"][i].tolist(),
                 "labels": batch["labels"][i].tolist(),
@@ -89,10 +95,7 @@ class ByT5v2(pl.LightningModule):
                 "name": batch["name"][i],
             })
 
-        return loss
-
     def on_validation_epoch_end(self):
-
         path = self.local_samples_path / f"samples_epoch_{self.current_epoch}_rank_{self.global_rank}.json"
         print(f"Saving samples to {path} ({self.global_rank})")
         with open(path, "w") as json_file:
@@ -101,8 +104,10 @@ class ByT5v2(pl.LightningModule):
 
         aws_s3_sync(self.local_samples_path, self.remote_samples_path)
 
-        # Reset sample_infos
-        self.sample_infos = []
+        self._reset_sample_infos()
+
+    def _reset_sample_infos(self):
+        self.sample_infos = {val_name: [] for val_name in self.val_names}
 
     def _get_model_batch(self, batch):
         cols = ["input_ids", "attention_mask", "labels"]
