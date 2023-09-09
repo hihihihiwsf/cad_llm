@@ -248,6 +248,9 @@ class ByT5Model(pl.LightningModule):
         txt_embeddings = txt_embeddings[:, 1, :]
         pad_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
         start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
+        
+        modeA = self.model.encoder.get_input_embeddings()(torch.tensor([37]).to(self.device))
+        modeB = self.model.encoder.get_input_embeddings()(torch.tensor([38]).to(self.device))
                 
         ########### INPUT CHUNKS
         # Find the maximum chunk size
@@ -285,11 +288,13 @@ class ByT5Model(pl.LightningModule):
             decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
             # decoder_inputs_embeds.requires_grad_(False)
         
-        model_batch['inputs_embeds'] = input_tensor
+        # model_batch['inputs_embeds'] = input_tensor
+        model_batch['inputs_embeds'] = torch.concatenate((modeA.unsqueeze(1).repeat(input_tensor.shape[0], 1, 1), input_tensor), dim=1)
         model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
-        del model_batch['input_ids'], 
+        del model_batch['input_ids']
         del model_batch['labels']
-        model_batch['attention_mask'] =  batch['batch_att_mask']
+        # model_batch['attention_mask'] =  batch['batch_att_mask']
+        model_batch['attention_mask'] = torch.concatenate((torch.ones(batch['batch_att_mask'].shape[0], 1).to(self.device), batch['batch_att_mask']), dim=1)
         outputs = self.model(**model_batch, output_hidden_states=True)
         
 
@@ -328,7 +333,9 @@ class ByT5Model(pl.LightningModule):
         
         batch_3 = {}
         batch_3['labels'] = batch['labels']
-        batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
+        # batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
+        batch_3['inputs_embeds'] = torch.concatenate((modeB.unsqueeze(1).repeat(outputs["decoder_hidden_states"][-1].shape[0], 1, 1), outputs["decoder_hidden_states"][-1]), dim=1)
+        batch["output_ent_length"] = [i+1 for i in batch["output_ent_length"]]
         batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
         decoder_outputs = self.model(**batch_3, output_hidden_states=True)
         loss = decoder_outputs.loss
@@ -374,7 +381,9 @@ class ByT5Model(pl.LightningModule):
         txt_embeddings = txt_embeddings[:, 1, :]
         pad_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
         start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
-                
+        
+        modeA = self.model.encoder.get_input_embeddings()(torch.tensor([37]).to(self.device))
+        modeB = self.model.encoder.get_input_embeddings()(torch.tensor([38]).to(self.device))
         ########### INPUT CHUNKS
         # Find the maximum chunk size
         chunks = batch['input_ent_length']
@@ -411,16 +420,19 @@ class ByT5Model(pl.LightningModule):
             idx += size
         decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
         
-        model_batch['inputs_embeds'] = input_tensor
-        del model_batch['input_ids'] 
-        del model_batch['labels']
-        model_batch['attention_mask'] = batch['batch_att_mask']
+        # model_batch['inputs_embeds'] = input_tensor
+        # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
+        # del model_batch['input_ids'] 
+        # del model_batch['labels']
+        # model_batch['attention_mask'] = batch['batch_att_mask']
         
-
-        
+        model_batch['inputs_embeds'] = torch.concatenate((modeA.unsqueeze(1).repeat(input_tensor.shape[0], 1, 1), input_tensor), dim=1)
         model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
+        del model_batch['input_ids']
+        del model_batch['labels']
+        model_batch['attention_mask'] = torch.concatenate((torch.ones(batch['batch_att_mask'].shape[0], 1).to(self.device), batch['batch_att_mask']), dim=1)
+        
  
-        # model_batch['attention_mask'] =  batch['batch_att_mask']
         outputs = self.model(**model_batch, output_hidden_states=True)
         
         # o = batch['output_entities'].input_ids
@@ -443,7 +455,9 @@ class ByT5Model(pl.LightningModule):
         
         batch_3 = {}
         batch_3['labels'] = batch['labels']
-        batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
+        # batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
+        batch_3['inputs_embeds'] = torch.concatenate((modeB.unsqueeze(1).repeat(outputs["decoder_hidden_states"][-1].shape[0], 1, 1), outputs["decoder_hidden_states"][-1]), dim=1)
+        batch["output_ent_length"] = [i+1 for i in batch["output_ent_length"]]
         batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
         decoder_outputs = self.model(**batch_3, output_hidden_states=True)
         loss = decoder_outputs.loss
@@ -504,24 +518,27 @@ class ByT5Model(pl.LightningModule):
 
     
     def seq_inference(self, model_batch, batch, batch_idx=None):
-        
-        del model_batch['decoder_inputs_embeds']
-        batch['samples'] = self.model.generate(**model_batch, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=96+10, early_stopping=True, do_sample=False)
-        
-        
-        # decoder_hidden_states = []
-        # for e in outputs['decoder_hidden_states']:
-        #     decoder_hidden_states.append(e[-1])
-        # src = torch.cat(decoder_hidden_states, dim=1)
-        # # src = src.view(-1, 1, src.shape[2])
-        
-        # # if batch_idx % 10 == 0:
-        # #     print(src.shape)
-        
-        # batch_final = {}
-        # batch_final['inputs_embeds'] = src
-        # batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
-        # batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=self.args.max_length+10, early_stopping=True, do_sample=False)
+        with torch.no_grad():
+            del model_batch['decoder_inputs_embeds']
+            modeB = self.model.encoder.get_input_embeddings()(torch.tensor([38]).to(self.device))
+            outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=15, early_stopping=False, do_sample=False)
+            
+            
+            decoder_hidden_states = []
+            for e in outputs['decoder_hidden_states']:
+                decoder_hidden_states.append(e[-1])
+            src = torch.cat(decoder_hidden_states, dim=1)
+            # src = src.view(-1, 1, src.shape[2])
+            
+            # # if batch_idx % 10 == 0:
+            # #     print(src.shape)
+            
+            batch_final = {}
+            # batch_final['inputs_embeds'] = src
+            batch_final['inputs_embeds'] = torch.concatenate((modeB.unsqueeze(1).repeat(src.shape[0], 1, 1), src), dim=1)
+            batch["output_ent_length"] = [i+1 for i in batch["output_ent_length"]]
+            batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_final['inputs_embeds'].shape[1])
+            batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=self.args.max_length+10, early_stopping=True, do_sample=False)
         
         
         # final_seq = []
