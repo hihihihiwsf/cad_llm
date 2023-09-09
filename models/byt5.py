@@ -293,10 +293,10 @@ class ByT5Model(pl.LightningModule):
         outputs = self.model(**model_batch, output_hidden_states=True)
         
 
-        o = batch['output_entities'].input_ids
-        o = torch.concatenate((o[:, 0].unsqueeze(1), o[:, 2:]), dim=1)
+        # o = batch['output_entities'].input_ids
+        # o = torch.concatenate((o[:, 0].unsqueeze(1), o[:, 2:]), dim=1)
         
-        l = batch['output_ent_length']
+        # l = batch['output_ent_length']
         
         
         # unpacked_entities = []
@@ -505,22 +505,23 @@ class ByT5Model(pl.LightningModule):
     
     def seq_inference(self, model_batch, batch, batch_idx=None):
         
-        outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=30, early_stopping=False, do_sample=False)
+        del model_batch['decoder_inputs_embeds']
+        batch['samples'] = self.model.generate(**model_batch, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=96+10, early_stopping=True, do_sample=False)
         
         
-        decoder_hidden_states = []
-        for e in outputs['decoder_hidden_states']:
-            decoder_hidden_states.append(e[-1])
-        src = torch.cat(decoder_hidden_states, dim=1)
-        # src = src.view(-1, 1, src.shape[2])
+        # decoder_hidden_states = []
+        # for e in outputs['decoder_hidden_states']:
+        #     decoder_hidden_states.append(e[-1])
+        # src = torch.cat(decoder_hidden_states, dim=1)
+        # # src = src.view(-1, 1, src.shape[2])
         
-        # if batch_idx % 10 == 0:
-        #     print(src.shape)
+        # # if batch_idx % 10 == 0:
+        # #     print(src.shape)
         
-        batch_final = {}
-        batch_final['inputs_embeds'] = src
-        batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
-        batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=self.args.max_length+10, early_stopping=True, do_sample=False)
+        # batch_final = {}
+        # batch_final['inputs_embeds'] = src
+        # batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=src.shape[1])
+        # batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=self.args.max_length+10, early_stopping=True, do_sample=False)
         
         
         # final_seq = []
@@ -538,13 +539,14 @@ class ByT5Model(pl.LightningModule):
                 with open("output_string_logs.txt", "a") as file:
                     i = 0
                     text_string = "\n EPOCH: {} ---- Batch Idx: {} \n".format(self.current_epoch, batch_idx)
-                    for j in range(30): #the first 30 elements of this shit
-                        text_string += self.tokenizer.decode(batch['samples'][j])+ "------"
+                    # for j in range(30): #the first 30 elements of this shit
+                    text_string += self.tokenizer.decode(batch['samples'][0])+ "------"
                     text_string += "\n" + "GROUND TRUTH: \n"
                     text_string += batch['output_text'][i]
                     text_string += "\n"
                     file.write(text_string)
         except:
+            print('writing ride')
             pass
                 
         # batch['samples'] = batch['samples'].reshape(len(batch['labels']), -1)
