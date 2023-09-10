@@ -119,11 +119,11 @@ class ByT5Model(pl.LightningModule):
         
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
 
-        self.automatic_optimization = False
+        #self.automatic_optimization = False
 
     def training_step(self, batch, batch_idx):
         
-        opt1, opt2 = self.optimizers()
+        #opt1, opt2 = self.optimizers()
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
@@ -219,11 +219,11 @@ class ByT5Model(pl.LightningModule):
         # if batch_idx % 15==0:
         #     sch1.step()
         #     sch2.step()
-        opt1.zero_grad()
-        opt2.zero_grad()
-        self.manual_backward(loss)
-        opt1.step()
-        opt2.step()
+        # opt1.zero_grad()
+        # opt2.zero_grad()
+        # self.manual_backward(loss)
+        # opt1.step()
+        # opt2.step()
 
         return loss
 
@@ -419,15 +419,15 @@ class ByT5Model(pl.LightningModule):
         params1 = list(self.model.parameters()) +list(self.vit_mae.parameters()) 
         params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vision_projection.parameters())+ list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
         
-        optimizer2 = Adafactor(params1, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+        optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
         
-        optimizer1 = optim.AdamW(params2, lr=self.lr, weight_decay=0.05)
+        #optimizer1 = optim.AdamW(params2, lr=self.lr, weight_decay=0.05)
         #optimizer2 = optim.AdamW(params2, lr=10*self.lr)
         if not self.args.cosinedecay:
-            return optimizer1, optimizer2
+            return optimizer #, optimizer2
             
-        scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=int(self.args.epochs * 1.15), verbose=True)
-        scheduler2 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=int(self.args.epochs * 1.15), verbose=True)
+        #scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=int(self.args.epochs * 1.15), verbose=True)
+        #scheduler2 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=int(self.args.epochs * 1.15), verbose=True)
 
         # scheduler_A = {
         #     "optimizer": optimizer1,
@@ -447,24 +447,14 @@ class ByT5Model(pl.LightningModule):
         # }
     
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,verbose=True)
-        #lr_scheduler = AdafactorSchedule(optimizer)
-        return (
-        {
-            "optimizer": optimizer1,
+        lr_scheduler = AdafactorSchedule(optimizer)
+        return {
+            "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": scheduler1,
+                "scheduler": lr_scheduler,
                 "interval": "epoch",
                 "frequency": 1,
                 "monitor": "metric_to_track",
             },
-        },
-        {
-            "optimizer": optimizer2,
-            "lr_scheduler": {
-                "scheduler": scheduler2,
-                "interval": "epoch",
-                "frequency": 1,
-                "monitor": "metric_to_track",
-            },
-        },
-    )
+        }
+
