@@ -341,7 +341,7 @@ class ByT5Model(pl.LightningModule):
             return optimizer
             
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,verbose=True)
         #lr_scheduler = AdafactorSchedule(optimizer)
         return {
             "optimizer": optimizer,
