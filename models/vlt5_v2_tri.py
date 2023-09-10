@@ -212,7 +212,7 @@ class ByT5Model(pl.LightningModule):
         '''contrastive loss'''
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
-        loss = txt_loss + img_loss + contrastive_loss
+        loss = (txt_loss + img_loss + contrastive_loss) / 3.0
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
@@ -416,22 +416,13 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) +list(self.vit_mae.parameters()) 
+        params1 = list(self.model.parameters()) +list(self.vit_mae.parameters()) 
         params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vision_projection.parameters())+ list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
-        # optimizer = Adafactor(
-        #         params,
-        #         lr=None,
-        #         eps=(1e-30, 1e-3),
-        #         clip_threshold=1.0,
-        #         decay_rate=-0.8,
-        #         beta1=None,
-        #         weight_decay=0.0,
-        #         relative_step=True, #
-        #         scale_parameter=True, #
-        #         warmup_init=True, #
-        #     )
-        optimizer1 = optim.AdamW(params+params2, lr=self.lr, weight_decay=0.05)
-        optimizer2 = optim.AdamW(params2, lr=10*self.lr)
+        
+        optimizer2 = Adafactor(params1, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+        
+        optimizer1 = optim.AdamW(params2, lr=self.lr, weight_decay=0.05)
+        #optimizer2 = optim.AdamW(params2, lr=10*self.lr)
         if not self.args.cosinedecay:
             return optimizer1, optimizer2
             

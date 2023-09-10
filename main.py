@@ -9,8 +9,8 @@ except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchDataModule
-from models.byt5 import ByT5Model
-#from models.vlt5_v2_tri import ByT5Model
+# from models.byt5 import ByT5Model
+from models.vlt5_v2_tri import ByT5Model
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -107,14 +107,15 @@ def main():
         # model.hparams.lr = new_lr
         
         print("Start training")
-        trainer.fit(model, datamodule=sketchdata) #ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
+        trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
         #trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
        
     else:
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=sketchdata.val_dataloader())
+        ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt'
+        trainer.validate(model, ckpt_path=ckpt_path, dataloaders=sketchdata.val_dataloader())
 
 
 if __name__ == "__main__":

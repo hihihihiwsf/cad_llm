@@ -27,6 +27,7 @@ import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
 from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
+from geometry.visualization import visualize_sample_cv
 
 from transformers.optimization import Adafactor, AdafactorSchedule
 
@@ -139,26 +140,27 @@ class ByT5Model(pl.LightningModule):
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
-        # '''measure training completely'''
-        # self.generate_samples(batch)
-        # # Calculate metrics
-        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        '''measure training completely'''
+        if batch_idx%100 == 0:
+            self.generate_samples(batch)
+            # Calculate metrics
+            top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        # self.log("train_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-        #          batch_size=self.batch_size, sync_dist=True)
+            self.log("train_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                    batch_size=self.batch_size, sync_dist=True)
 
-        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+            top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        # self.log("train_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-        #     batch_size=self.batch_size, sync_dist=True)
-        # # # Convert string entities to curves and check validity
-        # validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        # self.log("train_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-        #          batch_size=self.batch_size, sync_dist=True)
+            self.log("train_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                batch_size=self.batch_size, sync_dist=True)
+            # # Convert string entities to curves and check validity
+            validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
+            self.log("train_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                    batch_size=self.batch_size, sync_dist=True)
 
-        # f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
-        # self.log("train_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-        #     batch_size=self.batch_size, sync_dist=True)
+            f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+            self.log("train_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                batch_size=self.batch_size, sync_dist=True)
         
         return loss
 
@@ -172,9 +174,19 @@ class ByT5Model(pl.LightningModule):
         
         
     def evaluation_process(self, batch, batch_idx, validate):
+        ''' compare some sample with vitruvion
+        device = batch['input_ids'].device
+        strings = '63,32,63,51;53,51,63,51;0,32,0,51;46,44,46,51;46,44,53,44;53,44,53,51;53,44,53,51;0,32,63,32;'
+        token_in = self.tokenizer(strings, padding=True, truncation=True, max_length=96, return_tensors="pt")
+        batch['input_ids'] = token_in.input_ids.to(device)
+        batch['attention_mask'] =token_in.attention_mask.to(device)
+        point_input=get_point_entities(strings)
+        list_of_img = visualize_sample_cv(point_entities=[point_input], box_lim=64 + 3)
+        _images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        batch['images'] = _images.pixel_values.to(device)
+        '''
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
@@ -275,7 +287,7 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         params = list(self.model.parameters()) + list(self.mapper.parameters()) #+ list(self.vis_model.parameters())
-        params2= list(self.embed_patch.parameters()) + list(self.layernorm.parameters())+list(self.post_layernorm.parameters())
+        #params2= list(self.embed_patch.parameters()) + list(self.layernorm.parameters())+list(self.post_layernorm.parameters())
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
@@ -288,19 +300,19 @@ class ByT5Model(pl.LightningModule):
         #         scale_parameter=True, #
         #         warmup_init=True, #
         #     )
-        #optimizer = optim.AdamW(params+params2, lr=self.lr, weight_decay=0.05)
-        optimizer = Adafactor(params+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+        optimizer = optim.AdamW(params, lr=self.lr, weight_decay=0.05)
+        #optimizer = Adafactor(params+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
 
         if not self.args.cosinedecay:
             return optimizer
             
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
-        lr_scheduler = AdafactorSchedule(optimizer)
+        #lr_scheduler = AdafactorSchedule(optimizer)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": lr_scheduler,
+                "scheduler": scheduler,
                 "interval": "epoch",
                 "frequency": 1,
             }
