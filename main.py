@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models.vlt5_v0 import ByT5Model
+from models.vlt5_v2_tri import ByT5Model
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -106,7 +106,7 @@ def main():
         # model.hparams.lr = new_lr
         
         print("Start training")
-        trainer.fit(model, datamodule=sketchdata, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-v0-bn-09-06-23-2129/checkpoints/model/sg_multimodal_v0_bn/last.ckpt')
+        trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-v0-bn-09-06-23-2129/checkpoints/model/sg_multimodal_v0_bn/last.ckpt')
         #trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
        
     else:
