@@ -9,8 +9,8 @@ except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader, SketchDataModule
-# from models.byt5 import ByT5Model
-from models.vlt5_v2_tri import ByT5Model
+#from models.byt5 import ByT5Model
+from models.vlt5_v0 import ByT5Model
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -25,7 +25,7 @@ from pytorch_lightning.strategies import DDPStrategy
 
 from transformers import AutoTokenizer
 #from lightning.fabric import Fabric
-from lightning.pytorch.tuner import Tuner
+#from lightning.pytorch.tuner import Tuner
 
 def main():
     """Entry point for our training script"""
@@ -90,7 +90,6 @@ def main():
         logger=loggers,
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
-        #resume_from_checkpoint='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt',  #'s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-07-04-23-2320/checkpoints/best.ckpt',
         precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
         # limit_train_batches=0.01,
@@ -107,7 +106,7 @@ def main():
         # model.hparams.lr = new_lr
         
         print("Start training")
-        trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
+        trainer.fit(model, datamodule=sketchdata, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt')
         #trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
        
     else:
@@ -115,7 +114,7 @@ def main():
         print("Start evaluating")
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
         ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt'
-        trainer.validate(model, ckpt_path=ckpt_path, dataloaders=sketchdata.val_dataloader())
+        trainer.validate(model, ckpt_path=ckpt_path, dataloaders=sketchdata.train_dataloader())
 
 
 if __name__ == "__main__":

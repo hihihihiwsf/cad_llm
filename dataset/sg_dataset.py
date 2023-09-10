@@ -16,6 +16,7 @@ class SketchGraphsDataset(Dataset):
         path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
+        
 
         if split == "train":
             n = int(args.limit_data * len(self.data))
@@ -130,6 +131,7 @@ class SketchGraphsCollator:
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
+    
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)

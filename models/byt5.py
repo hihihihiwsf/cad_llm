@@ -141,26 +141,8 @@ class ByT5Model(pl.LightningModule):
                  batch_size=self.batch_size, sync_dist=True)
         
         '''measure training completely'''
-        if batch_idx%100 == 0:
-            self.generate_samples(batch)
-            # Calculate metrics
-            top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        # if batch_idx%100 == 0:
 
-            self.log("train_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                    batch_size=self.batch_size, sync_dist=True)
-
-            top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
-
-            self.log("train_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                batch_size=self.batch_size, sync_dist=True)
-            # # Convert string entities to curves and check validity
-            validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-            self.log("train_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                    batch_size=self.batch_size, sync_dist=True)
-
-            f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
-            self.log("train_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                batch_size=self.batch_size, sync_dist=True)
         
         return loss
 

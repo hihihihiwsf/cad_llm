@@ -164,6 +164,7 @@ class ByT5Model(pl.LightningModule):
         #pooled_output= last_hidden_state[:, 0, :]
         image_embeds = self.batchnorm(last_hidden_state.permute(0,2,1).float()) #self.post_layernorm(last_hidden_state)
         image_embeds = image_embeds.permute(0,2,1)
+        
         '''patch embedding downsample 196 to 14'''
         # image_embeds = image_embeds.permute(0,2,1)
         # image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
