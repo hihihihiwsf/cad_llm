@@ -42,6 +42,7 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 
+from lion_pytorch import Lion
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
@@ -419,12 +420,13 @@ class ByT5Model(pl.LightningModule):
         params1 = list(self.model.parameters()) +list(self.vit_mae.parameters()) 
         params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vision_projection.parameters())+ list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
         
-        optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+        #optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+        opt = Lion(params1+params2, lr=self.lr, weight_decay=1e-2)
         
         #optimizer1 = optim.AdamW(params2, lr=self.lr, weight_decay=0.05)
         #optimizer2 = optim.AdamW(params2, lr=10*self.lr)
         if not self.args.cosinedecay:
-            return optimizer #, optimizer2
+            return opt #, optimizer2
             
         #scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=int(self.args.epochs * 1.15), verbose=True)
         #scheduler2 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=int(self.args.epochs * 1.15), verbose=True)
@@ -447,9 +449,9 @@ class ByT5Model(pl.LightningModule):
         # }
     
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,verbose=True)
-        lr_scheduler = AdafactorSchedule(optimizer)
+        lr_scheduler = AdafactorSchedule(opt)
         return {
-            "optimizer": optimizer,
+            "optimizer": opt,
             "lr_scheduler": {
                 "scheduler": lr_scheduler,
                 "interval": "epoch",
