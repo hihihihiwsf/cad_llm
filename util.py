@@ -4,6 +4,12 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 import aws_utils
 
+def get_total_train_steps(num_train_batches, num_gpus, epochs):
+    # Assumes running on gpus, one node and no accumulate_grad_batches
+    train_batches = num_train_batches // num_gpus if num_gpus else num_train_batches
+    total_train_steps = train_batches * epochs
+
+    return total_train_steps
 
 def get_loggers(args, log_dir):
     """Get the loggers to use"""

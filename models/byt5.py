@@ -29,6 +29,7 @@ from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
 from geometry.visualization import visualize_sample_cv
 
+import transformers
 from transformers.optimization import Adafactor, AdafactorSchedule
 
 class ByT5Model(pl.LightningModule):

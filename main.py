@@ -14,7 +14,7 @@ from models.vlt5_v2_tri import ByT5Model
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
-from util import get_loggers, get_checkpoint_callbacks
+from util import get_loggers, get_checkpoint_callbacks, get_total_train_steps
 from args.main_args import get_training_args
 from pathlib import Path
 import pytorch_lightning as pl
@@ -52,26 +52,28 @@ def main():
 
     # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
+    tokenizer=AutoTokenizer.from_pretrained(args.model_name)
+
+    print("Loading data...")
+    sketchdata = SketchDataModule(tokenizer, args)
+    num_train_batches = len(sketchdata.train_dataloader())
+    num_gpus = torch.cuda.device_count()
+    total_train_steps = get_total_train_steps(num_train_batches, num_gpus, args.epochs)
 
     print("Loading model...")
 
     if not args.untrained_model:
-        model = ByT5Model(args=args, vit_mae=None)
+        model = ByT5Model(args=args, vit_mae=None, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
     else:
         print("train_mae", args.untrained_model)
         model = VisRecon(args=args)
         model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-mae-ps-32-scratch-dm-07-05-23-1623/checkpoints/model/mae_ps_32_scratch_dm/best.ckpt')
         
-    tokenizer=AutoTokenizer.from_pretrained(args.model_name)
-
-    print("Loading data...")
-    
     
     # train_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
     # val_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
     # test_dataloader = get_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="test", shuffle=False)
-    sketchdata = SketchDataModule(tokenizer, args)
 
     call_backs = get_checkpoint_callbacks(log_dir=results_dir, all_checkpoint_dir=checkpoint_dir,
                                           using_sagemaker=args.using_sagemaker)

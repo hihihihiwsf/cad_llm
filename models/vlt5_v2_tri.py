@@ -30,7 +30,7 @@ from models.modeling_vlt5 import T5ForConditionalGeneration
 from geometry.visualize_vit import Visualize_VIT
 
 import torch.nn as nn
-from transformers.optimization import Adafactor, AdafactorSchedule
+from transformers.optimization import Adafactor, AdafactorSchedule, get_cosine_schedule_with_warmup
 from copy import deepcopy
 
 from models.modeling_vit_mae import get_2d_sincos_pos_embed, ViTMAEDecoderOutput
@@ -58,30 +58,47 @@ class BlipTextPooler(nn.Module):
         pooled_output = self.activation(pooled_output)
         return pooled_output
     
+class ImageTransform(nn.Module):
+    def __init__(self, vis_model_config, text_model_config):
+        super().__init__()
+        self.patch_num = int(vis_model_config.image_size/vis_model_config.patch_size)
 
+        self.downsample = torch.nn.Linear(self.patch_num*self.patch_num +1, self.patch_num)
+        self.gelu = torch.nn.GELU()
+        
+        self.mapper = torch.nn.Linear(vis_model_config.hidden_size, text_model_config.d_model)
+        self.activation = nn.Tanh()
+        self.layernorm = torch.nn.LayerNorm(text_model_config.d_model, eps=1e-5)
+        
+    def forward(self, img_hidden_state):
+        _image_embeds = img_hidden_state.permute(0,2,1)
+        '''patch embedding downsample 196 to 14'''
+        image_for_llm = self.activation(self.downsample(_image_embeds).permute(0,2,1))
+        image_for_llm = self.mapper(image_for_llm)
+        image_for_llm = self.activation(self.layernorm(image_for_llm))
+        
+        return image_for_llm
+        
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae):
+    def __init__(self, args, vit_mae,num_train_steps):
         super().__init__()
         self.save_hyperparameters()
         
+        self.num_train_steps = num_train_steps
         self.args = args
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-
-        # if args.untrained_model:
-        #     config = T5Config.from_pretrained(args.model_name)
-        #     model = T5ForConditionalGeneration(config)
-        #     model._init_weights(model)  # maybe redundant
-        # else:
-        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-
-        self.model = model
+        
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         # self.tokenizer.add_special_tokens(["<IMAGE>"])
+        
+        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        self.model = model
+        
         self.projection_dim = 1024
         self.text_embed_dim = self.model.config.d_model
         
@@ -104,22 +121,15 @@ class ByT5Model(pl.LightningModule):
         #self.vis_model.requires_grad_(False)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
+        self.img_transform = ImageTransform(self.vis_model.config, self.model.config)
+        
         self.vision_embed_dim = self.vis_model.config.hidden_size
         self.vision_projection = nn.Linear(self.vision_embed_dim, self.projection_dim, bias=False)
        
-        self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
-
-        #self.post_layernorm = self.vis_model.vit.layernorm
-        self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
-
-        self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
-
-        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num +1, self.patch_num)
-        self.gelu = torch.nn.GELU()
         
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
-
+        self.activation = nn.Tanh()
         #self.automatic_optimization = False
 
     def training_step(self, batch, batch_idx):
@@ -132,19 +142,11 @@ class ByT5Model(pl.LightningModule):
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         oi = self.vis_model.vit(batch['images'], output_hidden_states=True) 
-
-        last_hidden_state = oi['last_hidden_state']
-        #pooled_output= last_hidden_state[:, 0, :]
-        _image_embeds = last_hidden_state #self.post_layernorm(last_hidden_state)
+        img_last_hidden_state = oi['last_hidden_state']
         
-        '''patch embedding downsample 196 to 14'''
-        _image_embeds = _image_embeds.permute(0,2,1)
-        _image_embeds = self.gelu(self.embed_patch(_image_embeds).permute(0,2,1))
-
-        image_embeds = self.vision_projection(_image_embeds[:,0])
-        image_for_llm = self.gelu(self.layernorm(image_embeds))
-        # image_for_llm = self.layernorm(image_for_llm)
-
+        image_for_llm = self.img_transform(img_last_hidden_state)
+        image_embeds = self.vision_projection(img_last_hidden_state[:,0]) #for contrastive learning
+        
 
         '''txt encoder'''
         txt_encoder_output = self.model.encoder(batch['input_ids'], batch['attention_mask'],output_hidden_states=True)
@@ -153,14 +155,14 @@ class ByT5Model(pl.LightningModule):
         text_embeds = self.textpooler(_txt_embeds)
         text_embeds = self.text_projection(text_embeds)
         
-        output_embed = torch.concatenate((torch.unsqueeze(image_for_llm, dim=1), _txt_embeds), dim=1)
+        output_embed = torch.concatenate((image_for_llm, _txt_embeds), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['encoder_outputs_embeds'] = output_embed
 
 
         # adding ones to attention_mask
         att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
         
         decoder_input_ids = self.model._shift_right(batch['labels'])
@@ -173,6 +175,7 @@ class ByT5Model(pl.LightningModule):
 
         sequence_output = decoder_outputs[0]
 
+        '''text reconstruction loss'''
         # Set device for model parallelism
         if self.model.model_parallel:
             torch.cuda.set_device(self.encoder.first_device)
@@ -191,17 +194,17 @@ class ByT5Model(pl.LightningModule):
         
         
         '''image decoder pixel loss'''
-        img_hidden_state = self.layernorm(output_embed)
+        img_hidden_state = self.img_transform.layernorm(output_embed)
         self.post_layernorm=self.vis_model.vit.layernorm
-        img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
-        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
         img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
         img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
-        
+        '''image text contrastive loss'''
         # normalized features
         image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
@@ -210,7 +213,7 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
-        '''contrastive loss'''
+        
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
         loss = (txt_loss + img_loss + contrastive_loss) / 3.0
@@ -245,19 +248,11 @@ class ByT5Model(pl.LightningModule):
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         oi = self.vis_model.vit(batch['images'], output_hidden_states=True) 
-
-        last_hidden_state = oi['last_hidden_state']
-        #pooled_output= last_hidden_state[:, 0, :]
-        _image_embeds = last_hidden_state #self.post_layernorm(last_hidden_state)
+        img_last_hidden_state = oi['last_hidden_state']
         
-        '''patch embedding downsample 196 to 14'''
-        _image_embeds = _image_embeds.permute(0,2,1)
-        _image_embeds = self.gelu(self.embed_patch(_image_embeds).permute(0,2,1))
-
-        image_embeds = self.vision_projection(_image_embeds[:,0])
-        image_for_llm = self.gelu(self.layernorm(image_embeds))
-        # image_for_llm = self.layernorm(image_for_llm)
-
+        image_for_llm = self.img_transform(img_last_hidden_state)
+        image_embeds = self.vision_projection(img_last_hidden_state[:,0]) #for contrastive learning
+        
 
         '''txt encoder'''
         txt_encoder_output = self.model.encoder(batch['input_ids'], batch['attention_mask'],output_hidden_states=True)
@@ -265,15 +260,15 @@ class ByT5Model(pl.LightningModule):
         
         text_embeds = self.textpooler(_txt_embeds)
         text_embeds = self.text_projection(text_embeds)
-        
-        output_embed = torch.concatenate((torch.unsqueeze(image_for_llm, dim=1), _txt_embeds), dim=1)
+    
+        output_embed = torch.concatenate((image_for_llm, _txt_embeds), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['encoder_outputs_embeds'] = output_embed
 
 
         # adding ones to attention_mask
         att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
         
         decoder_input_ids = self.model._shift_right(batch['labels'])
@@ -286,6 +281,7 @@ class ByT5Model(pl.LightningModule):
 
         sequence_output = decoder_outputs[0]
 
+        '''text reconstruction loss'''
         # Set device for model parallelism
         if self.model.model_parallel:
             torch.cuda.set_device(self.encoder.first_device)
@@ -293,8 +289,6 @@ class ByT5Model(pl.LightningModule):
             sequence_output = sequence_output.to(self.lm_head.weight.device)
 
         if self.model.config.tie_word_embeddings:
-            # Rescale output before projecting on vocab
-            # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/transformer.py#L586
             sequence_output = sequence_output * (self.model.model_dim**-0.5)
 
         lm_logits = self.model.lm_head(sequence_output)
@@ -306,17 +300,17 @@ class ByT5Model(pl.LightningModule):
         
         
         '''image decoder pixel loss'''
-        img_hidden_state = self.layernorm(output_embed)
-        self.post_layernorm = self.vis_model.vit.layernorm
-        img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
-        mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-        img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
+        img_hidden_state = self.img_transform.layernorm(output_embed)
+        self.post_layernorm=self.vis_model.vit.layernorm
+        img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
         img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
-        
+        '''image text contrastive loss'''
         # normalized features
         image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
@@ -325,10 +319,10 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
-        '''contrastive loss'''
+        
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
-        loss = txt_loss + img_loss + contrastive_loss
+        loss = (txt_loss + img_loss + contrastive_loss) / 3.0
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
@@ -360,7 +354,6 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
-        
         return loss
 
 
@@ -418,15 +411,35 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         params1 = list(self.model.parameters()) +list(self.vit_mae.parameters()) 
-        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vision_projection.parameters())+ list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
+        params2 = list(self.img_transform.parameters())  +list(self.vision_projection.parameters())+ list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
         
         #optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
-        opt = Lion(params1+params2, lr=self.lr, weight_decay=1e-2)
+        #opt = Lion(params1+params2, lr=self.lr, weight_decay=1e-2)
         
-        #optimizer1 = optim.AdamW(params2, lr=self.lr, weight_decay=0.05)
+        optimizer1 = optim.AdamW(params2+params1, lr=self.lr, weight_decay=0.05)
         #optimizer2 = optim.AdamW(params2, lr=10*self.lr)
-        if not self.args.cosinedecay:
-            return opt #, optimizer2
+        if not self.args.cosinedecay and not self.args.adafactor:
+            return optimizer1
+
+        if self.args.cosinedecay:
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=self.num_train_steps, eta_min=self.lr * 0.1)
+            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+
+        if self.args.adafactor:
+            # optimizer = Adafactor(self.model.parameters(), scale_parameter=False, relative_step=False,
+            #                       warmup_init=False, lr=self.lr)
+            optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True,
+                                  warmup_init=True, lr=None)
+            scheduler = AdafactorSchedule(optimizer)
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1,
+            }
+        }
             
         #scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=int(self.args.epochs * 1.15), verbose=True)
         #scheduler2 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=int(self.args.epochs * 1.15), verbose=True)
@@ -449,14 +462,6 @@ class ByT5Model(pl.LightningModule):
         # }
     
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,verbose=True)
-        lr_scheduler = AdafactorSchedule(opt)
-        return {
-            "optimizer": opt,
-            "lr_scheduler": {
-                "scheduler": lr_scheduler,
-                "interval": "epoch",
-                "frequency": 1,
-                "monitor": "metric_to_track",
-            },
-        }
+        #lr_scheduler = AdafactorSchedule(optimizer1)
+
 
