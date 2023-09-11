@@ -33,7 +33,7 @@ import transformers
 from transformers.optimization import Adafactor, AdafactorSchedule
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae):
+    def __init__(self, args, vit_mae, num_train_steps):
         super().__init__()
         self.save_hyperparameters()
 
@@ -157,17 +157,22 @@ class ByT5Model(pl.LightningModule):
         
         
     def evaluation_process(self, batch, batch_idx, validate):
-        ''' compare some sample with vitruvion
+        
+        ''' compare some sample with vitruvion'''
+        
         device = batch['input_ids'].device
-        strings = '63,32,63,51;53,51,63,51;0,32,0,51;46,44,46,51;46,44,53,44;53,44,53,51;53,44,53,51;0,32,63,32;'
+        strings =  ['0,60,63,60;0,3,63,3;'] #'63,32,63,51;53,51,63,51;0,32,0,51;46,44,46,51;46,44,53,44;53,44,53,51;53,44,53,51;0,32,63,32;'
         token_in = self.tokenizer(strings, padding=True, truncation=True, max_length=96, return_tensors="pt")
         batch['input_ids'] = token_in.input_ids.to(device)
         batch['attention_mask'] =token_in.attention_mask.to(device)
-        point_input=get_point_entities(strings)
+        point_input=get_point_entities(strings[0])
         list_of_img = visualize_sample_cv(point_entities=[point_input], box_lim=64 + 3)
         _images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         batch['images'] = _images.pixel_values.to(device)
-        '''
+        
+        cols = ["attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
@@ -235,9 +240,9 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
-        # # # Plot sketches
-        # if batch_idx < 5:
-        #     self.log_samples(batch=batch, batch_idx=batch_idx)
+        # # Plot sketches
+        if batch_idx < 5:
+            self.log_samples(batch=batch, batch_idx=batch_idx)
         
         return loss
 

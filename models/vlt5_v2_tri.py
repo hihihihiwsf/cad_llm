@@ -203,7 +203,7 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_loss = self.forward_focal_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         '''image text contrastive loss'''
         # normalized features
@@ -394,12 +394,26 @@ class ByT5Model(pl.LightningModule):
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.0e-6) ** 0.5
 
-        loss = (pred - target) ** 2
+        loss = (pred - target)
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
 
         #loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         loss = loss.mean()
         return loss
+
+    def forward_focal_loss(self, pixel_values, pred):
+        gamma = 2
+        target = self.vis_model.patchify(pixel_values)
+        if self.vis_model.config.norm_pix_loss:
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, keepdim=True)
+            target = (target - mean) / (var + 1.0e-6) ** 0.5
+            
+        abs_error = torch.abs(pred - target)
+        normalized_error = abs_error / 64  # or use torch.sigmoid(abs_error)
+        focal_weight = (1 - normalized_error) ** gamma
+        focal_loss = focal_weight * abs_error
+        return focal_loss.mean()
     
     def log_samples(self, batch, batch_idx):
         label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]

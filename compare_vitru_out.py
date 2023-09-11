@@ -6,8 +6,6 @@ import ast
 from geometry.visualization import visualize_sample_cv,visualize_batch
 
 
-
-
 def compute_metric(string_completed_entities, string_label_entities):
     
     top1_full, top1_ent = 0, 0
@@ -16,13 +14,13 @@ def compute_metric(string_completed_entities, string_label_entities):
     completed_entities = sorted(string_completed_entities)
     
     if len(completed_entities) ==0 or len(label_entities) ==0:
-            return 0,0,0
+            return 0,0,0,0
     
     if label_entities == completed_entities:
         top1_full=1
     
     if not completed_entities:
-        return top1_full, 0
+        return top1_full, 0, 0, 0
     
     eps =1e-6
     TP=0
@@ -94,6 +92,9 @@ def arc_midpoint(arc):
     
 def convert_circle(string_ent):
     le = len(string_ent)
+    result = any([item < 0 for ent in string_ent for item in ent])
+    if result:
+        embed()
     new_string = []
     for idx in range(le):
         if len(string_ent[idx])==3:
@@ -134,42 +135,39 @@ def visua_vitru(prefix, output_entities, labels):
         
         top1_full, top1_ent, _, _ = compute_metric(completed, label)
         
-        if top1_full==0 and top1_ent ==1 and len(label)>5:
-            _prefix = convert_circle(_prefix)
-            completed = convert_circle(completed)
-            label = convert_circle(label) 
+        # if top1_full==0 and top1_ent ==1 and len(label)>5:
+        _prefix = convert_circle(_prefix)
+        completed = convert_circle(completed)
+        label = convert_circle(label) 
             
-            embed()
-            cad_out = '1,13,1,32;1,13,64,13;1,32,63,32;46,51,53,51;63,32,64,13;'
-            cadllm = get_point_entities(cad_out)
+        embed()
+        cad_out = '1,13,1,32;1,13,64,13;1,32,63,32;46,51,53,51;63,32,64,13;'
+        cadllm = get_point_entities(cad_out)
+    
+        img1 = save_entities(_prefix, 'outputs/vitru_prefix.png')
+        img2 = save_entities(label, "outputs/vitru_label.png")
+        img3 = save_entities(completed, "outputs/vitru_completed.png")
+        img4 = save_entities(cadllm, "outputs/vitru_completed.png")
         
-            img1 = save_entities(_prefix, 'outputs/vitru_prefix.png')
-            img2 = save_entities(label, "outputs/vitru_label.png")
-            img3 = save_entities(completed, "outputs/vitru_completed.png")
-            img4 = save_entities(cadllm, "outputs/vitru_completed.png")
-            
-            fig, axarr = plt.subplots(2, 2)
+        fig, axarr = plt.subplots(2, 2)
 
-            axarr[0, 0].imshow(img1, cmap='gray')
-            axarr[0, 0].set_title('input')
-            axarr[0, 1].imshow(img2, cmap='gray')
-            axarr[0, 1].set_title('ground_truth')
-            axarr[1, 0].imshow(img3, cmap='gray')
-            axarr[1, 0].set_title('output_vitru')
-            axarr[1, 1].imshow(img4, cmap='gray')
-            axarr[1, 1].set_title('output_cadllm')
+        axarr[0, 0].imshow(img1, cmap='gray')
+        axarr[0, 0].set_title('input')
+        axarr[0, 1].imshow(img2, cmap='gray')
+        axarr[0, 1].set_title('ground_truth')
+        axarr[1, 0].imshow(img3, cmap='gray')
+        axarr[1, 0].set_title('output_vitru')
+        axarr[1, 1].imshow(img4, cmap='gray')
+        axarr[1, 1].set_title('output_cadllm')
 
-            # Removing axis ticks for better visualization
-            for ax in axarr.ravel():
-                ax.axis('off')
+        # Removing axis ticks for better visualization
+        for ax in axarr.ravel():
+            ax.axis('off')
 
-            plt.tight_layout()
-            plt.savefig(f'outputs/vitru_test_{idx}.png')
-            embed()
+        plt.tight_layout()
+        plt.savefig(f'outputs/vitru_test_{idx}.png')
+        embed()
         
-
-                
-
 from geometry.visualization import render_sketch_opencv              
 
 
