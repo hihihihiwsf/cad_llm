@@ -326,8 +326,6 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
-        
-        
         # Generate and process samples
         batch['attention_mask'] = model_batch['attention_mask']
         encoder_outputs = BaseModelOutput(last_hidden_state=output_embed)
@@ -356,8 +354,6 @@ class ByT5Model(pl.LightningModule):
 
         return loss
 
-
-    
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
@@ -416,14 +412,14 @@ class ByT5Model(pl.LightningModule):
         #optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
         #opt = Lion(params1+params2, lr=self.lr, weight_decay=1e-2)
         
-        optimizer1 = optim.AdamW(params2+params1, lr=self.lr, weight_decay=0.05)
+        optimizer = optim.AdamW(params2+params1, lr=self.lr, weight_decay=0.05)
         #optimizer2 = optim.AdamW(params2, lr=10*self.lr)
         if not self.args.cosinedecay and not self.args.adafactor:
-            return optimizer1
+            return optimizer
 
         if self.args.cosinedecay:
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=self.num_train_steps, eta_min=self.lr * 0.1)
-            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+            # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=self.num_train_steps, eta_min=self.lr * 0.1)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20, eta_min=1e-5, verbose=True)
 
         if self.args.adafactor:
             # optimizer = Adafactor(self.model.parameters(), scale_parameter=False, relative_step=False,
