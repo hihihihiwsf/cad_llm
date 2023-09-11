@@ -161,7 +161,7 @@ class ByT5Model(pl.LightningModule):
         ''' compare some sample with vitruvion'''
         
         device = batch['input_ids'].device
-        strings =  ['0,60,63,60;0,3,63,3;'] #'63,32,63,51;53,51,63,51;0,32,0,51;46,44,46,51;46,44,53,44;53,44,53,51;53,44,53,51;0,32,63,32;'
+        strings =  ['0,38,16,24;0,24,0,38;0,11,0,24;21,29,32,43;'] #'63,32,63,51;53,51,63,51;0,32,0,51;46,44,46,51;46,44,53,44;53,44,53,51;53,44,53,51;0,32,63,32;'
         token_in = self.tokenizer(strings, padding=True, truncation=True, max_length=96, return_tensors="pt")
         batch['input_ids'] = token_in.input_ids.to(device)
         batch['attention_mask'] =token_in.attention_mask.to(device)
@@ -211,15 +211,16 @@ class ByT5Model(pl.LightningModule):
 
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']
+        
+        # Generate and process samples
+        self.generate_samples(batch)
 
         outputs = self.model(**model_batch)
         loss = outputs.loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
-        
-        # Generate and process samples
-        self.generate_samples(batch)
+    
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
