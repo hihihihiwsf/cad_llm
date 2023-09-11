@@ -94,9 +94,9 @@ def main():
         log_every_n_steps=log_every_n_steps,
         precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
-        gradient_clip_val=0.5, 
+        gradient_clip_val=1.0, 
         gradient_clip_algorithm="value",
-        # limit_train_batches=0.01,
+        #limit_train_batches=0.01,
         # limit_val_batches=0.1,
     )
     

@@ -140,10 +140,10 @@ class ImageDecoderModel(pl.LightningModule):
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae):
+    def __init__(self, args, vit_mae, num_train_steps):
         super().__init__()
         self.save_hyperparameters()
-
+        self.num_train_steps = num_train_steps
 
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
@@ -421,25 +421,18 @@ class ByT5Model(pl.LightningModule):
         params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.back_mapper.parameters())
         params2 = list(self.layernorm.parameters())+list(self.post_layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())
 
-        # optimizer = Adafactor(
-        #         params,
-        #         lr=None,
-        #         eps=(1e-30, 1e-3),
-        #         clip_threshold=1.0,
-        #         decay_rate=-0.8,
-        #         beta1=None,
-        #         weight_decay=0.0,
-        #         relative_step=True, #
-        #         scale_parameter=True, #
-        #         warmup_init=True, #
-        #     )
-        optimizer = optim.AdamW(params+params2, lr=self.lr)
-        if not self.args.cosinedecay:
+
+        optimizer = optim.AdamW(params+params2, lr=self.lr, weight_decay=0.05)
+        if not self.args.cosinedecay and not self.args.adafactor:
             return optimizer
-            
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
-        #lr_scheduler = AdafactorSchedule(optimizer)
+        
+        if self.args.cosinedecay:    
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.num_train_steps, eta_min=self.lr * 0.1)
+            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
+        
+        if self.args.adafactor:
+            optimizer = Adafactor(params+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+            scheduler = AdafactorSchedule(optimizer)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
