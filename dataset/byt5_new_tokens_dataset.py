@@ -87,7 +87,7 @@ class Byt5NewTokensDataModule(pl.LightningDataModule):
 
     def _get_dataloader(self, ds, shuffle):
         return DataLoader(ds, batch_size=self.batch_size, shuffle=shuffle, collate_fn=self.collator,
-                          num_workers=self.num_dataloader_workers)
+                          num_workers=self.num_dataloader_workers, pin_memory=True)
 
     def batch_split_entities(self, batch, min_ratio, max_ratio):
         """ Wrapper for split_entities_to_io """
