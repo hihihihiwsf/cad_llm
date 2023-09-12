@@ -6,3 +6,11 @@ CV2_COLORS = {
     "red": (0, 0, 255),
     "black": (0, 0, 0),
 }
+
+
+# CV2_COLORS = {
+#     "blue": 255,
+#     "green": 255,
+#     "red": 255,
+#     "black": 255,
+# }

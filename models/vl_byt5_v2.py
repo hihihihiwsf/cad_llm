@@ -31,205 +31,354 @@ import numpy as np
 from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
 from models.modeling_vlt5 import T5ForConditionalGeneration
 
+from transformers.modeling_outputs import BaseModelOutput
+
+
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import time
 
 def contains_nan_or_inf(tensor):
     return torch.isnan(tensor).any() or torch.isinf(tensor).any()
 
+class BlipTextPooler(nn.Module):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.activation = nn.Tanh()
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
+    
+class ImageTransform(nn.Module):
+    def __init__(self, vis_model_config, text_model_config):
+        super().__init__()
+        self.patch_num = int(vis_model_config.image_size/vis_model_config.patch_size)
+
+        self.downsample = torch.nn.Linear((self.patch_num*self.patch_num +1)*2, self.patch_num)
+        self.gelu = torch.nn.GELU()
+        
+        self.mapper = torch.nn.Linear(vis_model_config.hidden_size, text_model_config.d_model)
+        self.activation = nn.Tanh()
+        self.layernorm = torch.nn.LayerNorm(text_model_config.d_model, eps=1e-5)
+        
+    def forward(self, img_hidden_state):
+        _image_embeds = img_hidden_state.permute(0,2,1)
+        '''patch embedding downsample 196 to 14'''
+        image_for_llm = self.activation(self.downsample(_image_embeds).permute(0,2,1))
+        image_for_llm = self.mapper(image_for_llm)
+        image_for_llm = self.activation(self.layernorm(image_for_llm))
+        
+        return image_for_llm
+    
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, tokenizer, total_train_steps, vit_mae=None):
         super().__init__()
         self.save_hyperparameters()
 
-        if args.untrained_model:
-            config = T5Config.from_pretrained(args.model_name)
-            model = T5ForConditionalGeneration(config)
-            model._init_weights(model)  # maybe redundant
-        else:
-            model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-
-        self.model = model
-        self.tokenizer = tokenizer
-        
-        # self.tokenizer.add_special_tokens(["<IMAGE>"])
-        
+        self.total_train_steps = total_train_steps
         self.args = args
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
-        self.total_train_steps = total_train_steps  # should be set later for lr scheduler
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
         
+        self.tokenizer = tokenizer
+        # self.tokenizer.add_special_tokens(["<IMAGE>"])
         
-        m = VisRecon(args=args)
-        #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
-        self.vit_mae = m.model
-        del m
+        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        self.model = model
+        
+        self.projection_dim = 1024
+        self.text_embed_dim = self.model.config.d_model
+        
+        self.textpooler = BlipTextPooler(self.text_embed_dim )
+        self.text_projection = nn.Linear(self.text_embed_dim, self.projection_dim, bias=False)
+        
 
-        if self.vit_mae is not None:
-            self.vis_model = self.vit_mae
-            self.vis_model.config.mask_ratio = 0.
-            self.vis_model.requires_grad_(False)
-            self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
+        self.vit_mae = vit_mae
+        if vit_mae is not None:
+            self.vit_mae = vit_mae
+        else:
+            m = VisRecon(args=args)
+            # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+            m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
+            self.vit_mae = m.model 
+            del m
+        
+        self.vis_model = self.vit_mae
+        self.vis_model.config.mask_ratio = 0.
+        #self.vis_model.requires_grad_(False)
+        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
-        self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
-        self.fusion_image = torch.nn.Transformer(nhead=8, num_encoder_layers=1, dropout=0.3, d_model=self.vis_model.config.hidden_size)
-
+        self.img_transform = ImageTransform(self.vis_model.config, self.model.config)
+        
+        self.vision_embed_dim = self.vis_model.config.hidden_size
+        self.vision_projection = nn.Linear(self.vision_embed_dim, self.projection_dim, bias=False)
+       
+        self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
+        
+        self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
+        self.activation = nn.Tanh()
+        
         self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
-        self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
+        encoderlayer = nn.TransformerEncoderLayer(d_model=self.vision_embed_dim, nhead=8)
+        self.fusion_image = nn.TransformerEncoder(encoderlayer, num_layers=1, norm=self.post_layernorm) #torch.nn.Transformer(nhead=8, num_encoder_layers=1, dropout=0.3, d_model=self.vis_model.config.hidden_size)
 
-        self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
-
-        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
-        self.gelu = torch.nn.GELU()
         
     def training_step(self, batch, batch_idx):
-        cols = ["labels"]
+        cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
+        '''img encoder'''
+        oi = self.vis_model.vit(batch['input_images'], output_hidden_states=True) 
+        img_last_hidden_state = oi['last_hidden_state']
         
-        # image_features = self.clip_model.encode_image(batch['images'])
-        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        with torch.no_grad():
-            start_time = time.time()
-            
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images']))
-            #input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
-            input_image_features = self.post_layernorm(oi['last_hidden_state'])
-            input_image_features = input_image_features.permute(0,2,1)
-            input_image_features = self.gelu(self.embed_patch(input_image_features).permute(0,2,1))
-            del oi
-
-            retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image']))
-            #icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
-            icl_image_features = self.post_layernorm(retrieve_image['last_hidden_state'])
-            icl_image_features = icl_image_features.permute(0,2,1)
-            icl_image_features = self.gelu(self.embed_patch(icl_image_features).permute(0,2,1))
-            del retrieve_image
-        end_image_time=time.time()
-        print("end image:", end_image_time-start_time)
-            
-        '''fuse input image features and icl image features'''
-        image_features = self.post_layernorm(torch.cat((input_image_features, icl_image_features), 1))
-        image_features = self.post_layernorm(self.fusion_image.encoder(image_features))  #shape (bsz, 2, 768)
-        image_features = self.layernorm(self.gelu(self.mapper(image_features)))
-        del input_image_features
-        del icl_image_features
+        icl_img = self.vis_model.vit(batch['icl_image'], output_hidden_states=True) 
+        icl_last_hidden_state = icl_img['last_hidden_state']
+        fused_img_hidden_state = self.fusion_image(torch.cat((img_last_hidden_state, icl_last_hidden_state), 1))
+        
+        image_for_llm = self.img_transform(fused_img_hidden_state)
+        image_embeds = self.vision_projection(fused_img_hidden_state[:,0]) #for contrastive learning
         
 
-        txt_embeddings = self.model.shared(batch['input_ids']) # size: (batch_size, seq_length, 1536)
-        model_batch['inputs_embeds']  = torch.concatenate((image_features, txt_embeddings), dim=1)
+        '''txt encoder'''
+        txt_encoder_output = self.model.encoder(batch['input_ids'], batch['attention_mask'],output_hidden_states=True)
+        _txt_embeds = txt_encoder_output[0]
         
+        text_embeds = self.textpooler(_txt_embeds)
+        text_embeds = self.text_projection(text_embeds)
+    
+        output_embed = torch.concatenate((image_for_llm, _txt_embeds), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        model_batch['encoder_outputs_embeds'] = output_embed
 
-        att = torch.ones(model_batch['inputs_embeds'].shape[0], image_features.shape[1]).to(self.device)
-        model_batch['attention_mask'] = torch.cat((att, batch['attention_mask']), dim=1)
-        del att
 
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        # adding ones to attention_mask
+        att = model_batch['attention_mask']
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
+        
+        decoder_input_ids = self.model._shift_right(batch['labels'])
+        # Decode
+        decoder_outputs = self.model.decoder(
+            input_ids =decoder_input_ids,
+            encoder_hidden_states=model_batch['encoder_outputs_embeds'],
+            encoder_attention_mask=model_batch['attention_mask'],
+            output_hidden_states=True)
+
+        sequence_output = decoder_outputs[0]
+
+        '''text reconstruction loss'''
+        # Set device for model parallelism
+        if self.model.model_parallel:
+            torch.cuda.set_device(self.encoder.first_device)
+            self.lm_head = self.model.lm_head.to(self.encoder.first_device)
+            sequence_output = sequence_output.to(self.lm_head.weight.device)
+
+        if self.model.config.tie_word_embeddings:
+            sequence_output = sequence_output * (self.model.model_dim**-0.5)
+
+        lm_logits = self.model.lm_head(sequence_output)
+
+        loss = None
+        if model_batch['labels'] is not None:
+            loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+            txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
+        
+        
+        '''image decoder pixel loss'''
+        img_hidden_state = self.img_transform.layernorm(output_embed)
+        self.post_layernorm=self.vis_model.vit.layernorm
+        img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
+        #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        
+        img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
+        img_loss = self.forward_loss(batch['output_image'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        
+        '''image text contrastive loss'''
+        # normalized features
+        image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
+        text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
+
+        # cosine similarity as logits
+        logit_scale = self.logit_scale.exp()
+        similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
+        #logits_per_image = logits_per_text.t() # = similarity.t()
+        
+        contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
+        
+        loss = (txt_loss + img_loss + contrastive_loss) / 3.0
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         return loss
 
 
     def validation_step(self, batch, batch_idx):
-        loss = self.validation(batch,batch_idx,val='val')
+        loss = self.validation(batch,batch_idx,validate='val')
         return loss
     
     def test_step(self, batch, batch_idx):
-        loss = self.validation(batch,batch_idx,val='test')
+        loss = self.validation(batch,batch_idx,validate='test')
         return loss
         
-    def validation(self, batch, batch_idx,val):
-        cols = ["labels"]
+    def validation(self, batch, batch_idx, validate):
+        cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
+        '''img encoder'''
+        oi = self.vis_model.vit(batch['input_images'], output_hidden_states=True) 
+        img_last_hidden_state = oi['last_hidden_state']
         
-        # image_features = self.clip_model.encode_image(batch['images'])
-        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
-        with torch.no_grad():
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
-            #input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
-            input_image_features = self.post_layernorm(oi['last_hidden_state'])
-            input_image_features = input_image_features.permute(0,2,1)
-            input_image_features = self.gelu(self.embed_patch(input_image_features).permute(0,2,1))
-            del oi
-
-            retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
-            #icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
-            icl_image_features = self.post_layernorm(retrieve_image['last_hidden_state'])
-            icl_image_features = icl_image_features.permute(0,2,1)
-            icl_image_features = self.gelu(self.embed_patch(icl_image_features).permute(0,2,1))
-            del retrieve_image
-            
-        '''fuse input image features and icl image features'''
-        image_features = self.post_layernorm(torch.cat((input_image_features, icl_image_features), 1))
-        image_features = self.post_layernorm(self.fusion_image.encoder(image_features))  #shape (bsz, 2, 768)
-        image_features = self.layernorm(self.gelu(self.mapper(image_features)))
-        del input_image_features
-        del icl_image_features
+        icl_img = self.vis_model.vit(batch['icl_image'], output_hidden_states=True) 
+        icl_last_hidden_state = icl_img['last_hidden_state']
+        fused_img_hidden_state = self.fusion_image(torch.cat((img_last_hidden_state, icl_last_hidden_state), 1))
+        
+        image_for_llm = self.img_transform(fused_img_hidden_state)
+        image_embeds = self.vision_projection(fused_img_hidden_state[:,0]) #for contrastive learning
         
 
-        txt_embeddings = self.model.shared(batch['input_ids']) # size: (batch_size, seq_length, 1536)
-        model_batch['inputs_embeds']  = torch.concatenate((image_features, txt_embeddings), dim=1)
+        '''txt encoder'''
+        txt_encoder_output = self.model.encoder(batch['input_ids'], batch['attention_mask'],output_hidden_states=True)
+        _txt_embeds = txt_encoder_output[0]
         
+        text_embeds = self.textpooler(_txt_embeds)
+        text_embeds = self.text_projection(text_embeds)
+    
+        output_embed = torch.concatenate((image_for_llm, _txt_embeds), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        model_batch['encoder_outputs_embeds'] = output_embed
 
-        att = torch.ones(model_batch['inputs_embeds'].shape[0], image_features.shape[1]).to(self.device)
-        model_batch['attention_mask'] = torch.cat((att, batch['attention_mask']), dim=1)
-        del att
 
-        outputs = self.model(**model_batch)
-        loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
+        # adding ones to attention_mask
+        att = model_batch['attention_mask']
+        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
         
-        batch['attention_mask'] = model_batch['attention_mask']
-        batch['inputs_embeds'] = model_batch['inputs_embeds']
+        decoder_input_ids = self.model._shift_right(batch['labels'])
+        # Decode
+        decoder_outputs = self.model.decoder(
+            input_ids =decoder_input_ids,
+            encoder_hidden_states=model_batch['encoder_outputs_embeds'],
+            encoder_attention_mask=model_batch['attention_mask'],
+            output_hidden_states=True)
 
-        self.log(f"{val}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        sequence_output = decoder_outputs[0]
+
+        '''text reconstruction loss'''
+        # Set device for model parallelism
+        if self.model.model_parallel:
+            torch.cuda.set_device(self.encoder.first_device)
+            self.lm_head = self.model.lm_head.to(self.encoder.first_device)
+            sequence_output = sequence_output.to(self.lm_head.weight.device)
+
+        if self.model.config.tie_word_embeddings:
+            sequence_output = sequence_output * (self.model.model_dim**-0.5)
+
+        lm_logits = self.model.lm_head(sequence_output)
+
+        loss = None
+        if model_batch['labels'] is not None:
+            loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+            txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
+        
+        
+        '''image decoder pixel loss'''
+        img_hidden_state = self.img_transform.layernorm(output_embed)
+        self.post_layernorm=self.vis_model.vit.layernorm
+        img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
+        #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        
+        img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
+        img_loss = self.forward_loss(batch['output_image'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        
+        '''image text contrastive loss'''
+        # normalized features
+        image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
+        text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
+
+        # cosine similarity as logits
+        logit_scale = self.logit_scale.exp()
+        similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
+        #logits_per_image = logits_per_text.t() # = similarity.t()
+        
+        contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
+        
+        loss = (txt_loss + img_loss + contrastive_loss) / 3.0
+        self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-        del model_batch
         
         # Generate and process samples
+        batch['attention_mask'] = model_batch['attention_mask']
+        encoder_outputs = BaseModelOutput(last_hidden_state=output_embed)
+        batch['encoder_outputs'] = encoder_outputs
+        
         self.generate_samples(batch)
-
-        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log(f"{val}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        self.log(f"{val}_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{validate}_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        self.log(f"{val}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{validate}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
-        # Convert string entities to curves and check validity
+        # # Convert string entities to curves and check validity
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        self.log(f"{val}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
+        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
 
-        # # Plot sketches
-        # if batch_idx < 5:
-        #    self.log_samples(batch=batch, batch_idx=batch_idx)
-        
+        return loss
+
+
+    def forward_loss(self, pixel_values, pred):
+        """
+        Args:
+            pixel_values (`torch.FloatTensor` of shape `(batch_size, num_channels, height, width)`):
+                Pixel values.
+            pred (`torch.FloatTensor` of shape `(batch_size, num_patches, patch_size**2 * num_channels)`:
+                Predicted pixel values.
+            mask (`torch.FloatTensor` of shape `(batch_size, sequence_length)`):
+                Tensor indicating which patches are masked (1) and which are not (0).
+        Returns:
+            `torch.FloatTensor`: Pixel reconstruction loss.
+        """
+        target = self.vis_model.patchify(pixel_values)
+        if self.vis_model.config.norm_pix_loss:
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, keepdim=True)
+            target = (target - mean) / (var + 1.0e-6) ** 0.5
+
+        loss = (pred - target)**2
+        loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
+
+        #loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
+        loss = loss.mean()
         return loss
 
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(inputs_embeds=batch["inputs_embeds"], attention_mask=batch["attention_mask"],
+        batch["samples"] = generate_func(encoder_outputs=batch["encoder_outputs"], attention_mask=batch["attention_mask"],
                                          do_sample=False, max_new_tokens=self.args.max_length+10)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
-        batch["string_labels"] = [sketch["output_text"] for sketch in batch["sketches"]]
+        batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
 
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
         batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
@@ -260,7 +409,10 @@ class ByT5Model(pl.LightningModule):
         return AutoTokenizer.from_pretrained(model_name)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+        params1 = list(self.trainer.model.parameters()) +list(self.vit_mae.parameters())+ list(self.fusion_image.parameters())+list(self.post_layernorm)
+        params2 = list(self.img_transform.parameters())  +list(self.vision_projection.parameters())+ list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
+        params = params1+params2
+        optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
 

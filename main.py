@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader, get_icl_sketchgraphs_dataloader
 
-from models import vl_byt5, byt5
+from models import vl_byt5, byt5, vl_byt5_v2
 
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -60,15 +60,15 @@ def main():
     
     print("Loading model...")
 
-    architecture = vl_byt5
+    architecture = vl_byt5_v2
     
     from transformers import ViTMAEForPreTraining 
     # vitmae_model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
     tokenizer = architecture.ByT5Model.get_tokenizer(args.model_name)
 
     print("Loading data...")
-    train_dataloader = save_icl_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
-    '''
+    train_dataloader = get_icl_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="train", shuffle=True)
+    
     val_dataloader = get_icl_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="val", shuffle=False)
     test_dataloader = get_icl_sketchgraphs_dataloader(tokenizer=tokenizer, args=args, split="test", shuffle=False)
 
@@ -114,7 +114,7 @@ def main():
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
     
         print("end evaluation")
-    '''
+    
         
         # #saved_image_embeddings = embedding_callback.image_embeddings
         # saved_txt_embeddings = embedding_callback.txt_embeddings
