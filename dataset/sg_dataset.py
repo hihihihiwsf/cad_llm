@@ -54,6 +54,8 @@ class SketchGraphsRetrievalCollator:
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
+        icl_strings = [sketch['input_text'] for sketch in sketch_dicts]
+        tokenized_icl = self.tokenize(icl_strings)
 
         labels = tokenized_output.input_ids
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
@@ -94,6 +96,8 @@ class SketchGraphsRetrievalCollator:
         batch = {
             "input_ids": tokenized_input.input_ids,
             "attention_mask": tokenized_input.attention_mask,
+            'icl_ids':tokenized_icl.input_ids,
+            "icl_att_mask":tokenized_icl.attention_mask,
             "labels": labels,
             "sketches": sketch_dicts,
             "input_images": input_batch_images.pixel_values,
