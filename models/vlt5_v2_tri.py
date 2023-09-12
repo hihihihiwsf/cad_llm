@@ -429,13 +429,11 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params1 = list(self.model.parameters()) +list(self.vit_mae.parameters()) 
-        params2 = list(self.img_transform.parameters())  +list(self.vision_projection.parameters())+ list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
         
         #optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
         #opt = Lion(params1+params2, lr=self.lr, weight_decay=1e-2)
         
-        optimizer = optim.AdamW(params1+params2, lr=self.lr)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay and not self.args.adafactor:
             return optimizer
         
@@ -444,7 +442,7 @@ class ByT5Model(pl.LightningModule):
             # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
         
         if self.args.adafactor:
-            optimizer = Adafactor(params1+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+            optimizer = Adafactor(self.trainer.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
             scheduler = AdafactorSchedule(optimizer)
         return {
             "optimizer": optimizer,
