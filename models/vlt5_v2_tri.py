@@ -42,6 +42,7 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 
+from torchvision.ops.focal_loss import sigmoid_focal_loss
 from lion_pytorch import Lion
 
 class BlipTextPooler(nn.Module):
@@ -394,7 +395,7 @@ class ByT5Model(pl.LightningModule):
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.0e-6) ** 0.5
 
-        loss = (pred - target)
+        loss = (pred - target)**2
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
 
         #loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
@@ -409,11 +410,12 @@ class ByT5Model(pl.LightningModule):
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.0e-6) ** 0.5
             
-        abs_error = torch.abs(pred - target)
-        normalized_error = abs_error / 64  # or use torch.sigmoid(abs_error)
-        focal_weight = (1 - normalized_error) ** gamma
-        focal_loss = focal_weight * abs_error
-        return focal_loss.mean()
+        # abs_error = torch.abs(pred - target)
+        # normalized_error = abs_error / 64  # or use torch.sigmoid(abs_error)
+        # focal_weight = (1 - normalized_error) ** gamma
+        # focal_loss = focal_weight * abs_error
+        focal_loss = sigmoid_focal_loss(pred, target, alpha=0.25,gamma=2,reduction='mean')
+        return focal_loss
     
     def log_samples(self, batch, batch_idx):
         label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]
