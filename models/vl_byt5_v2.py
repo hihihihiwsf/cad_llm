@@ -409,10 +409,8 @@ class ByT5Model(pl.LightningModule):
         return AutoTokenizer.from_pretrained(model_name)
 
     def configure_optimizers(self):
-        params1 = list(self.trainer.model.parameters()) +list(self.vit_mae.parameters())+ list(self.fusion_image.parameters())+list(self.post_layernorm)
-        params2 = list(self.img_transform.parameters())  +list(self.vision_projection.parameters())+ list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
-        params = params1+params2
-        optimizer = optim.AdamW(params, lr=self.lr, weight_decay=0.05)
+
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr, weight_decay=0.05)
         if not self.args.cosinedecay:
             return optimizer
 
