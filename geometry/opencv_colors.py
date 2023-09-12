@@ -8,8 +8,8 @@
 # }
 
 CV2_COLORS = {
-    "blue": 1,
-    "green":1,
-    "red": 1,
-    "black": 1,
+    "blue": (1,0,0),
+    "green":(0,1,0),
+    "red": (0,0,1),
+    "black": (0,0,0),
 }
