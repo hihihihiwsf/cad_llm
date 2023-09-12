@@ -57,8 +57,8 @@ class Arc(Curve):
 
             return
 
-        center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.int)
-        radius = (self.radius * cell_size).astype(dtype=np.uint)
+        center = self.shift_point(self.center, cell_size=cell_size).astype(dtype=np.int32)
+        radius = (self.radius * cell_size).astype(dtype=np.int32)
 
         start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
         end_angle = geom_utils.rads_to_degs(self.end_angle_rads)
