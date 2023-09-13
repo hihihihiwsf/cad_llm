@@ -94,7 +94,7 @@ class ByT5Model(pl.LightningModule):
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         with torch.no_grad():
-            start_time = time.time()
+            #start_time = time.time()
             
             oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images']))
             #input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
@@ -109,8 +109,8 @@ class ByT5Model(pl.LightningModule):
             icl_image_features = icl_image_features.permute(0,2,1)
             icl_image_features = self.gelu(self.embed_patch(icl_image_features).permute(0,2,1))
             del retrieve_image
-        end_image_time=time.time()
-        print("end image:", end_image_time-start_time)
+        # end_image_time=time.time()
+        #print("end image:", end_image_time-start_time)
             
         '''fuse input image features and icl image features'''
         image_features = self.post_layernorm(torch.cat((input_image_features, icl_image_features), 1))
