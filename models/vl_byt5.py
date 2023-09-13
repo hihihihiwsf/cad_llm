@@ -152,14 +152,14 @@ class ByT5Model(pl.LightningModule):
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         with torch.no_grad():
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images'].pixel_values))
+            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['input_images']))
             #input_image_features = self.post_layernorm(torch.unsqueeze(torch.sum(oi['last_hidden_state'], 1), 1))       # oi = self.clip_model(**batch['images'])
             input_image_features = self.post_layernorm(oi['last_hidden_state'])
             input_image_features = input_image_features.permute(0,2,1)
             input_image_features = self.gelu(self.embed_patch(input_image_features).permute(0,2,1))
             del oi
 
-            retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image'].pixel_values))
+            retrieve_image = self.vis_model.vit.encoder(self.vis_model.patchify(batch['icl_image']))
             #icl_image_features =  self.post_layernorm(torch.unsqueeze(torch.sum(retrieve_image['last_hidden_state'], 1), 1))
             icl_image_features = self.post_layernorm(retrieve_image['last_hidden_state'])
             icl_image_features = icl_image_features.permute(0,2,1)
