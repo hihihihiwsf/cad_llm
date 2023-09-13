@@ -41,7 +41,7 @@ from transformers.modeling_outputs import (
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
 )
-
+from transformers import ViTFeatureExtractor
 from torchvision.ops.focal_loss import sigmoid_focal_loss
 from lion_pytorch import Lion
 
@@ -116,6 +116,8 @@ class ByT5Model(pl.LightningModule):
             m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
             del m
+        self.feature_extractor = ViTFeatureExtractor.from_pretrained("facebook/vit-mae-base")
+        
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
@@ -204,7 +206,7 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.forward_focal_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_loss = self.focal_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         '''image text contrastive loss'''
         # normalized features
@@ -316,7 +318,7 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_loss = self.focal_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         '''image text contrastive loss'''
         # normalized features
@@ -410,11 +412,29 @@ class ByT5Model(pl.LightningModule):
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.0e-6) ** 0.5
             
-        # abs_error = torch.abs(pred - target)
-        # normalized_error = abs_error / 64  # or use torch.sigmoid(abs_error)
-        # focal_weight = (1 - normalized_error) ** gamma
-        # focal_loss = focal_weight * abs_error
-        focal_loss = sigmoid_focal_loss(pred, target, alpha=0.25,gamma=2,reduction='mean')
+        abs_error = torch.abs(pred - target)
+        normalized_error = torch.sigmoid(abs_error)
+        focal_weight = (1 - normalized_error) ** gamma
+        focal_loss = focal_weight * abs_error
+        # focal_loss = sigmoid_focal_loss(pred, target, alpha=0.25, gamma=10,reduction='mean')
+        return focal_loss.mean()
+    
+
+    def focal_loss(self, pixel_values, pred):
+        
+        mean = torch.Tensor(self.feature_extractor.image_mean).view(3,1,1)
+        new_mean = mean*torch.ones(self.batch_size, 3,224,224)
+        new_mean=new_mean.to(pred.device)
+        std = torch.Tensor(self.feature_extractor.image_std).view(3,1,1)
+        new_std = std*torch.ones(self.batch_size, 3,224,224)
+        new_std=new_std.to(pred.device)
+        
+        pred_pixel = self.vis_model.unpatchify(pred)
+        pred_pixel = pred_pixel*new_std + new_mean
+        
+        pixel_values = pixel_values*new_std + new_mean
+        
+        focal_loss = sigmoid_focal_loss(pred_pixel, pixel_values, alpha=0.25, gamma=2, reduction='mean')
         return focal_loss
     
     def log_samples(self, batch, batch_idx):

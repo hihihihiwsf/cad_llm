@@ -133,7 +133,7 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     dataset = SketchGraphsDataset(split=split, args=args)
     
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
-    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
+    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle, drop_last=True,
                       num_workers=args.num_workers)
 
 
