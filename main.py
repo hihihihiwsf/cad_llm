@@ -60,7 +60,7 @@ def main():
     
     print("Loading model...")
 
-    architecture = vl_byt5
+    architecture = vl_byt5_v2
     
     from transformers import ViTMAEForPreTraining 
     # vitmae_model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
