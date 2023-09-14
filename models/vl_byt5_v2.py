@@ -74,7 +74,29 @@ class ImageTransform(nn.Module):
         image_for_llm = self.activation(self.layernorm(image_for_llm))
         
         return image_for_llm
+
+class ImagebackTransform(nn.Module):
+    def __init__(self, args, vis_model_config, text_model_config):
+        super().__init__()
+        self.patch_num = int(vis_model_config.image_size/vis_model_config.patch_size)
+
+        self.upsample = torch.nn.Linear(self.patch_num+args.max_length, self.patch_num*self.patch_num)
+        self.gelu = torch.nn.GELU()
+        
+        self.mapper = torch.nn.Linear(text_model_config.d_model, vis_model_config.hidden_size)
+        self.activation = nn.Tanh()
+        self.layernorm = torch.nn.LayerNorm(vis_model_config.hidden_size, eps=1e-5)
+        
+    def forward(self, img_hidden_state):
+        _image_embeds = img_hidden_state.permute(0,2,1)
+        '''patch embedding downsample 196 to 14'''
+        image_for_llm = self.activation(self.upsample(_image_embeds).permute(0,2,1))
+        image_for_llm = self.mapper(image_for_llm)
+        image_for_visdecoder = self.activation(self.layernorm(image_for_llm))
+        
+        return image_for_visdecoder
     
+
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, tokenizer, total_train_steps, vit_mae=None):
         super().__init__()
@@ -113,15 +135,14 @@ class ByT5Model(pl.LightningModule):
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
-        #self.vis_model.requires_grad_(False)
+        #self.vis_model.requires_grad_(True)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
         self.img_transform = ImageTransform(self.vis_model.config, self.model.config)
+        self.img_backtransform = ImagebackTransform(args, self.vis_model.config, self.model.config)
         
         self.vision_embed_dim = self.vis_model.config.hidden_size
         self.vision_projection = nn.Linear(self.vision_embed_dim, self.projection_dim, bias=False)
-       
-        self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
         
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
         self.activation = nn.Tanh()
@@ -193,12 +214,15 @@ class ByT5Model(pl.LightningModule):
         
         
         '''image decoder pixel loss'''
-        img_hidden_state = self.img_transform.layernorm(output_embed)
-        self.post_layernorm=self.vis_model.vit.layernorm
-        img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
-        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-        img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
+        # img_hidden_state = self.img_transform.layernorm(output_embed)
+        # self.post_layernorm=self.vis_model.vit.layernorm
+        # img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        
+        # self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        # img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        
+        img_hidden_state = self.img_backtransform(output_embed)
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
         img_loss = self.forward_loss(batch['output_image'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
@@ -297,12 +321,14 @@ class ByT5Model(pl.LightningModule):
         
         
         '''image decoder pixel loss'''
-        img_hidden_state = self.img_transform.layernorm(output_embed)
-        self.post_layernorm=self.vis_model.vit.layernorm
-        img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
-        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-        img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
+        # img_hidden_state = self.img_transform.layernorm(output_embed)
+        # self.post_layernorm=self.vis_model.vit.layernorm
+        # img_hidden_state = self.activation(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        # self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], img_last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        # img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        
+        img_hidden_state = self.img_backtransform(output_embed)
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
         img_loss = self.forward_loss(batch['output_image'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)

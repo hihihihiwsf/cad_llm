@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset import get_sketchgraphs_dataloader, get_icl_sketchgraphs_dataloader
 
-from models import vl_byt5, byt5, vl_byt5_v2, byt5_v2
+from models import bi_vl_byt5_v2, vl_byt5, byt5, vl_byt5_v2, byt5_v2
 
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -21,7 +21,7 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
 import os
-from pytorch_lightning.strategies import DDPStrategy
+from pytorch_lightning.strategies import DDPStrategy, FSDPStrategy
 
 from transformers import AutoTokenizer
 import matplotlib.pyplot as plt
@@ -60,7 +60,7 @@ def main():
     
     print("Loading model...")
 
-    architecture = vl_byt5_v2
+    architecture = bi_vl_byt5_v2 #vlt5_bi_ret
     
     from transformers import ViTMAEForPreTraining 
     # vitmae_model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
@@ -99,7 +99,7 @@ def main():
         max_epochs=args.epochs,
         log_every_n_steps=log_every_n_steps,
         # resume_from_checkpoint=None,
-        precision='16-mixed',
+        precision='16',
         check_val_every_n_epoch=args.val_every_n_epoch,
         #limit_train_batches=0.1,
         #limit_val_batches=0.1,
