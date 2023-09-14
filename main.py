@@ -111,7 +111,7 @@ def main():
         
         print("Start training")
         trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-v0-bn-09-06-23-2129/checkpoints/model/sg_multimodal_v0_bn/last.ckpt')
-        #trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
+        trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
        
     else:
         # loading the model from exp_name/best.ckpt

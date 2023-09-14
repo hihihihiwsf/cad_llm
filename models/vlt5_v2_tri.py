@@ -206,7 +206,7 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.focal_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         '''image text contrastive loss'''
         # normalized features
@@ -318,7 +318,7 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.focal_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         '''image text contrastive loss'''
         # normalized features
@@ -434,7 +434,7 @@ class ByT5Model(pl.LightningModule):
         
         pixel_values = pixel_values*new_std + new_mean
         
-        focal_loss = sigmoid_focal_loss(pred_pixel, pixel_values, alpha=0.25, gamma=2, reduction='mean')
+        focal_loss = sigmoid_focal_loss(pred_pixel, pixel_values, alpha=0.25, gamma=2, reduction='sum')
         return focal_loss
     
     def log_samples(self, batch, batch_idx):
