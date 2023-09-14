@@ -77,7 +77,7 @@ def launch_sagemaker():
         sagemaker_session=sagemaker_session,
         instance_count=launch_args.instance_count,
         instance_type=launch_args.instance_type,
-        volume_size=500,  # Joint data size alone is 22 GB
+        volume_size=1024,  # Joint data size alone is 22 GB
         framework_version='2.0.0',
         py_version='py310',
         hyperparameters=hyperparameters,
