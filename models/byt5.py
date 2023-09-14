@@ -15,7 +15,7 @@ from transformers.modeling_utils import unwrap_model
 import sys
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
+from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
@@ -209,7 +209,6 @@ class ByT5Model(pl.LightningModule):
         return shifted_input_ids
     
     
-    import torch
 
     def create_attention_mask_from_seq_length(self, sequence_lengths, max_length=None):
         # make attention mask from sequence length
@@ -297,7 +296,20 @@ class ByT5Model(pl.LightningModule):
         model_batch['attention_mask'] = torch.concatenate((torch.ones(batch['batch_att_mask'].shape[0], 1).to(self.device), batch['batch_att_mask']), dim=1)
         outputs = self.model(**model_batch, output_hidden_states=True)
         
+        valid_chunks_output, valid_chunks_gt = [], []
+        gt = decoder_inputs_embeds[:, 1:, :]
+        ot = outputs["decoder_hidden_states"][-1]
+        for i, c in enumerate(chunks):
+            valid_chunks_output.append(ot[i, :c, :])
+            valid_chunks_gt.append(gt[i, :c, :])
+        
+        valid_chunks_output = torch.cat(valid_chunks_output, dim=0)
+        valid_chunks_gt = torch.cat(valid_chunks_gt, dim=0)
 
+        
+        cos_loss = 1 - torch.nn.functional.cosine_similarity(valid_chunks_gt, valid_chunks_output).mean()
+
+        # cos_loss = -1 * torch.nn.functional.cosine_similarity(outputs["decoder_hidden_states"][-1], decoder_inputs_embeds[:, 1:, :]).mean()
         # o = batch['output_entities'].input_ids
         # o = torch.concatenate((o[:, 0].unsqueeze(1), o[:, 2:]), dim=1)
         
@@ -336,10 +348,11 @@ class ByT5Model(pl.LightningModule):
         # batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
         batch_3['inputs_embeds'] = torch.concatenate((modeB.unsqueeze(1).repeat(outputs["decoder_hidden_states"][-1].shape[0], 1, 1), outputs["decoder_hidden_states"][-1]), dim=1)
         batch["output_ent_length"] = [i+1 for i in batch["output_ent_length"]]
-        batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
-        decoder_outputs = self.model(**batch_3, output_hidden_states=True)
-        loss = decoder_outputs.loss
+        # batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
+        decoder_outputs = self.model(**batch_3, output_hidden_states=False)
+        loss_lm = decoder_outputs.loss
         
+        loss = cos_loss * 10 + loss_lm
         # lm_logits = self.model.lm_head(decoder_outputs['last_hidden_state'])
         # lm_logits = self.model2.lm_head(decoder_outputs['decoder_hidden_states'][-1])
         
@@ -347,13 +360,19 @@ class ByT5Model(pl.LightningModule):
         # lbl[lbl == self.tokenizer.pad_token_id] = -100
         # loss = torch.nn.functional.cross_entropy(lm_logits.permute(0, 2, 1), batch['labels'], ignore_index=-100) 
         
-           
+        
         
         self.log("loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
                 batch_size=self.batch_size, sync_dist=True)
         # loss = outputs.loss  # CrossEntropyLoss(ignore_index=-100) between outputs.logits and labels
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
+        
+        self.log("loss_lm", loss_lm, on_step=True, on_epoch=False, prog_bar=True, logger=True,
+                batch_size=self.batch_size, sync_dist=True)
+        self.log("loss_cos", cos_loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
+                batch_size=self.batch_size, sync_dist=True)
+        
         return loss
 
     
@@ -458,7 +477,7 @@ class ByT5Model(pl.LightningModule):
         # batch_3['inputs_embeds'] = outputs["decoder_hidden_states"][-1]
         batch_3['inputs_embeds'] = torch.concatenate((modeB.unsqueeze(1).repeat(outputs["decoder_hidden_states"][-1].shape[0], 1, 1), outputs["decoder_hidden_states"][-1]), dim=1)
         batch["output_ent_length"] = [i+1 for i in batch["output_ent_length"]]
-        batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
+        # batch_3['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_3['inputs_embeds'].shape[1])
         decoder_outputs = self.model(**batch_3, output_hidden_states=True)
         loss = decoder_outputs.loss
         
@@ -503,6 +522,10 @@ class ByT5Model(pl.LightningModule):
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
         self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
+        
+        f1_score = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        self.log("f1_score", f1_score, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
         # if batch_idx < 5:
@@ -521,7 +544,7 @@ class ByT5Model(pl.LightningModule):
         with torch.no_grad():
             del model_batch['decoder_inputs_embeds']
             modeB = self.model.encoder.get_input_embeddings()(torch.tensor([38]).to(self.device))
-            outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=15, early_stopping=False, do_sample=False)
+            outputs = self.model.generate(**model_batch, output_hidden_states=True, return_dict_in_generate=True, max_new_tokens=15, early_stopping=True, do_sample=False)
             
             
             decoder_hidden_states = []
@@ -536,9 +559,8 @@ class ByT5Model(pl.LightningModule):
             batch_final = {}
             # batch_final['inputs_embeds'] = src
             batch_final['inputs_embeds'] = torch.concatenate((modeB.unsqueeze(1).repeat(src.shape[0], 1, 1), src), dim=1)
-            batch["output_ent_length"] = [i+1 for i in batch["output_ent_length"]]
-            batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_final['inputs_embeds'].shape[1])
-            batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=self.args.max_length+10, early_stopping=True, do_sample=False)
+            # batch_final['attention_mask'] = self.create_attention_mask_from_seq_length(batch["output_ent_length"], max_length=batch_final['inputs_embeds'].shape[1])
+            batch['samples'] = self.model.generate(**batch_final, output_hidden_states=False, return_dict_in_generate=False, max_new_tokens=self.args.max_length+10, early_stopping=False, do_sample=False)
         
         
         # final_seq = []
@@ -552,7 +574,7 @@ class ByT5Model(pl.LightningModule):
         # batch['samples'] = torch.argmax(batch['samples'], dim=2)
         
         try:
-            if batch_idx % 100 == 0:
+            if batch_idx % 10 == 0:
                 with open("output_string_logs.txt", "a") as file:
                     i = 0
                     text_string = "\n EPOCH: {} ---- Batch Idx: {} \n".format(self.current_epoch, batch_idx)
