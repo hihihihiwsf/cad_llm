@@ -209,8 +209,6 @@ class ByT5Model(pl.LightningModule):
         return shifted_input_ids
     
     
-    import torch
-
     def create_attention_mask_from_seq_length(self, sequence_lengths, max_length=None):
         # make attention mask from sequence length
         # Determine the max length
@@ -227,8 +225,7 @@ class ByT5Model(pl.LightningModule):
         return mask
 
 
-    
-    
+
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
@@ -254,6 +251,7 @@ class ByT5Model(pl.LightningModule):
         chunks = batch['input_ent_length']
         # Create an empty tensor with zero padding
         input_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        
         idx = 0
         for i, size in enumerate(chunks):
             input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
