@@ -135,7 +135,7 @@ class ByT5Model(pl.LightningModule):
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
-        self.vis_model.requires_grad_(True)
+        #self.vis_model.requires_grad_(True)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
         self.img_transform = ImageTransform(self.vis_model.config, self.model.config)
