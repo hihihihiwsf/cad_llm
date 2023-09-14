@@ -13,7 +13,7 @@ from pytorch_lightning.loggers import CometLogger
 from args.ray_args import get_ray_args
 from dataset.byt5_new_tokens_dataset import Byt5NewTokensDataModule
 from models.byt5_v2 import ByT5v2
-from util import get_comet_logger
+from cad_tokenizers.sketch_single_token_byt5_tokenizer import SketchSingleTokenByt5Tokenizer
 
 from functools import partial
 import torch
@@ -58,7 +58,7 @@ def train_on_ray_cluster():
     }
 
     model_class = ByT5v2
-    tokenizer = Byt5NewTokensDataModule.get_tokenizer(args.model_name)
+    tokenizer = SketchSingleTokenByt5Tokenizer.from_pretrained(args.model_name)
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
     remote_samples_path = f"s3://{args.output_s3_bucket}/{exp_name}/samples"
     model_class_kwargs = {
@@ -68,7 +68,7 @@ def train_on_ray_cluster():
         "max_length": args.max_length,
         "local_samples_path": local_samples_path,
         "remote_samples_path": remote_samples_path,
-        "tokenizer_length": len(tokenizer),
+        "tokenizer": tokenizer,
     }
 
     strategy_kwargs = {}

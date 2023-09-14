@@ -21,10 +21,13 @@ import torch.optim as optim
 from adsk_ailab_ray.tools.aws import aws_s3_sync
 from transformers import T5ForConditionalGeneration
 from transformers.modeling_utils import unwrap_model
-
+from eval_metrics.top1_full_sketch_metric import Top1FullSketchMetric
+from eval_metrics.top1_entity_metric import Top1EntityMetric
+from eval_metrics.validity_metric import ValidityMetric
+from torch.nn import ModuleDict
 
 class ByT5v2(pl.LightningModule):
-    def __init__(self, model_name, lr, batch_size, max_length, tokenizer_length, local_samples_path,
+    def __init__(self, model_name, lr, batch_size, max_length, tokenizer, local_samples_path,
                  remote_samples_path):
         super().__init__()
         self.save_hyperparameters()
@@ -34,12 +37,17 @@ class ByT5v2(pl.LightningModule):
         self.max_length = max_length
         self.local_samples_path = local_samples_path
         self.remote_samples_path = remote_samples_path
-        self.tokenizer_length = tokenizer_length
+        self.tokenizer = tokenizer
+
         self.model = T5ForConditionalGeneration.from_pretrained(model_name)
         self.adjust_model_to_tokenizer()
 
         self.val_names = ["val", "val_20", "val_40", "val_60", "val_80"]
         self._reset_sample_infos()
+
+        self.val_name_to_full_sketch_metric = ModuleDict({name: Top1FullSketchMetric() for name in self.val_names})
+        self.val_name_to_top1_entity_metric = ModuleDict({name: Top1EntityMetric() for name in self.val_names})
+        self.val_name_to_validity_metric = ModuleDict({name: ValidityMetric() for name in self.val_names})
 
     def setup(self, stage):
         self.local_samples_path = Path(self.local_samples_path) / f"rank_{self.global_rank}/"
@@ -49,13 +57,13 @@ class ByT5v2(pl.LightningModule):
     def adjust_model_to_tokenizer(self):
         num_special_tokens = 3
         original_token_count = self.model.get_input_embeddings().weight.data.shape[0]
-        new_token_count = self.tokenizer_length - original_token_count
+        new_token_count = len(self.tokenizer) - original_token_count
 
         if not new_token_count:
             return
 
         # Add new token embeddings and initialize using learned embeddings
-        self.model.resize_token_embeddings(self.tokenizer_length)
+        self.model.resize_token_embeddings(len(self.tokenizer))
         embedding_params = self.model.get_input_embeddings().weight.data
         for i in range(new_token_count):
             embedding_params[original_token_count + i] = embedding_params[num_special_tokens + i]
@@ -81,17 +89,20 @@ class ByT5v2(pl.LightningModule):
         # Generate samples for all validation sets
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        samples = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                do_sample=False, max_new_tokens=self.max_length+10)
+        pred_tokens = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                                    do_sample=False, max_new_tokens=self.max_length+10)
+
+        batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
+        batch_true = batch["output_entities"]
+
+        self._update_metrics(val_name, batch_pred, batch_true)
 
         # Log all samples for later metric extraction
-        for i in range(len(samples)):
+        for i in range(len(batch_pred)):
             self.sample_infos[val_name].append({
-                "samples": samples[i].tolist(),
-                "input_ids": batch["input_ids"][i].tolist(),
-                "labels": batch["labels"][i].tolist(),
-                "input_text": batch["input_text"][i],
-                "output_text": batch["output_text"][i],
+                "true": batch_true[i],
+                "pred": batch_pred[i],
+                "prompt": batch["input_entities"][i],
                 "name": batch["name"][i],
             })
 
@@ -106,8 +117,26 @@ class ByT5v2(pl.LightningModule):
 
         self._reset_sample_infos()
 
+        for val_name in self.val_names:
+            self.log_metric(name=f"{val_name}_top1_full_sketch", metric=self.val_name_to_full_sketch_metric[val_name])
+            self.log_metric(name=f"{val_name}_top1_entity", metric=self.val_name_to_top1_entity_metric[val_name])
+            self.log_metric(name=f"{val_name}_validity", metric=self.val_name_to_validity_metric[val_name])
+
     def _reset_sample_infos(self):
         self.sample_infos = {val_name: [] for val_name in self.val_names}
+
+    def _update_metrics(self, val_name, batch_pred, batch_true):
+        for pred, true in zip(batch_pred, batch_true):
+            pred = set(tuple(sorted([tuple(p) for p in ent])) for ent in pred if ent)
+            true = set(tuple(sorted([tuple(p) for p in ent])) for ent in true if ent)
+
+            self.val_name_to_full_sketch_metric[val_name].update(pred, true)
+            self.val_name_to_top1_entity_metric[val_name].update(pred, true)
+            self.val_name_to_validity_metric[val_name].update(pred)
+
+    def log_metric(self, name, metric):
+        self.log(name, metric.compute(), on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 add_dataloader_idx=False)
 
     def _get_model_batch(self, batch):
         cols = ["input_ids", "attention_mask", "labels"]
