@@ -24,8 +24,6 @@ import os
 from pytorch_lightning.strategies import DDPStrategy
 
 from transformers import AutoTokenizer
-#from lightning.fabric import Fabric
-#from lightning.pytorch.tuner import Tuner
 
 def main():
     """Entry point for our training script"""
@@ -110,14 +108,15 @@ def main():
         # model.hparams.lr = new_lr
         
         print("Start training")
-        trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-v0-bn-09-06-23-2129/checkpoints/model/sg_multimodal_v0_bn/last.ckpt')
+        trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt')
         trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
        
     else:
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt'
+        #ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt'
+        ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_path, dataloaders=sketchdata.train_dataloader())
 
 
