@@ -249,7 +249,7 @@ class ByT5Model(pl.LightningModule):
         
         
         
-        txt_embeddings = txt_embeddings[:, 1, :]
+        txt_embeddings = txt_embeddings[:, 2, :]
         pad_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
         start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
                 
