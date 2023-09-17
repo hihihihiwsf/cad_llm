@@ -108,7 +108,7 @@ def main():
         val_check_interval=args.val_check_interval,
         # limit_train_batches=0.001,  
         # limit_val_batches=0.1,
-        precision='16'
+        precision='16-mixed'
     )
     if not args.eval: 
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)

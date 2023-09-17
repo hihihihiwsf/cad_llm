@@ -234,10 +234,17 @@ class ByT5Model(pl.LightningModule):
         # mask = (-(batch['input_entities'].attention_mask) + 1).float()
         # txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
         # txt_embeddings = torch.sum(txt_embeddings, 1)
+        ent_id = self.tokenizer.encode('ENTITY')[1]
+        tok_id = self.tokenizer.encode('TOKEN')[1]
+        
         
         new_batch = {}
         new_batch['input_ids'] = batch['input_entities'].input_ids
         new_batch['attention_mask'] = batch['input_entities'].attention_mask
+
+        new_batch['input_ids'] = torch.concatenate((torch.tensor([ent_id]).unsqueeze(1).repeat(new_batch['input_ids'].shape[0], 1).to(self.device),new_batch['input_ids'] ), dim=1)
+        new_batch['attention_mask'] = torch.concatenate((torch.ones(new_batch['attention_mask'].shape[0], 1).to(self.device), new_batch['attention_mask']), dim=1)
+        
         txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
         
         
@@ -260,36 +267,50 @@ class ByT5Model(pl.LightningModule):
         # input_tensor = torch.zeros(len(chunks), max(chunks), 512).to(self.device)
 
         ########### OUTPUT CHUNKS
-        with torch.no_grad():
-            # txt_embeddings = self.model.encoder.get_input_embeddings()(batch['output_entities'].input_ids)
-            # mask = (-(batch['output_entities'].attention_mask) + 1).float()
-            # txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
-            new_batch = {}
-            new_batch['input_ids'] = batch['output_entities'].input_ids
-            new_batch['attention_mask'] = batch['output_entities'].attention_mask
-            txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
+        # with torch.no_grad():
+        #     # txt_embeddings = self.model.encoder.get_input_embeddings()(batch['output_entities'].input_ids)
+        #     # mask = (-(batch['output_entities'].attention_mask) + 1).float()
+        #     # txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        #     new_batch = {}
+        #     new_batch['input_ids'] = batch['output_entities'].input_ids
+        #     new_batch['attention_mask'] = batch['output_entities'].attention_mask
+        #     txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
         
-            # txt_embeddings = torch.sum(txt_embeddings, dim=1)
-            txt_embeddings = txt_embeddings[:, 1, :]
-            chunks = batch['output_ent_length']
-            output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
-            idx = 0
-            decoder_inputs_embeds = []
-            for i, size in enumerate(chunks):
-                output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
-                ## adding a pad token to the begining because decoder_input_token should be shifted right
-                decoder_inputs_embeds.append(torch.concatenate((start_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
-                idx += size
-            decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
-            # decoder_inputs_embeds.requires_grad_(False)
+        #     # txt_embeddings = torch.sum(txt_embeddings, dim=1)
+        #     txt_embeddings = txt_embeddings[:, 1, :]
+        #     chunks = batch['output_ent_length']
+        #     output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        #     idx = 0
+        #     decoder_inputs_embeds = []
+        #     for i, size in enumerate(chunks):
+        #         output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+        #         ## adding a pad token to the begining because decoder_input_token should be shifted right
+        #         decoder_inputs_embeds.append(torch.concatenate((start_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
+        #         idx += size
+        #     decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
+        #     # decoder_inputs_embeds.requires_grad_(False)
         
-        model_batch['inputs_embeds'] = input_tensor
-        # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
-        del model_batch['input_ids'], 
-        # del model_batch['labels']
-        model_batch['attention_mask'] =  batch['batch_att_mask']
+        # model_batch['inputs_embeds'] = input_tensor
+        # # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
+        # del model_batch['input_ids'], 
+        # # del model_batch['labels']
+        # model_batch['attention_mask'] =  batch['batch_att_mask']
         
-        outputs = self.model(**model_batch, output_hidden_states=True)
+        token_batch = {}
+        token_batch['input_ids'] = batch['input_ids']
+        token_batch['attention_mask'] = batch['attention_mask']
+        
+        token_batch['input_ids'] = torch.concatenate((torch.tensor([tok_id]).unsqueeze(1).repeat(token_batch['input_ids'].shape[0], 1).to(self.device),token_batch['input_ids'] ), dim=1)
+        token_batch['attention_mask'] = torch.concatenate((torch.ones(token_batch['attention_mask'].shape[0], 1).to(self.device), token_batch['attention_mask']), dim=1)
+        
+        token_embeddings = self.model.encoder(**token_batch)['last_hidden_state']
+        
+        final_batch = {}
+        final_batch['inputs_embeds'] = torch.concatenate((input_tensor, token_embeddings), dim=1)
+        final_batch['attention_mask'] = torch.concatenate((self.create_attention_mask_from_seq_length(batch["input_ent_length"]), token_batch['attention_mask']), dim=1)
+        final_batch['labels'] = model_batch['labels']
+        
+        outputs = self.model(**final_batch, output_hidden_states=False)
         
         loss = outputs.loss
         
@@ -324,17 +345,26 @@ class ByT5Model(pl.LightningModule):
         # mask = (-(batch['input_entities'].attention_mask) + 1).float()
         # txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
         
+
+        ent_id = self.tokenizer.encode('ENTITY')[1]
+        tok_id = self.tokenizer.encode('TOKEN')[1]
+        
         new_batch = {}
         new_batch['input_ids'] = batch['input_entities'].input_ids
         new_batch['attention_mask'] = batch['input_entities'].attention_mask
+        
+        new_batch['input_ids'] = torch.concatenate((torch.tensor([ent_id]).unsqueeze(1).repeat(new_batch['input_ids'].shape[0], 1).to(self.device),new_batch['input_ids'] ), dim=1)
+        new_batch['attention_mask'] = torch.concatenate((torch.ones(new_batch['attention_mask'].shape[0], 1).to(self.device), new_batch['attention_mask']), dim=1)
+
         txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
         
         
         # txt_embeddings = torch.sum(txt_embeddings, 1)
-        txt_embeddings = txt_embeddings[:, 1, :]
+        txt_embeddings = txt_embeddings[:, 2, :]
         pad_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
         start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
-                
+        
+        
         ########### INPUT CHUNKS
         # Find the maximum chunk size
         chunks = batch['input_ent_length']
@@ -353,38 +383,56 @@ class ByT5Model(pl.LightningModule):
         # txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
         
         
-        new_batch = {}
-        new_batch['input_ids'] = batch['output_entities'].input_ids
-        new_batch['attention_mask'] = batch['output_entities'].attention_mask
-        txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
+        # new_batch = {}
+        # new_batch['input_ids'] = batch['output_entities'].input_ids
+        # new_batch['attention_mask'] = batch['output_entities'].attention_mask
+        # txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
         
         
-        txt_embeddings = txt_embeddings[:, 1, :]
-        chunks = batch['output_ent_length']
-        output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
-        idx = 0
-        decoder_inputs_embeds = []
-        for i, size in enumerate(chunks):
-            output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
-            ## adding a pad token to the begining because decoder_input_token should be shifted right
-            decoder_inputs_embeds.append(torch.concatenate((start_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
-            idx += size
-        decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
+        # txt_embeddings = txt_embeddings[:, 1, :]
+        # chunks = batch['output_ent_length']
+        # output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
+        # idx = 0
+        # decoder_inputs_embeds = []
+        # for i, size in enumerate(chunks):
+        #     output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
+        #     ## adding a pad token to the begining because decoder_input_token should be shifted right
+        #     decoder_inputs_embeds.append(torch.concatenate((start_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
+        #     idx += size
+        # decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
         
-        model_batch['inputs_embeds'] = input_tensor
-        del model_batch['input_ids'] 
-        # del model_batch['labels']
-        model_batch['attention_mask'] = batch['batch_att_mask']
+        # del model_batch['input_ids'] 
+        # # del model_batch['labels']
+        # model_batch['attention_mask'] = batch['batch_att_mask']
+        # model_batch['inputs_embeds'] = input_tensor
+
+        
+        
+        token_batch = {}
+        token_batch['input_ids'] = batch['input_ids']
+        token_batch['attention_mask'] = batch['attention_mask']
+        
+        token_batch['input_ids'] = torch.concatenate((torch.tensor([tok_id]).unsqueeze(1).repeat(token_batch['input_ids'].shape[0], 1).to(self.device),token_batch['input_ids'] ), dim=1)
+        token_batch['attention_mask'] = torch.concatenate((torch.ones(token_batch['attention_mask'].shape[0], 1).to(self.device), token_batch['attention_mask']), dim=1)
+        
+        token_embeddings = self.model.encoder(**token_batch)['last_hidden_state']
+        
+        final_batch = {}
+        final_batch['inputs_embeds'] = torch.concatenate((input_tensor, token_embeddings), dim=1)
+        final_batch['attention_mask'] = torch.concatenate((self.create_attention_mask_from_seq_length(batch["input_ent_length"]), token_batch['attention_mask']), dim=1)
+        final_batch['labels'] = model_batch['labels']
+        
+
         
 
         
         # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
 
         # model_batch['attention_mask'] =  batch['batch_att_mask']
-        outputs = self.model(**model_batch, output_hidden_states=True)
+        outputs = self.model(**final_batch, output_hidden_states=False)
         loss = outputs.loss    
         
-        self.seq_inference(model_batch, batch, batch_idx)
+        self.seq_inference(final_batch, batch, batch_idx)
         self.generate_samples(batch)
         
         self.log("loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True,
