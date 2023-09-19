@@ -197,17 +197,29 @@ class ByT5Model(pl.LightningModule):
         image_for_llm = self.layernorm(image_for_llm)
 
         txt_embedder = self.model.get_input_embeddings()
+        
+        decoder_input_ids = self.model.config.bos_token_id
+        batch['intput_ids'] = (
+                torch.LongTensor([[decoder_input_ids, self.model.config.eos_token_id]])
+                .repeat(image_embeds.shape[0], 1)
+                .to(image_embeds.device)
+            )
+        batch['intput_ids'][:, 0] = decoder_input_ids
+        batch['attention_mask'] = None
+        
         txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
         
-        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+        #input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+        input_embed = image_for_llm
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
 
 
         # adding ones to attention_mask
-        att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # att = model_batch['attention_mask']
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        model_batch['attention_mask'] = torch.ones(image_for_llm.shape[0], image_for_llm.shape[1]).to(self.device)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
 
         batch['attention_mask'] = model_batch['attention_mask']

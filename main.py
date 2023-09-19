@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset_imageconditional import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models.vlt5_v2_tri import ByT5Model
+from models.conditional_vl_align import ByT5Model
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader

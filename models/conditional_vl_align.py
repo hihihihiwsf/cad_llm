@@ -136,11 +136,14 @@ class ByT5Model(pl.LightningModule):
         _image_embeds = last_hidden_state #self.post_layernorm(last_hidden_state)
         
         '''patch embedding downsample 196 to 14'''
+        '''
         _image_embeds = _image_embeds.permute(0,2,1)
         _image_embeds = self.gelu(self.embed_patch(_image_embeds).permute(0,2,1))
-
-        image_embeds = self.vision_projection(_image_embeds[:,0])
+        '''
+        
+        image_embeds = self.vision_projection(_image_embeds)
         image_for_llm = self.gelu(self.layernorm(image_embeds))
+        image_embeds = image_embeds[:,0]
         # image_for_llm = self.layernorm(image_for_llm)
 
 
@@ -151,14 +154,15 @@ class ByT5Model(pl.LightningModule):
         text_embeds = self.textpooler(_txt_embeds)
         text_embeds = self.text_projection(text_embeds)
         
-        output_embed = torch.concatenate((torch.unsqueeze(image_for_llm, dim=1), _txt_embeds), dim=1)
+        #output_embed = torch.concatenate((torch.unsqueeze(image_for_llm, dim=1), _txt_embeds), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        output_embed = image_for_llm
         model_batch['encoder_outputs_embeds'] = output_embed
 
 
         # adding ones to attention_mask
         att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
+        model_batch['attention_mask'] = torch.ones(att.shape[0], output_embed.shape[1]).to(self.device)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
         
         decoder_input_ids = self.model._shift_right(batch['labels'])
@@ -197,7 +201,7 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         
         # normalized features
@@ -245,21 +249,25 @@ class ByT5Model(pl.LightningModule):
         #pooled_output= last_hidden_state[:, 0, :]
         _image_embeds = last_hidden_state #self.post_layernorm(last_hidden_state)
         
+        
         '''patch embedding downsample 196 to 14'''
+        '''
         _image_embeds = _image_embeds.permute(0,2,1)
         _image_embeds = self.gelu(self.embed_patch(_image_embeds).permute(0,2,1))
-
-        image_embeds = self.vision_projection(_image_embeds[:,0])
+        '''
+        
+        image_embeds = self.vision_projection(_image_embeds)
         image_for_llm = self.gelu(self.layernorm(image_embeds))
+        image_embeds = image_embeds[:,0]
         # image_for_llm = self.layernorm(image_for_llm)
 
         decoder_input_ids = self.model.config.bos_token_id
-        batch['intput_ids'] = (
+        batch['decoder_input_ids'] = (
                 torch.LongTensor([[decoder_input_ids, self.model.config.eos_token_id]])
                 .repeat(image_embeds.shape[0], 1)
                 .to(image_embeds.device)
             )
-        batch['intput_ids'][:, 0] = decoder_input_ids
+        batch['decoder_input_ids'][:, 0] = decoder_input_ids
         batch['attention_mask'] = None
 
         '''txt encoder'''
@@ -269,20 +277,22 @@ class ByT5Model(pl.LightningModule):
         text_embeds = self.textpooler(_txt_embeds)
         text_embeds = self.text_projection(text_embeds)
         
-        output_embed = torch.concatenate((torch.unsqueeze(image_for_llm, dim=1), _txt_embeds), dim=1)
+        #output_embed = torch.concatenate((torch.unsqueeze(image_for_llm, dim=1), _txt_embeds), dim=1)
+        
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        output_embed = image_for_llm
         model_batch['encoder_outputs_embeds'] = output_embed
 
 
         # adding ones to attention_mask
         att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
+        model_batch['attention_mask'] = torch.ones(att.shape[0], output_embed.shape[1]).to(self.device)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
         
         decoder_input_ids = self.model._shift_right(batch['labels'])
         # Decode
         decoder_outputs = self.model.decoder(
-            input_ids =decoder_input_ids,
+            input_ids = decoder_input_ids,
             encoder_hidden_states=model_batch['encoder_outputs_embeds'],
             encoder_attention_mask=model_batch['attention_mask'],
             output_hidden_states=True)
