@@ -99,13 +99,13 @@ class ByT5Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-
-        #convert to PIL image for CLIP
-        # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-        with torch.no_grad():
-            oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images']))
-            #image_features = torch.sum(oi['last_hidden_state'], 1)
-
+        
+        # image_features = self.clip_model.encode_image(batch['images'])
+        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images'])) 
+        image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
+        # image_features = oi.image_embeds
+        # image_features = oi['pooler_output']
 
         '''owl vit'''
         last_hidden_state = oi['last_hidden_state']
@@ -113,24 +113,35 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.post_layernorm(last_hidden_state)
         
         #image_embeds = image_embeds.permute(0,2,1)
-        image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
+        #image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
         #image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
-        
-        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        image_for_llm = self.layernorm(image_for_llm)
 
-        txt_embedder = self.model.get_input_embeddings()
-        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds)))
+
+        # txt_embedder = self.model.get_input_embeddings()
+        
+        # decoder_input_ids = self.model.config.bos_token_id
+        # batch['intput_ids'] = (
+        #         torch.LongTensor([[decoder_input_ids, self.model.config.eos_token_id]])
+        #         .repeat(image_embeds.shape[0], 1)
+        #         .to(image_embeds.device)
+        #     )
+        # batch['intput_ids'][:, 0] = decoder_input_ids
+        # batch['attention_mask'] = None
+        
+        # txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
         
-        input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+        #input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
+        input_embed = image_for_llm
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         model_batch['inputs_embeds'] = input_embed
 
 
         # adding ones to attention_mask
-        att = model_batch['attention_mask']
-        model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        # att = model_batch['attention_mask']
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], image_for_llm.shape[1]).to(self.device), att), dim=1)
+        model_batch['attention_mask'] = torch.ones(image_for_llm.shape[0], image_for_llm.shape[1]).to(self.device)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
 
         batch['attention_mask'] = model_batch['attention_mask']
@@ -170,9 +181,6 @@ class ByT5Model(pl.LightningModule):
         _images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         batch['images'] = _images.pixel_values.to(device)
         '''
-        
-        cols = ["attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
 
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
@@ -190,24 +198,23 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.post_layernorm(last_hidden_state)
         
         #image_embeds = image_embeds.permute(0,2,1)
-        image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
+        #image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
         #image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
 
-        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
-        image_for_llm = self.layernorm(image_for_llm)
+        image_for_llm = self.gelu(self.layernorm(self.mapper(image_embeds)))
 
-        txt_embedder = self.model.get_input_embeddings()
+        # txt_embedder = self.model.get_input_embeddings()
         
-        decoder_input_ids = self.model.config.bos_token_id
-        batch['intput_ids'] = (
-                torch.LongTensor([[decoder_input_ids, self.model.config.eos_token_id]])
-                .repeat(image_embeds.shape[0], 1)
-                .to(image_embeds.device)
-            )
-        batch['intput_ids'][:, 0] = decoder_input_ids
-        batch['attention_mask'] = None
+        # decoder_input_ids = self.model.config.bos_token_id
+        # batch['intput_ids'] = (
+        #         torch.LongTensor([[decoder_input_ids, self.model.config.eos_token_id]])
+        #         .repeat(image_embeds.shape[0], 1)
+        #         .to(image_embeds.device)
+        #     )
+        # batch['intput_ids'][:, 0] = decoder_input_ids
+        # batch['attention_mask'] = None
         
-        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        # txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
         
         
         #input_embed = torch.concatenate((image_for_llm, txt_embeddings), dim=1)
