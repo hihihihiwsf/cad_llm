@@ -197,7 +197,7 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         
         # normalized features
@@ -253,6 +253,14 @@ class ByT5Model(pl.LightningModule):
         image_for_llm = self.gelu(self.layernorm(image_embeds))
         # image_for_llm = self.layernorm(image_for_llm)
 
+        decoder_input_ids = self.model.config.bos_token_id
+        batch['intput_ids'] = (
+                torch.LongTensor([[decoder_input_ids, self.model.config.eos_token_id]])
+                .repeat(image_embeds.shape[0], 1)
+                .to(image_embeds.device)
+            )
+        batch['intput_ids'][:, 0] = decoder_input_ids
+        batch['attention_mask'] = None
 
         '''txt encoder'''
         txt_encoder_output = self.model.encoder(batch['input_ids'], batch['attention_mask'],output_hidden_states=True)
@@ -367,7 +375,8 @@ class ByT5Model(pl.LightningModule):
                                          do_sample=False, max_new_tokens=self.args.max_length+10)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
-        batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
+        '''change only output_text to full_text'''
+        batch["string_labels"] = [sketch["input_text"].replace ('</s>', '')+sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
 
         batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
         batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
@@ -448,27 +457,12 @@ class ByT5Model(pl.LightningModule):
         return
         
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
-        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())+list(self.vision_projection.parameters())
-        # # optimizer = Adafactor(
-        #         params,
-        #         lr=None,
-        #         eps=(1e-30, 1e-3),
-        #         clip_threshold=1.0,
-        #         decay_rate=-0.8,
-        #         beta1=None,
-        #         weight_decay=0.0,
-        #         relative_step=True, #
-        #         scale_parameter=True, #
-        #         warmup_init=True, #
-        #     )
-        optimizer = optim.AdamW(params+params2, lr=self.lr)
+
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
-        #lr_scheduler = AdafactorSchedule(optimizer)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
