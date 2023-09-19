@@ -97,7 +97,7 @@ class ByT5Model(pl.LightningModule):
         self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
         self.gelu = torch.nn.GELU()
 
-        encoderlayer = torch.nn.TransformerEncoderLayer(d_model=self.model.config.d_model, nhead=8)
+        encoderlayer = torch.nn.TransformerEncoderLayer(d_model=self.model.config.d_model, nhead=8, dropout=0.2, norm_first=True, activation="gelu")
         self.fusion_text_transformer = torch.nn.TransformerEncoder(encoderlayer, num_layers=1, norm=self.layernorm) #torch.nn.Transformer(nhead=8, num_encoder_layers=1, dropout=0.3, d_model=self.vis_model.config.hidden_size)
 
         # If using single token encoding - adjust tokenizer and model embeddings
@@ -326,12 +326,20 @@ class ByT5Model(pl.LightningModule):
         return AutoTokenizer.from_pretrained(model_name)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr,weight_decay=1e-5)
+        #from apex.optimizers import FusedAdam
+        #base_lr = self.lr*30 / 128
+        #optimizer = FuseAdam(self.trainer.model.parameters(), lr=base_lr, weight_decay=1e-5)
         if not self.args.cosinedecay:
             return optimizer
 
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
+        #scheduler = CosineAnnealingLR(optimizer, T_max=self.total_train_steps, eta_min=self.lr * 0.1)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, verbose=True)
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=self.lr,
+            epochs=30,
+            steps_per_epoch=self.total_train_steps)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

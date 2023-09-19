@@ -60,7 +60,14 @@ def main():
     
     print("Loading model...")
 
-    architecture = bi_vl_byt5_v2 #vlt5_bi_ret
+    if args.architecture  == "bi_vl_byt5_v2":
+        architecture = bi_vl_byt5_v2
+    elif args.architecture =="vl_byt5_v2":
+        architecture = vl_byt5_v2
+    elif args.architecture == "vl_byt5":
+        architecture = vl_byt5
+    elif args.architecture =="byt5_v2":
+        architecture = byt5_v2
     
     from transformers import ViTMAEForPreTraining 
     # vitmae_model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
