@@ -77,11 +77,7 @@ class ByT5Model(pl.LightningModule):
         self.vis_model.config.mask_ratio = 0.
         self.vis_model.requires_grad_(False)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
-       
         
-        # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
 
         self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
@@ -89,7 +85,7 @@ class ByT5Model(pl.LightningModule):
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
 
-        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
+        #self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
         #self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, kernel_size=3, padding='same')
         #self.bn = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
         #self.lkrelu = torch.nn.LeakyReLU()
@@ -295,21 +291,7 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters()) #+ list(self.vis_model.parameters())
-        #params2= list(self.embed_patch.parameters()) + list(self.layernorm.parameters())+list(self.post_layernorm.parameters())
-        # optimizer = Adafactor(
-        #         params,
-        #         lr=None,
-        #         eps=(1e-30, 1e-3),
-        #         clip_threshold=1.0,
-        #         decay_rate=-0.8,
-        #         beta1=None,
-        #         weight_decay=0.0,
-        #         relative_step=True, #
-        #         scale_parameter=True, #
-        #         warmup_init=True, #
-        #     )
-        optimizer = optim.AdamW(params, lr=self.lr, weight_decay=0.05)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr, weight_decay=0.05)
         #optimizer = Adafactor(params+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
 
         if not self.args.cosinedecay:

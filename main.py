@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset_imageconditional import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models.conditional_vision_only import ByT5Model
+from models import conditional_vl_align, conditional_vision_only
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -60,8 +60,13 @@ def main():
 
     print("Loading model...")
 
+    if args.arch == "conditional_vision_only":
+        architecture = conditional_vision_only
+    else:
+        architecture = conditional_vl_align
+    
     if not args.untrained_model:
-        model = ByT5Model(args=args, vit_mae=None, num_train_steps=total_train_steps)
+        model = architecture.ByT5Model(args=args, vit_mae=None, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
     else:
         print("train_mae", args.untrained_model)
