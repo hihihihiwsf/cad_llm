@@ -101,11 +101,16 @@
 
 
 import torch
+from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
+from geometry.parse import get_curves, get_point_entities
+from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv
+
 
 class SketchStringsCollator:
     def __init__(self, tokenizer, max_length=None):
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
     def tokenize(self, strings):
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
@@ -126,7 +131,11 @@ class SketchStringsCollator:
             output_entities.extend(single_ents_out)
             single_ents_length_out.append(len(single_ents_out))
             
-            
+        
+        point_inputs = [get_point_entities(example["input_text"]) for example in examples]
+        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
+        batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        
         # Encode input and output
         tokenized_input = self.tokenize(input_text)
         tokenized_output = self.tokenize(output_text)
@@ -152,6 +161,7 @@ class SketchStringsCollator:
             "batch_att_mask": batch_att_mask,
             "output_entities": tokenized_single_entity_output,
             "output_ent_length": single_ents_length_out,
+            "images": batch_images.pixel_values
             
         }
 

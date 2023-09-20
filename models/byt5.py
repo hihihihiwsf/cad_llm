@@ -15,7 +15,7 @@ from transformers.modeling_utils import unwrap_model
 import sys
 
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
+from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
@@ -30,6 +30,9 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer, TransformerDec
 
 from models.modeling_t5 import T5ForConditionalGeneration
 import numpy as np
+from transformers import CLIPVisionModelWithProjection, CLIPVisionModel, ViTMAEForPreTraining, AutoImageProcessor
+from models.vis_recon import VisRecon
+
 
 class TransformerModel(nn.Module):
 
@@ -135,17 +138,32 @@ class ByT5Model(pl.LightningModule):
         self.box_lim = max(self.quantized_range)  # for visualization
         # self.lhead = nn.Linear(self.model.config.d_model, 64+3, bias=False)
 
-        mapper_to_possible_outputs = {self.tokenizer.encode(str(i))[1]: i-1 for i in range(1, 65)}
-        mapper_to_possible_outputs[self.tokenizer.encode(',')[1]] = 64
-        mapper_to_possible_outputs[self.tokenizer.encode(';')[1]] = 64+1
-        mapper_to_possible_outputs[self.tokenizer.pad_token_id] = 64+2
-        mapper_to_possible_outputs[self.tokenizer.bos_token_id] = 64+3
-        mapper_to_possible_outputs[self.tokenizer.eos_token_id] = 64+4
-        self.token_mapper = mapper_to_possible_outputs
+
+        m = VisRecon(args=args)
+        #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+        # m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
+        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
+        m.load_from_checkpoint('~/Projects/cad_llm/checkpoints/vitmae_deepmind/best.ckpt')
+        self.vit_mae = m.model
+        del m
         
-        self.back_to_llm_token_mapper = {}
-        for k, v in self.token_mapper.items():
-            self.back_to_llm_token_mapper[v] = k
+        
+        self.vis_model = self.vit_mae
+        self.vis_model.config.mask_ratio = 0.
+        self.vis_model.requires_grad_(False)
+        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
+
+        hid_dim = self.vis_model.config.hidden_size
+        hid_dim = 512
+        self.mapper =torch.nn.Linear(hid_dim, self.model.get_input_embeddings().weight.shape[1])
+        self.post_layernorm = torch.nn.LayerNorm(hid_dim, eps=1e-5)
+        self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
+
+        self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
+
+        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num + 1, self.patch_num)
+        self.gelu = torch.nn.GELU()
+        
         
         # If using single token encoding - adjust tokenizer and model embeddings
         if not args.ascii_encoding:
@@ -251,7 +269,7 @@ class ByT5Model(pl.LightningModule):
         
         txt_embeddings = txt_embeddings[:, 2, :]
         pad_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.tokenizer.pad_token_id]).to(self.device))
-        start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
+        # start_embed = self.model.encoder.get_input_embeddings()(torch.tensor([self.model.config.decoder_start_token_id]).to(self.device))
                 
         ########### INPUT CHUNKS
         # Find the maximum chunk size
@@ -263,38 +281,31 @@ class ByT5Model(pl.LightningModule):
         for i, size in enumerate(chunks):
             input_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
             idx += size
+
+        '''VISION PART'''
+        with torch.no_grad():
+            # oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images']))
+            # oi = self.vis_model.vit(batch['images'], output_hidden_states=True)
+            oi = self.vis_model(batch['images'], output_hidden_states=True)
+            #image_features = torch.sum(oi['last_hidden_state'], 1)
+
+
+        '''owl vit'''
+        # last_hidden_state = oi['last_hidden_state']
+        last_hidden_state = oi.decoder_hidden_state
+        #pooled_output= last_hidden_state[:, 0, :]
+        image_embeds = self.post_layernorm(last_hidden_state)
         
+        #image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
+        #image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
+        
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
+        image_for_llm = self.layernorm(image_for_llm)
         # input_tensor = torch.zeros(len(chunks), max(chunks), 512).to(self.device)
 
         ########### OUTPUT CHUNKS
-        # with torch.no_grad():
-        #     # txt_embeddings = self.model.encoder.get_input_embeddings()(batch['output_entities'].input_ids)
-        #     # mask = (-(batch['output_entities'].attention_mask) + 1).float()
-        #     # txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
-        #     new_batch = {}
-        #     new_batch['input_ids'] = batch['output_entities'].input_ids
-        #     new_batch['attention_mask'] = batch['output_entities'].attention_mask
-        #     txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
-        
-        #     # txt_embeddings = torch.sum(txt_embeddings, dim=1)
-        #     txt_embeddings = txt_embeddings[:, 1, :]
-        #     chunks = batch['output_ent_length']
-        #     output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
-        #     idx = 0
-        #     decoder_inputs_embeds = []
-        #     for i, size in enumerate(chunks):
-        #         output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
-        #         ## adding a pad token to the begining because decoder_input_token should be shifted right
-        #         decoder_inputs_embeds.append(torch.concatenate((start_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
-        #         idx += size
-        #     decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
-        #     # decoder_inputs_embeds.requires_grad_(False)
-        
-        # model_batch['inputs_embeds'] = input_tensor
-        # # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
-        # del model_batch['input_ids'], 
-        # # del model_batch['labels']
-        # model_batch['attention_mask'] =  batch['batch_att_mask']
+
         
         token_batch = {}
         token_batch['input_ids'] = batch['input_ids']
@@ -309,6 +320,13 @@ class ByT5Model(pl.LightningModule):
         final_batch['inputs_embeds'] = torch.concatenate((input_tensor, token_embeddings), dim=1)
         final_batch['attention_mask'] = torch.concatenate((self.create_attention_mask_from_seq_length(batch["input_ent_length"]), token_batch['attention_mask']), dim=1)
         final_batch['labels'] = model_batch['labels']
+        
+        #adding the vision tokens
+        final_batch['inputs_embeds'] = torch.concatenate((image_for_llm, final_batch['inputs_embeds']), dim=1)
+        final_batch['attention_mask'] = torch.cat((torch.ones(image_for_llm.shape[0], image_for_llm.shape[1]).to(self.device), final_batch['attention_mask']), dim=1)
+        final_batch['attention_mask'] = torch.zeros_like(final_batch['attention_mask'])
+        
+        
         
         outputs = self.model(**final_batch, output_hidden_states=False)
         
@@ -377,34 +395,25 @@ class ByT5Model(pl.LightningModule):
         
         # input_tensor = torch.zeros(len(chunks), max(chunks), 512).to(self.device)
 
-        ########### OUTPUT CHUNKS
-        # txt_embeddings = self.model.encoder.get_input_embeddings()(batch['output_entities'].input_ids)
-        # mask = (-(batch['output_entities'].attention_mask) + 1).float()
-        # txt_embeddings = self.local_model.encode(txt_embeddings, mask=mask)
+        '''VISION PART'''
+        # oi = self.vis_model.vit.encoder(self.vis_model.patchify(batch['images']))
+        # oi = self.vis_model.vit(batch['images'], output_hidden_states=True)
+        oi = self.vis_model(batch['images'], output_hidden_states=True)
         
+
+        '''owl vit'''
+        # last_hidden_state = oi['last_hidden_state']
+        last_hidden_state = oi.decoder_hidden_state
+        #pooled_output= last_hidden_state[:, 0, :]
+        image_embeds = self.post_layernorm(last_hidden_state)
         
-        # new_batch = {}
-        # new_batch['input_ids'] = batch['output_entities'].input_ids
-        # new_batch['attention_mask'] = batch['output_entities'].attention_mask
-        # txt_embeddings = self.model.encoder(**new_batch)['last_hidden_state']
+        #image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds.permute(0,2,1)).permute(0,2,1))
+        #image_embeds = self.lkrelu(self.bn(self.conv(image_embeds).permute(0,2,1)).permute(0,2,1))
         
-        
-        # txt_embeddings = txt_embeddings[:, 1, :]
-        # chunks = batch['output_ent_length']
-        # output_tensor = pad_embed.repeat(len(chunks), max(chunks), 1)
-        # idx = 0
-        # decoder_inputs_embeds = []
-        # for i, size in enumerate(chunks):
-        #     output_tensor[i, :size, :] = txt_embeddings[idx : idx + size]
-        #     ## adding a pad token to the begining because decoder_input_token should be shifted right
-        #     decoder_inputs_embeds.append(torch.concatenate((start_embed, output_tensor[i, :, :]), dim=0).unsqueeze(0))
-        #     idx += size
-        # decoder_inputs_embeds = torch.cat(decoder_inputs_embeds, dim=0)
-        
-        # del model_batch['input_ids'] 
-        # # del model_batch['labels']
-        # model_batch['attention_mask'] = batch['batch_att_mask']
-        # model_batch['inputs_embeds'] = input_tensor
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
+        image_for_llm = self.layernorm(image_for_llm)
+        # input_tensor = torch.zeros(len(chunks), max(chunks), 512).to(self.device)
 
         
         
@@ -423,7 +432,9 @@ class ByT5Model(pl.LightningModule):
         final_batch['labels'] = model_batch['labels']
         
 
-        
+        #adding the vision tokens
+        final_batch['inputs_embeds'] = torch.concatenate((image_for_llm, final_batch['inputs_embeds']), dim=1)
+        final_batch['attention_mask'] = torch.cat((torch.ones(image_for_llm.shape[0], image_for_llm.shape[1]).to(self.device), final_batch['attention_mask']), dim=1)
 
         
         # model_batch['decoder_inputs_embeds'] = decoder_inputs_embeds[:, :-1, :]
@@ -454,6 +465,10 @@ class ByT5Model(pl.LightningModule):
         # Convert string entities to curves and check validity
         validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
         self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+        
+        f1_score = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        self.log("f1_score", f1_score, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
