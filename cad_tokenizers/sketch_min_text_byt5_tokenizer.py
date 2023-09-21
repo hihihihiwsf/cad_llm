@@ -1,11 +1,13 @@
 import json
 
-from transformers import ByT5Tokenizer, PreTrainedTokenizer
+from transformers import ByT5Tokenizer
 
-from preprocess.preprocess_utils import sort_points, point_entity_from_flat_points
+from preprocess.preprocess_utils import point_entity_from_flat_points
+
+from cad_tokenizers.sketch_tokenizer_base import SketchTokenizerBase
 
 
-class SketchMinTextTokenizerBase(PreTrainedTokenizer):
+class SketchMinTextTokenizerBase(SketchTokenizerBase):
     """
     Abstract class that use minimal text representation to tokenize sketch entities
     Usage: subclass this class and inherit from a tokenizer class (e.g. ByT5Tokenizer)
@@ -63,14 +65,9 @@ class SketchMinTextTokenizerBase(PreTrainedTokenizer):
 
         return entity
 
-    def batch_decode_to_entities(self, batch, skip_special_tokens=True, sort=True):
-        batch_texts = self.batch_decode(batch, skip_special_tokens=skip_special_tokens)
-        batch_preds = [self.str_to_entities(text, sort=sort) for text in batch_texts]
-        return batch_preds
-
 
 class SketchMinTextByt5Tokenizer(ByT5Tokenizer, SketchMinTextTokenizerBase):
     """
-    Usage: SketchJsonTokenizer.from_pretrained(model_name)
+    Usage: SketchMinTextByt5Tokenizer.from_pretrained(model_name)
     """
     pass

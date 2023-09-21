@@ -1,16 +1,22 @@
 from transformers import ByT5Tokenizer
 
 from preprocess.preprocess_utils import sort_points, point_entity_from_flat_points
+from cad_tokenizers.sketch_tokenizer_base import SketchTokenizerBase
 
 
-class SketchSingleTokenByt5Tokenizer(ByT5Tokenizer):
+class SketchSingleTokenTokenizer(SketchTokenizerBase):
     """
-    ByT5Tokenizer that tokenizes sketch entities of the form:
+    Abstract class that use minimal text representation to tokenize sketch entities
+    Usage: subclass this class and inherit from a tokenizer class (e.g. ByT5Tokenizer)
+
+    For example this list of two entities:
 
     [[[0, 1], [63, 1]], [[0, 61], [63, 61]]]
 
-    This tokenizer uses a single token for each coordinate. Entities are separated by <EOE> tokens.
-    End of prompt is marked by <EOP> token.
+    can be converted to a single token representation of the form
+    "<0><1><63><61><EOE><0><61><63><61><EOE>"
+
+    For prompts we add a "<EOP>" at the end of the string
     """
 
     END_OF_ENT = "<EOE>"
@@ -64,7 +70,6 @@ class SketchSingleTokenByt5Tokenizer(ByT5Tokenizer):
 
         return point_entity
 
-    def batch_decode_to_entities(self, batch, skip_special_tokens=True, sort=True):
-        batch_texts = self.batch_decode(batch, skip_special_tokens=skip_special_tokens)
-        batch_preds = [self.str_to_entities(text, sort=sort) for text in batch_texts]
-        return batch_preds
+
+class SketchSingleTokenByt5Tokenizer(SketchSingleTokenTokenizer, ByT5Tokenizer):
+    pass
