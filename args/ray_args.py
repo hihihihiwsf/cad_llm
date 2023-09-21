@@ -31,7 +31,7 @@ def get_ray_args():
         "--strategy", 
         type=str, 
         default="ddp", 
-        help="The name of distributed strategy used by lightening trainer ('ddp' or 'fsdp')"
+        help="The name of distributed strategy used by lightening trainer ('ddp', 'fsdp', or 'deepspeed')"
     )
     parser.add_argument(
         "--cpu_offload",
@@ -50,6 +50,12 @@ def get_ray_args():
         type=int,
         default="0",
         help="The maximum number of attempts to recover a run"
+    )
+    parser.add_argument(
+        "--grad_accu",
+        type=int,
+        default=1,
+        help="Number of batches to accumulate gradients over"
     )
     parser.add_argument(
         "--input_s3_bucket",

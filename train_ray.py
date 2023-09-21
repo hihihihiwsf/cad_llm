@@ -73,22 +73,18 @@ def train_on_ray_cluster():
 
     strategy_kwargs = {}
     if args.strategy == "fsdp":
-        strategy_kwargs["cpu_offload"] = True
-        # strategy_kwargs['auto_wrap_policy'] = partial(size_based_auto_wrap_policy, min_num_params=100000)
-        strategy_kwargs['mixed_precision'] = MixedPrecision(param_dtype=torch.bfloat16, cast_forward_inputs=True)
-
-    if args.strategy == "deep_speed":
-        deepspeed_configs_path = Path(__file__).parent / "models/deepspeed_configs/zero_3.json"
-        with open(deepspeed_configs_path) as f:
-            deepspeed_configs = json.load(f)
-
-        strategy_kwargs["config"] = deepspeed_configs
-
+        if args.mix_precision:
+            strategy_kwargs["mixed_precision"] = MixedPrecision(param_dtype=torch.bfloat16, cast_forward_inputs=True)
+        if args.cpu_offload:
+            strategy_kwargs["cpu_offload"] = True
+    elif args.strategy == "deepspeed":
+        strategy_kwargs["stage"] = 2
 
     # Configure lightning trainer kwargs
     loggers = get_loggers(exp_name, args.comet, comet_workspace=args.comet_workspace,
                           comet_project_name=args.comet_project_name)
     trainer_kwargs = {
+        "accumulate_grad_batches": args.grad_accu,
         "logger": loggers,
         "max_epochs": args.max_epochs,
         "accelerator": "auto",

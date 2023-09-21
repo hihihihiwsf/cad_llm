@@ -63,7 +63,7 @@ class ByT5v2(pl.LightningModule):
             return
 
         # Add new token embeddings and initialize using learned embeddings
-        self.model.resize_token_embeddings(len(self.tokenizer))
+        self.model.resize_token_embeddings(len(self.tokenizer), pad_to_multiple_of=64)
         embedding_params = self.model.get_input_embeddings().weight.data
         for i in range(new_token_count):
             embedding_params[original_token_count + i] = embedding_params[num_special_tokens + i]
