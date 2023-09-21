@@ -1,5 +1,7 @@
 import numpy as np
 
+from preprocess.preprocess_utils import sort_points
+
 
 def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     if not sketch_dict:
@@ -49,23 +51,6 @@ def get_entities_string(entities, new_tokens):
     else:
         str_entities = ["".join([f"<{x}>" for x in ent]) + ";" for ent in flat_entities]
     return str_entities
-
-
-def sort_points(points):
-    if not points:
-        return None
-
-    if len(points) == 2:  # Line
-        points = sorted(points)
-    elif len(points) == 3:  # Arc
-        start, mid, end = points
-        if start > end:
-            points = [end, mid, start]
-    if len(points) == 4:  # Circle
-        # top, right, bottom, left = points
-        # sort -> left, top, bottom, right
-        points = sorted(points)
-    return tuple(points)
 
 
 def center_vertices(vertices):

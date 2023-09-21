@@ -9,7 +9,7 @@ from dataset.syn_constraints_dataset import (
 
 class TestSynConstraintsDataModule(unittest.TestCase):
 
-    def _test_syn_constraints_datamodule(self, data_module_class):
+    def _test_syn_constraints_datamodule(self, datamodule_class):
         batch_size = 2
         max_length = 128
         ds_path = "syn_constraints_test_data/"
@@ -21,7 +21,7 @@ class TestSynConstraintsDataModule(unittest.TestCase):
             "num_workers": 1,
         }
 
-        datamodule = data_module_class(**kwargs)
+        datamodule = datamodule_class(**kwargs)
         datamodule.setup(stage="fit", load_from_cache_file=False, num_proc=1)
         dataloader = datamodule.val_dataloader()
 
