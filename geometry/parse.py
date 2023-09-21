@@ -56,6 +56,9 @@ def get_curve(points):
             curve = Arc(points)
         elif len(points) == 4:
             curve = Circle(points)
+        
+        if curve ==None:
+            print(points)
     except Exception as e:
         pass
     return curve

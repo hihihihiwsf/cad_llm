@@ -2,9 +2,12 @@ import cv2
 import matplotlib.lines as lines
 import matplotlib.patches as patches
 import numpy as np
+import numpy.random as npr
 
+import math
 import geometry.geom_utils as geom_utils
 from geometry.curve import Curve
+from geometry.line import Line
 from geometry.opencv_colors import CV2_COLORS
 
 
@@ -12,7 +15,20 @@ class Arc(Curve):
     def __init__(self, points):
         assert len(points) == 3, "Arc must be defined by 3 points"
         super(Arc, self).__init__(points)
+        
+        self.start_point=None
         self.find_arc_geometry()
+        
+        if self.start_point!=None:
+            self.get_ranges()
+            self._get_chol()
+        
+    def get_ranges(self):
+        self.update_x(self.start_point[0])
+        self.update_y(self.start_point[1])
+        self.update_x(self.end_point[0])
+        self.update_x(self.end_point[1])
+
 
     def draw(self, ax, draw_points=True, linewidth=1, color="green"):
         if not self.good:
@@ -43,6 +59,45 @@ class Arc(Curve):
         if draw_points:
             self.draw_points(ax)
 
+    def hand_draw(self, ax, draw_points=True, linewidth=1, color="green"):
+        if not self.good:
+            xdata, ydata = zip(self.points[0], self.points[2])
+            line = Line((self.points[0],self.points[2]))
+            line.hand_draw(ax, draw_points, linewidth,color)
+            
+            return 
+        
+        start_angle = geom_utils.rads_to_degs(self.start_angle_rads)
+        end_angle = geom_utils.rads_to_degs(self.end_angle_rads)
+        
+        # angle = math.atan2(self.center[1], self.center[0]) * 180 / math.pi
+        # start = start_angle * 180 / math.pi + angle
+        # end = end_angle * 180 / math.pi + angle
+        
+        start = np.pi * start_angle / 180
+        end = np.pi * end_angle / 180
+        
+
+
+        if end < start:
+            end += 2 * np.pi
+
+        length = np.abs(self.radius * (end-start))
+        max_idx = np.maximum(int(np.floor((length / self.scale) * self.resolution)), 1)
+
+        try:
+            y = self.scale * self.cK[:max_idx, :max_idx] @ npr.randn(max_idx)
+        except:
+            import pdb;pdb.set_trace()
+            
+        thetas = np.linspace(start, end, max_idx)
+        newx = self.center[0]+ (self.radius + y) * np.cos(thetas)
+        newy = self.center[1] + (self.radius + y) * np.sin(thetas)
+        
+        ax.plot(newx, newy, color=color, linewidth=linewidth)
+        if draw_points:
+            self.draw_points(ax)
+    
     def draw_np(self, np_image, draw_points=True, linewidth=1, color="green", cell_size=4):
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
 
@@ -125,6 +180,10 @@ class Arc(Curve):
 
         # [O' Rourke (C)] p. 201. Simplified by Jim Ward.
         a, b, c = self.points
+        a = np.array(a)
+        b = np.array(b)
+        c = np.array(c)
+        
 
         A = b[0] - a[0] 
         B = b[1] - a[1]

@@ -1,6 +1,7 @@
 import cv2
 import matplotlib.lines as lines
 import numpy as np
+import numpy.random as npr
 
 from geometry.curve import Curve
 from geometry.opencv_colors import CV2_COLORS
@@ -19,6 +20,14 @@ class Line(Curve):
         else:
             self.invalid_reason = "Line has zero length"
 
+        self.get_ranges()
+        self._get_chol()
+        
+    def get_ranges(self):
+        self.max_x = self.points[0][0] if self.points[0][0]>self.points[1][0] else self.points[1][0]
+        self.min_x = self.points[1][0] if self.points[0][0]>self.points[1][0] else self.points[0][0]
+        self.max_y = self.points[0][1] if self.points[0][1]>self.points[1][1] else self.points[1][1]
+        self.min_y = self.points[1][1] if self.points[0][1]>self.points[1][1] else self.points[0][1]
 
     def draw(self, ax, draw_points=True, linewidth=1, color="black"):
         pt0, pt1 = self.points
@@ -63,3 +72,33 @@ class Line(Curve):
             self.draw_points_pil(img_draw, transform=transform)
 
         return img_draw
+    
+    def hand_draw(self, ax, draw_points=True, linewidth=1, color="black"):
+        pt0, pt1 = self.points
+
+        linestyle = "-"
+        xdata = [pt0[0], pt1[0]]
+        ydata = [pt0[1], pt1[1]]
+        start_x = xdata[0]
+        start_y = ydata[0]
+        end_x = xdata[1]
+        end_y = ydata[1]
+        
+        length = np.sqrt((end_x-start_x)**2 + (end_y-start_y)**2)
+        max_idx = int(np.floor((length / self.scale) * self.resolution))
+
+        y = self.scale * self.cK[:max_idx, :max_idx] @ npr.randn(max_idx)
+        x = self.x[:max_idx] * self.scale
+
+        theta = np.arctan2(end_y-start_y, end_x-start_x)
+        newx = start_x + x * np.cos(theta) - y * np.sin(theta)
+        newy = start_y + y * np.cos(theta) + x * np.sin(theta)
+        
+        if draw_points:
+            marker = '.'
+        else:
+            marker = None
+        
+        ax.plot(x, y, color, linewidth=linewidth, marker=marker, linestyle=linestyle)
+        
+        return newx, newy
