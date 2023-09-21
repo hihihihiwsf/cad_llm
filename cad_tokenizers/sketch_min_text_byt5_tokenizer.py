@@ -42,6 +42,7 @@ class SketchMinTextTokenizerBase(SketchTokenizerBase):
 
             entity_texts = text.split(";")
             entities = [self.str_to_entity(text=entity_text, sort=sort) for entity_text in entity_texts if entity_text]
+            entities = [entity for entity in entities if entity]
             if sort:
                 entities = sorted(entities)
 
