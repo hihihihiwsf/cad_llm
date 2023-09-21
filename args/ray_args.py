@@ -54,7 +54,7 @@ def get_ray_args():
     parser.add_argument(
         "--input_s3_bucket",
         type=str, 
-        default="cad-llm-katzm/dataset/sg_entities_v5",
+        default="cad-llm-katzm/dataset/deepmind_entities_v1",
         help="Name of the input S3 bucket"
     )
     parser.add_argument(
@@ -100,6 +100,12 @@ def get_ray_args():
         help="Huggingface model name"
     )
     parser.add_argument(
+        "--tokenizer_name",
+        type=str,
+        default="min_text_byt5",
+        help="Tokenizer name as defined in cad_tokenizers_utils.py"
+    )
+    parser.add_argument(
         "--num_dataloader_workers",
         type=int,
         default=4,
@@ -132,7 +138,7 @@ def get_ray_args():
     parser.add_argument(
         "--max_length",
         type=int,
-        default=192,
+        default=320,
         help="Maximal length in tokens for both input and output. Longer sequences will be truncated."
     )
     parser.add_argument(
