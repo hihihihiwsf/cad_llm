@@ -23,14 +23,16 @@ from torch.distributed.fsdp import MixedPrecision
 import json
 
 
-def get_loggers(exp_name, use_comet, comet_workspace, comet_project_name):
+def get_loggers(exp_name, use_comet, comet_workspace, comet_project_name, comet_experiment_key):
     loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]
 
+    comet_experiment_name = exp_name if not comet_experiment_key else None  # If resuming, don't create new experiment
     if use_comet:
         comet_logger = CometLogger(
             workspace=comet_workspace,
             project_name=comet_project_name,
-            experiment_name=exp_name,
+            experiment_name=comet_experiment_name,
+            experiment_key=comet_experiment_key,
             log_code=False,
             log_git_metadata=False,
             log_git_patch=False,
@@ -86,7 +88,7 @@ def train_on_ray_cluster():
 
     # Configure lightning trainer kwargs
     loggers = get_loggers(exp_name, args.comet, comet_workspace=args.comet_workspace,
-                          comet_project_name=args.comet_project_name)
+                          comet_project_name=args.comet_project_name, comet_experiment_key=args.comet_experiment_key)
     trainer_kwargs = {
         "accumulate_grad_batches": args.grad_accu,
         "logger": loggers,

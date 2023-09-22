@@ -100,6 +100,12 @@ def get_ray_args():
         help="Comet project name"
     )
     parser.add_argument(
+        "--comet_experiment_key",
+        type=str,
+        default=None,
+        help="Optional comet experiment key to resume experiment"
+    )
+    parser.add_argument(
         "--model_name",
         type=str,
         default="google/byt5-small",
