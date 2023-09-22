@@ -109,7 +109,7 @@ class SketchGraphsCollator:
             hand_imgs = visualize_sample_cv(point_inputs, 64+3)
         
         if self.args.data_aug==1:
-            shift_fraction = 12 / 128
+            shift_fraction = 6 / 128
             scale = 0.2
             shear = 8
             rotation = 8
