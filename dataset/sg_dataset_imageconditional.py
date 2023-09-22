@@ -4,7 +4,7 @@ import random
 import json
 from pathlib import Path
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv, visualize_sample_handraw
+from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv, visualize_sample_handraw2
 # import clip
 import torch 
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
@@ -104,7 +104,7 @@ class SketchGraphsCollator:
         point_inputs = [get_point_entities(sketch["input_text"]+sketch['output_text']) for sketch in sketch_dicts]
         
         if self.args.hand_draw ==1:
-            hand_imgs = visualize_sample_handraw(point_inputs, 64+3)
+            hand_imgs = visualize_sample_handraw2(point_inputs, 64+3)
         else:
             hand_imgs = visualize_sample_cv(point_inputs, 64+3)
         

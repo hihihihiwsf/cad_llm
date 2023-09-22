@@ -1,11 +1,11 @@
 import cv2
 import matplotlib.lines as lines
 import numpy as np
-import numpy.random as npr
 
 from geometry.curve import Curve
 from geometry.opencv_colors import CV2_COLORS
 
+import matplotlib.pyplot as plt
 
 class Line(Curve):
     def __init__(self, points):
@@ -20,32 +20,26 @@ class Line(Curve):
         else:
             self.invalid_reason = "Line has zero length"
 
-        self.get_ranges()
-        self._get_chol()
-        
-    def get_ranges(self):
-        self.update_x(self.points[0][0])
-        self.update_y(self.points[0][1])
-        self.update_x(self.points[1][0])
-        self.update_y(self.points[1][1])
 
     def draw(self, ax, draw_points=True, linewidth=1, color="black"):
-        pt0, pt1 = self.points
+        with plt.xkcd():
+            pt0, pt1 = self.points
 
-        linestyle = "-"
-        xdata = [pt0[0], pt1[0]]
-        ydata = [pt0[1], pt1[1]]
-        l1 = lines.Line2D(
-            xdata, 
-            ydata, 
-            lw=linewidth, 
-            linestyle=linestyle, 
-            color=color, 
-            axes=ax
-        )
-        ax.add_line(l1)
-        if draw_points:
-            self.draw_points(ax)
+            linestyle = "-"
+            xdata = [pt0[0], pt1[0]]
+            ydata = [pt0[1], pt1[1]]
+            l1 = lines.Line2D(
+                xdata, 
+                ydata, 
+                lw=linewidth, 
+                linestyle=linestyle, 
+                color=color, 
+                axes=ax
+            )
+            ax.add_line(l1)
+            if draw_points:
+                self.draw_points(ax)
+            ax.axis('off')
 
     def draw_np(self, np_image, draw_points=True, linewidth=1, color="blue", cell_size=4):
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
@@ -72,32 +66,3 @@ class Line(Curve):
             self.draw_points_pil(img_draw, transform=transform)
 
         return img_draw
-    
-    def hand_draw(self, ax, draw_points=True, linewidth=1, color="black"):
-        pt0, pt1 = self.points
-
-        linestyle = "-"
-
-        start_x = self.points[0][0]
-        start_y = self.points[0][1]
-        end_x = self.points[1][0]
-        end_y = self.points[1][1]
-        
-        length = np.sqrt((end_x-start_x)**2 + (end_y-start_y)**2)
-        max_idx = int(np.floor((length / self.scale) * self.resolution))
-
-        y = self.scale * self.cK[:max_idx, :max_idx] @ npr.randn(max_idx)
-        x = self.x[:max_idx] * self.scale
-
-        theta = np.arctan2(end_y-start_y, end_x-start_x)
-        newx = start_x + x * np.cos(theta) - y * np.sin(theta)
-        newy = start_y + y * np.cos(theta) + x * np.sin(theta)
-        
-        if draw_points:
-            marker = '.'
-        else:
-            marker = None
-        
-        ax.plot(newx, newy, color, linewidth=linewidth, marker=marker, linestyle=linestyle)
-        
-        return newx, newy

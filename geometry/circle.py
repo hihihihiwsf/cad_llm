@@ -4,8 +4,7 @@ from geometry.curve import Curve
 import cv2
 from geometry.opencv_colors import CV2_COLORS
 
-import numpy.random as npr
-
+import matplotlib.pyplot as plt
 
 class Circle(Curve):
     def __init__(self, points):
@@ -13,49 +12,14 @@ class Circle(Curve):
         super(Circle, self).__init__(points)
         self.find_circle_geometry()
 
-        self.get_ranges()
-        self._get_chol()
-        
-    def get_ranges(self):
-        self.update_x(self.center[0])
-        self.update_y(self.center[1])
-        self.update_x(self.radius)
-        self.update_x(-self.radius)
-        self.update_y(self.radius)
-        self.update_y(-self.radius)
-        
     def draw(self, ax, draw_points=True, linewidth=1, color="red"):
-        assert self.good, "The curve is not in the good state"
-        ap = patches.Circle(self.center, self.radius, lw=linewidth, fill=None, color=color)
-        ax.add_patch(ap)
-        if draw_points:
-            self.draw_points(ax)
-    
-    # color should be red
-    def hand_draw(self, ax, draw_points=True, linewidth=1, color="black"):
-        gap = npr.rand() * 360
-        
-        start = gap
-        end = gap+359
-        
-        start = np.pi * start / 180
-        end = np.pi * end / 180
-
-        if end < start:
-            end += 2 * np.pi
-
-        length = np.abs(self.radius * (end-start))
-        max_idx = np.maximum(int(np.floor((length / self.scale) * self.resolution)), 1)
-
-        y = self.scale * self.cK[:max_idx, :max_idx] @ npr.randn(max_idx)
-
-        thetas = np.linspace(start, end, max_idx)
-        newx = self.center[0] + (self.radius + y) * np.cos(thetas)
-        newy = self.center[1] + (self.radius + y) * np.sin(thetas)
-        ax.plot(newx, newy, color=color, linewidth=linewidth)
-        if draw_points:
-            self.draw_points(ax)
-            
+        with plt.xkcd():
+            assert self.good, "The curve is not in the good state"
+            ap = patches.Circle(self.center, self.radius, lw=linewidth, fill=None, color=color)
+            ax.add_patch(ap)
+            if draw_points:
+                self.draw_points(ax)
+            ax.axis('off')
 
     def draw_np(self, np_image, draw_points=True, linewidth=2, color="red", cell_size=4):
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """

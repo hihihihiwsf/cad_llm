@@ -257,9 +257,9 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
-        # # Plot sketches
-        if batch_idx < 5:
-            self.log_samples(batch=batch, batch_idx=batch_idx)
+        # # # Plot sketches
+        # if batch_idx < 5:
+        #     self.log_samples(batch=batch, batch_idx=batch_idx)
         
         return loss
 
