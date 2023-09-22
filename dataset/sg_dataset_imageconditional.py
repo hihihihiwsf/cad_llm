@@ -11,10 +11,13 @@ from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 import pytorch_lightning as pl
 
+import torchvision
+
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
+
             self.data = json.load(f)
         
 
@@ -100,9 +103,26 @@ class SketchGraphsCollator:
 
         point_inputs = [get_point_entities(sketch["input_text"]+sketch['output_text']) for sketch in sketch_dicts]
         
-        #hand_imgs = visualize_sample_handraw(point_inputs, 64+3)
-        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
-        batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
+        if self.args.hand_draw ==1:
+            hand_imgs = visualize_sample_handraw(point_inputs, 64+3)
+        else:
+            hand_imgs = visualize_sample_cv(point_inputs, 64+3)
+        
+        if self.args.data_aug==1:
+            shift_fraction = 12 / 128
+            scale = 0.2
+            shear = 8
+            rotation = 8
+            img_affine = torchvision.transforms.RandomAffine(
+                rotation,
+                translate=(shift_fraction, shift_fraction),
+                scale=(1 - scale, 1 + scale),
+                shear=shear,
+                fill=255)
+            hand_imgs = [img_affine(imgs) for imgs in hand_imgs]
+        
+        #list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
+        batch_images = self.vitmae_preprocess(hand_imgs, return_tensors="pt")
         
         
         # batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])

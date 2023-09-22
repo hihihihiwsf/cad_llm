@@ -31,7 +31,8 @@ class Circle(Curve):
         if draw_points:
             self.draw_points(ax)
     
-    def hand_draw(self, ax, draw_points=True, linewidth=1, color="red"):
+    # color should be red
+    def hand_draw(self, ax, draw_points=True, linewidth=1, color="black"):
         gap = npr.rand() * 360
         
         start = gap

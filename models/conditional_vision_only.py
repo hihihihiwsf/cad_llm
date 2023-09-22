@@ -85,7 +85,7 @@ class ByT5Model(pl.LightningModule):
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
 
-        #self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
+        self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
         #self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, kernel_size=3, padding='same')
         #self.bn = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
         #self.lkrelu = torch.nn.LeakyReLU()

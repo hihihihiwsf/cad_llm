@@ -16,10 +16,10 @@ class Arc(Curve):
         assert len(points) == 3, "Arc must be defined by 3 points"
         super(Arc, self).__init__(points)
         
-        self.start_point=None
+        #self.start_point=None
         self.find_arc_geometry()
         
-        if self.start_point!=None:
+        if self.good==True:
             self.get_ranges()
             self._get_chol()
         
@@ -27,7 +27,7 @@ class Arc(Curve):
         self.update_x(self.start_point[0])
         self.update_y(self.start_point[1])
         self.update_x(self.end_point[0])
-        self.update_x(self.end_point[1])
+        self.update_y(self.end_point[1])
 
 
     def draw(self, ax, draw_points=True, linewidth=1, color="green"):
@@ -59,7 +59,8 @@ class Arc(Curve):
         if draw_points:
             self.draw_points(ax)
 
-    def hand_draw(self, ax, draw_points=True, linewidth=1, color="green"):
+    #color should be green
+    def hand_draw(self, ax, draw_points=True, linewidth=1, color="black"):  
         if not self.good:
             xdata, ydata = zip(self.points[0], self.points[2])
             line = Line((self.points[0],self.points[2]))
@@ -74,18 +75,16 @@ class Arc(Curve):
         # start = start_angle * 180 / math.pi + angle
         # end = end_angle * 180 / math.pi + angle
         
-        start = np.pi * start_angle / 180
-        end = np.pi * end_angle / 180
+        start = np.pi * start_angle / 360
+        end = np.pi * end_angle / 360
         
 
-
-        if end < start:
-            end += 2 * np.pi
+        # if end < start:
+        #     end += 2 * np.pi
 
         length = np.abs(self.radius * (end-start))
-        max_idx = np.maximum(int(np.floor((length / self.scale) * self.resolution)), 1)
-
         try:
+            max_idx = np.minimum(np.maximum(int(np.floor((length / np.maximum(self.scale,1e-6)) * self.resolution)), 1), 500)
             y = self.scale * self.cK[:max_idx, :max_idx] @ npr.randn(max_idx)
         except:
             import pdb;pdb.set_trace()

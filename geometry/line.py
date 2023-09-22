@@ -24,10 +24,10 @@ class Line(Curve):
         self._get_chol()
         
     def get_ranges(self):
-        self.max_x = self.points[0][0] if self.points[0][0]>self.points[1][0] else self.points[1][0]
-        self.min_x = self.points[1][0] if self.points[0][0]>self.points[1][0] else self.points[0][0]
-        self.max_y = self.points[0][1] if self.points[0][1]>self.points[1][1] else self.points[1][1]
-        self.min_y = self.points[1][1] if self.points[0][1]>self.points[1][1] else self.points[0][1]
+        self.update_x(self.points[0][0])
+        self.update_y(self.points[0][1])
+        self.update_x(self.points[1][0])
+        self.update_y(self.points[1][1])
 
     def draw(self, ax, draw_points=True, linewidth=1, color="black"):
         pt0, pt1 = self.points
@@ -77,12 +77,11 @@ class Line(Curve):
         pt0, pt1 = self.points
 
         linestyle = "-"
-        xdata = [pt0[0], pt1[0]]
-        ydata = [pt0[1], pt1[1]]
-        start_x = xdata[0]
-        start_y = ydata[0]
-        end_x = xdata[1]
-        end_y = ydata[1]
+
+        start_x = self.points[0][0]
+        start_y = self.points[0][1]
+        end_x = self.points[1][0]
+        end_y = self.points[1][1]
         
         length = np.sqrt((end_x-start_x)**2 + (end_y-start_y)**2)
         max_idx = int(np.floor((length / self.scale) * self.resolution))
@@ -99,6 +98,6 @@ class Line(Curve):
         else:
             marker = None
         
-        ax.plot(x, y, color, linewidth=linewidth, marker=marker, linestyle=linestyle)
+        ax.plot(newx, newy, color, linewidth=linewidth, marker=marker, linestyle=linestyle)
         
         return newx, newy
