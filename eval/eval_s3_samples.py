@@ -80,11 +80,11 @@ def process_samples(sample_infos, tokenizer):
 
         # Decode and parse to point entities
         pred_text = tokenizer.decode(info["samples"], skip_special_tokens=True)
-        pred = tokenizer.new_tokens_str_to_entities(text=pred_text, sort=True)
+        pred = tokenizer.str_to_entities(text=pred_text, sort=True)
         if "true" in info:
             true = info["true"]
         else:
-            true = tokenizer.new_tokens_str_to_entities(info["output_text"], sort=True)
+            true = tokenizer.str_to_entities(info["output_text"], sort=True)
 
         pred = set(tuple(sorted([tuple(p) for p in ent])) for ent in pred if ent)
         true = set(tuple(sorted([tuple(p) for p in ent])) for ent in true if ent)

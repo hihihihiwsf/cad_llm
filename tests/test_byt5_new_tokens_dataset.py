@@ -2,17 +2,20 @@ import unittest
 
 import numpy as np
 
-from dataset.byt5_new_tokens_dataset import Byt5NewTokensDataModule
+from cad_tokenizers.cad_tokenizers_utils import tokenizer_name_to_cls
+from dataset.byt5_datamodule import Byt5DataModule
 
 
 class TestByt5NewTokensDataModule(unittest.TestCase):
-    def test_byt5_new_tokens_data_module(self):
+    def test_byt5_datamodule(self):
         batch_size = 2
         max_length = 128
         ds_path = "mock_entities_data/"
+        tokenizer_cls = tokenizer_name_to_cls["single_token_byt5"]
 
-        datamodule = Byt5NewTokensDataModule(
+        datamodule = Byt5DataModule(
             model_name="google/byt5-small",
+            tokenizer_cls=tokenizer_cls,
             batch_size=batch_size,
             max_length=max_length,
             dataset_path=ds_path,
@@ -41,13 +44,14 @@ class TestByt5NewTokensDataModule(unittest.TestCase):
             expected_num_tokens = batch["output_text"][0].count("<") + 1
             self.assertEqual(actual_num_tokens, expected_num_tokens)
 
-    def test_byt5_new_tokens_data_module_validation_ratios(self):
+    def _test_byt5_datamodule_validation_ratios(self, tokenizer_cls):
         batch_size = 16
         max_length = 128
         ds_path = "mock_entities_data/"
 
-        datamodule = Byt5NewTokensDataModule(
+        datamodule = Byt5DataModule(
             model_name="google/byt5-small",
+            tokenizer_cls=tokenizer_cls,
             batch_size=batch_size,
             max_length=max_length,
             dataset_path=ds_path,
@@ -67,11 +71,14 @@ class TestByt5NewTokensDataModule(unittest.TestCase):
             out_ents = batch["output_entities"]
             self.assertTrue(all(len(in_ents[i]) + len(out_ents[i]) == len(ents[i]) for i in range(len(ents))))
 
-            all_entities = batch["entities"]
-            input_entities = batch["entities"]
-            ratios = [len(input_entities[i]) / len(all_entities[i]) for i in range(len(all_entities))]
+            ratios = [len(in_ents[i]) / len(ents[i]) for i in range(len(ents))]
             ratio = np.average(ratios)
 
             # Large delta since sample is small and skewed by 0.5 ratio for sketches with two entities
             delta = 0.1
             self.assertAlmostEqual(ratio, expected_ratio, delta=delta)
+
+    def test_byt5_datamodule_validation_ratios(self):
+        for tokenizer_name, tokenizer_cls in tokenizer_name_to_cls.items():
+            print(f"Running _test_byt5_datamodule_validation_ratios with tokenizer {tokenizer_cls}")
+            self._test_byt5_datamodule_validation_ratios(tokenizer_cls)

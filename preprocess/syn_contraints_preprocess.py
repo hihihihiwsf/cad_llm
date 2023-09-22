@@ -1,7 +1,8 @@
 import numpy as np
 
 from geometry.parse import get_point_entity
-from preprocess.preprocessing import normalize_and_quantize_vertices, sort_points
+from preprocess.preprocessing import normalize_and_quantize_vertices
+from preprocess.preprocess_utils import sort_points
 
 
 def process_for_syn_constraints(sketch, return_mid_points=False):

@@ -50,3 +50,36 @@ def save_splits(output_dir, split_to_sketches):
         filename = output_dir / f"{split_name}.json"
         with open(filename, "w") as f:
             json.dump(sketches, f)
+
+
+def sort_points(points):
+    if not points:
+        return None
+
+    if len(points) == 2:  # Line
+        points = sorted(points)
+    elif len(points) == 3:  # Arc
+        start, mid, end = points
+        if start > end:
+            points = [end, mid, start]
+    if len(points) == 4:  # Circle
+        # top, right, bottom, left = points
+        # sort -> left, top, bottom, right
+        points = sorted(points)
+    return tuple(points)
+
+
+def point_entity_from_flat_points(flat_points, sort):
+    """
+    :param flat_points: list of points in the form [x1, y1, x2, y2, ...]
+    :param sort: whether to sort the points
+    :return: list of points in the form [(x1, y1), (x2, y2), ...]
+    """
+    if len(flat_points) % 2 != 0:
+        flat_points = flat_points[:-1]
+
+    point_entity = [(flat_points[i], flat_points[i + 1]) for i in range(0, len(flat_points), 2)]
+    if sort:
+        point_entity = sort_points(point_entity)
+
+    return point_entity

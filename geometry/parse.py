@@ -3,7 +3,7 @@ import numpy as np
 from geometry.arc import Arc
 from geometry.circle import Circle
 from geometry.line import Line
-from preprocess.preprocessing import sort_points
+from preprocess.preprocess_utils import sort_points
 
 
 def get_point_entities(entities_string, sort=True):

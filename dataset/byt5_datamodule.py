@@ -12,16 +12,15 @@ from adsk_ailab_ray.tools.aws import aws_s3_sync
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-from cad_tokenizers.sketch_single_token_byt5_tokenizer import SketchSingleTokenByt5Tokenizer
 from dataset.dataset_utils import split_list
 from dataset.sketch_strings_collator import SketchStringsCollator
 
 from functools import partial
 
 
-class Byt5NewTokensDataModule(pl.LightningDataModule):
+class Byt5DataModule(pl.LightningDataModule):
     def __init__(self, model_name, batch_size, max_length, min_ratio, max_ratio, input_s3_bucket, dataset_path,
-                 num_dataloader_workers):
+                 num_dataloader_workers, tokenizer_cls):
         super().__init__()
         self.save_hyperparameters()
 
@@ -33,6 +32,7 @@ class Byt5NewTokensDataModule(pl.LightningDataModule):
         self.input_s3_bucket = input_s3_bucket
         self.dataset_path = dataset_path
         self.num_dataloader_workers = num_dataloader_workers
+        self.tokenizer_cls = tokenizer_cls
 
         self.tokenizer = None
         self.collator = None
@@ -40,12 +40,12 @@ class Byt5NewTokensDataModule(pl.LightningDataModule):
 
     def prepare_data(self):
         # Download tokenizer
-        SketchSingleTokenByt5Tokenizer.from_pretrained(self.model_name)
+        self.tokenizer_cls.from_pretrained(self.model_name)
         # Download data
         aws_s3_sync(f"s3://{self.input_s3_bucket}", self.dataset_path)
 
     def setup(self, stage):
-        self.tokenizer = SketchSingleTokenByt5Tokenizer.from_pretrained(self.model_name)
+        self.tokenizer = self.tokenizer_cls.from_pretrained(self.model_name)
         self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.max_length,
                                               additional_cols=["entities", "input_entities", "output_entities"])
         self.ds = self.get_dataset()
@@ -101,8 +101,9 @@ class Byt5NewTokensDataModule(pl.LightningDataModule):
         # Split
         input_entities, output_entities = split_list(entities, min_ratio, max_ratio)
         # Convert to strings
-        input_text = self.tokenizer.entities_to_new_tokens_str(input_entities, add_eop=True)
-        output_text = self.tokenizer.entities_to_new_tokens_str(output_entities)
+
+        input_text = self.tokenizer.entities_to_str(input_entities, is_prompt=True)
+        output_text = self.tokenizer.entities_to_str(output_entities)
 
         return {
             "input_entities": input_entities,

@@ -11,9 +11,10 @@ from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from pytorch_lightning.loggers import CometLogger
 
 from args.ray_args import get_ray_args
-from dataset.byt5_new_tokens_dataset import Byt5NewTokensDataModule
+from dataset.byt5_datamodule import Byt5DataModule
 from models.byt5_v2 import ByT5v2
-from cad_tokenizers.sketch_single_token_byt5_tokenizer import SketchSingleTokenByt5Tokenizer
+from cad_tokenizers.cad_tokenizers_utils import get_tokenizer_cls
+
 
 from functools import partial
 import torch
@@ -44,10 +45,13 @@ def train_on_ray_cluster():
 
     exp_name = args.exp_name + "_" + time.strftime("%Y%m%d-%H%M%S")
 
+    tokenizer_cls = get_tokenizer_cls(args.tokenizer_name)
+
     # Configure LightningModule and LightningDataModule classes and kwargs
-    data_class = Byt5NewTokensDataModule
+    data_class = Byt5DataModule
     data_class_kwargs = {
         "model_name": args.model_name,
+        "tokenizer_cls": tokenizer_cls,
         "batch_size": args.batch_size,
         "max_length": args.max_length,
         "min_ratio": args.min_split_ratio,
@@ -58,7 +62,7 @@ def train_on_ray_cluster():
     }
 
     model_class = ByT5v2
-    tokenizer = SketchSingleTokenByt5Tokenizer.from_pretrained(args.model_name)
+    tokenizer = tokenizer_cls.from_pretrained(args.model_name)
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
     remote_samples_path = f"s3://{args.output_s3_bucket}/{exp_name}/samples"
     model_class_kwargs = {
