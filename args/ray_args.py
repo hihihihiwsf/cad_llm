@@ -138,7 +138,7 @@ def get_ray_args():
     parser.add_argument(
         "--max_length",
         type=int,
-        default=320,
+        default=256,
         help="Maximal length in tokens for both input and output. Longer sequences will be truncated."
     )
     parser.add_argument(
