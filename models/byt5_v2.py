@@ -78,7 +78,6 @@ class ByT5v2(pl.LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx):
         val_name = self.val_names[dataloader_idx]
 
-        loss = None
         if val_name == "val":
             outputs = self.model(**self._get_model_batch(batch))
             loss = outputs.loss
@@ -91,7 +90,6 @@ class ByT5v2(pl.LightningModule):
         generate_func = unwrap_model(self.model).generate
         pred_tokens = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
                                     do_sample=False, max_new_tokens=self.max_length+10)
-
         batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
         batch_true = batch["output_entities"]
 

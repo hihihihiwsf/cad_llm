@@ -46,7 +46,7 @@ class SketchMinTextTokenizerBase(SketchTokenizerBase):
             if sort:
                 entities = sorted(entities)
 
-        except ValueError as e:
+        except Exception as e:
             if safe:
                 print(f"Error parsing {text}: {e}")
                 entities = []
