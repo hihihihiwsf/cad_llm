@@ -25,11 +25,12 @@ from eval_metrics.top1_full_sketch_metric import Top1FullSketchMetric
 from eval_metrics.top1_entity_metric import Top1EntityMetric
 from eval_metrics.validity_metric import ValidityMetric
 from torch.nn import ModuleDict
+from transformers.optimization import Adafactor, AdafactorSchedule
 
 
 class ByT5v2(pl.LightningModule):
     def __init__(self, model_name, lr, batch_size, max_length, tokenizer, local_samples_path,
-                 remote_samples_path, val_names):
+                 remote_samples_path, val_names, adafactor):
         super().__init__()
         self.save_hyperparameters()
 
@@ -40,6 +41,7 @@ class ByT5v2(pl.LightningModule):
         self.local_samples_path = local_samples_path
         self.remote_samples_path = remote_samples_path
         self.val_names = val_names
+        self.adafactor = adafactor
 
         self.model = T5ForConditionalGeneration.from_pretrained(model_name)
         self.adjust_model_to_tokenizer()
@@ -144,3 +146,21 @@ class ByT5v2(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         return optimizer
+
+    def configure_optimizers(self):
+        if not self.adafactor:
+            optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+            return optimizer
+
+        optimizer = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True,
+                              warmup_init=True, lr=None)
+        scheduler = AdafactorSchedule(optimizer)
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1,
+            }
+        }

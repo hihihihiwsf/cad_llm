@@ -177,7 +177,12 @@ def get_ray_args():
         default=1,
         help="Whether to add extra validation sets for different split ratios"
     )
-
+    parser.add_argument(
+        "--adafactor",
+        type=int,
+        default=0,
+        help="Use Adafactor optimizer and learning rate schedule"
+    )
 
     ray_args, _ = parser.parse_known_args()
     
