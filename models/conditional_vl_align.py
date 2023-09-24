@@ -195,8 +195,8 @@ class ByT5Model(pl.LightningModule):
         
 
         
-        # '''image decoder pixel loss'''
-        # st1 = time.time()
+        '''image decoder pixel loss'''
+        #st1 = time.time()
         # img_hidden_state = self.layernorm(output_embed)
         # st2 = time.time()
         # self.post_layernorm=self.vis_model.vit.layernorm
@@ -206,14 +206,14 @@ class ByT5Model(pl.LightningModule):
         # img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         # st4 = time.time()
         
-        # img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        # img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_res = self.vis_model.decoder(last_hidden_state, ids_restore=oi.ids_restore)
+        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         # im_de = time.time()
         # print("2-1 time:", st2-st1)
         # print("3-2 time:", st3-st3)
         # print("4-3 time:", st4-st3)
-        # print("5-4time:", im_de-st4)
+        # print("5-4time:", im_de-st1)
         
         
         # normalized features
@@ -229,11 +229,11 @@ class ByT5Model(pl.LightningModule):
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
 
         
-        loss = txt_loss +  contrastive_loss
+        loss = txt_loss +  contrastive_loss + img_loss
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-        # self.log("img_loss", img_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-        #          batch_size=self.batch_size, sync_dist=True)
+        #self.log("img_loss", img_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 #batch_size=self.batch_size, sync_dist=True)
         self.log("contrastive_loss", contrastive_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         self.log("txt_loss", txt_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
@@ -324,7 +324,7 @@ class ByT5Model(pl.LightningModule):
             txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
         
         
-        # '''image decoder pixel loss'''
+        '''image decoder pixel loss'''
         # st1 = time.time()
         # img_hidden_state = self.layernorm(output_embed)
         # st2 = time.time()
@@ -335,8 +335,8 @@ class ByT5Model(pl.LightningModule):
         # img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         # st4 = time.time()
         
-        # img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        # img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        img_res = self.vis_model.decoder(last_hidden_state, ids_restore=oi.ids_restore)
+        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         # im_de = time.time()
         # print("2-1 time:", st2-st1)
@@ -358,7 +358,7 @@ class ByT5Model(pl.LightningModule):
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
 
         
-        loss = txt_loss +  contrastive_loss
+        loss = txt_loss +  contrastive_loss + img_loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
@@ -425,7 +425,7 @@ class ByT5Model(pl.LightningModule):
         """
         target = self.vis_model.patchify(pixel_values)
         
-        self.draw_pred_image(pixel_values, pred)
+        #self.draw_pred_image(pixel_values, pred)
         
         if self.vis_model.config.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
