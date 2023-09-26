@@ -8,7 +8,7 @@ https://docs.aws.amazon.com/sagemaker/latest/dg/distributed-troubleshooting-mode
 
 import os
 from pytorch_lightning.callbacks import Callback
-
+from adsk_ailab_ray.tools.aws import aws_s3_sync
 
 class SyncCheckpoint(Callback):
     def on_train_epoch_end(self, trainer, pl_module):
@@ -18,20 +18,6 @@ class SyncCheckpoint(Callback):
             full_s3_uri = f"{base_s3_uri}/checkpoints/"
             print(f"Syncing checkpoints from local {pl_module.checkpoint_dir} to s3 {full_s3_uri}")
             sync_local_checkpoints_to_s3(local_path=pl_module.checkpoint_dir, s3_uri=full_s3_uri)
-
-
-def aws_s3_sync(source, destination):
-    """aws s3 sync in quiet mode and time profile"""
-    import time
-    import subprocess
-    cmd = ["aws", "s3", "sync", "--quiet", source, destination]
-    print(f"Syncing files from {source} to {destination}")
-    start_time = time.time()
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    p.wait()
-    end_time = time.time()
-    print("Time Taken to Sync: ", (end_time - start_time))
-    return
 
 
 def sync_local_checkpoints_to_s3(local_path="/opt/ml/checkpoints", s3_uri=os.path.dirname(os.path.dirname(os.getenv('SM_MODULE_DIR', ''))) + '/checkpoints'):

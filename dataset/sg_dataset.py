@@ -6,6 +6,7 @@ import numpy as np
 import pytorch_lightning as pl
 from datasets import load_dataset
 from torch.utils.data import Dataset, DataLoader
+from adsk_ailab_ray.tools.aws import aws_s3_sync
 
 from dataset.dataset_utils import split_list
 from dataset.sketch_strings_collator import SketchStringsCollator
@@ -87,14 +88,4 @@ class SketchGraphsDataModule(pl.LightningDataModule):
                 split="val",
                 shuffle=False
         )
-    
-    @staticmethod
-    def aws_s3_sync(source, destination):
-        cmd = ["aws", "s3", "sync", "--quiet", source, destination]
-        print(f"Syncing files from {source} to {destination}")
-        start_time = time.time()
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        p.wait()
-        end_time = time.time()
-        print("Time Taken to Sync: ", (end_time - start_time))
-        return
+
