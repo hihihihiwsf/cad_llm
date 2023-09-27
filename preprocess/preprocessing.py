@@ -1,6 +1,35 @@
 import numpy as np
+from pdb import set_trace as st
 
+def convert_constraint(constraint, entities, new_tokens):
+    string_type = str(40+constraint[0])
+    
+    constraint_entities = [entities[cons] for cons in constraint[1:]]
 
+    string_constraint = get_entities_string(constraint_entities, new_tokens=new_tokens)
+    string_constraint.insert(0, string_type)
+    string_constraint = ' '.join([item.replace(' ', ',') for item in string_constraint]).strip()
+    
+    return string_constraint
+
+def dep_sort_constraint(constraint, gather_idx, dedupled_ent_list, filter):
+    sort_cons = []
+    sort_cons.append(constraint[0])
+    dedup_idx = list(dedupled_ent_list)
+    for j, cons in enumerate(constraint[1:]): 
+        if cons in filter:
+            cons = filter.index(cons)
+        else:
+            return 
+        sort_id = gather_idx.index(cons)
+        if sort_id not in dedupled_ent_list:
+            return
+        sort_id = dedup_idx.index(sort_id)
+        sort_cons.append(sort_id)
+         
+    return sort_cons
+
+    
 def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     if not sketch_dict:
         return None
@@ -8,7 +37,9 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     name = sketch_dict["name"]
     vertices = sketch_dict["vertices"]
     curves = sketch_dict["curves"]
-
+    constraints = sketch_dict['constraints']
+    
+    
     # quantize vertices
     vertices = normalize_and_quantize_vertices(vertices=vertices, n_bits=quantize_bits)
 
@@ -19,14 +50,23 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     entities = [tuple(tuple(point) for point in points) for points in entities]
 
     # remove degenerate entities e.g. line with same start and end point
+    filter =[i for i, points in enumerate(entities) if len(points) == len(set(points))] 
     entities = [points for points in entities if len(points) == len(set(points))]
 
+    
     # make a copy to leave in user order
     user_ordered_entities = [points for points in entities]
 
     # sort points in each entity, keep entity order
     sorted_entities = [sort_points(points) for points in entities]
 
+    # sort entities
+    sorted_ent_with_indices = sorted(enumerate(sorted_entities), key=lambda x: x[1])
+    # Extract the sorted list and gather indices
+    sorted_entities = [item[1] for item in sorted_ent_with_indices]
+    gather_idx = [item[0] for item in sorted_ent_with_indices]
+
+    
     # find duplicate entities using sorted_entities as keys
     seen = set()
     deduped_ent_indices = set()
@@ -41,17 +81,20 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
         return None
 
     # deduplicate entities
-    user_ordered_entities = [points for i, points in enumerate(user_ordered_entities) if deduped_ent_indices]
+    user_ordered_entities = [points for i, points in enumerate(user_ordered_entities) if i in deduped_ent_indices]
     sorted_entities = [points for i, points in enumerate(sorted_entities) if i in deduped_ent_indices]
+    
 
-    # sort entities
-    sorted_entities.sort()
+    sorted_constraints = [dep_sort_constraint(constrain, gather_idx, deduped_ent_indices, filter) for constrain in constraints]
 
+    sorted_constraints = [item for item in sorted_constraints if item]
     # convert to strings
     entities_string = get_entities_string(sorted_entities, new_tokens=new_tokens)
     user_ordered_entities_string = get_entities_string(user_ordered_entities, new_tokens=new_tokens)
 
-    return dict(name=name, entities=entities_string, user_ordered_entities=user_ordered_entities_string)
+    sorted_constraints_string = [convert_constraint(cons, sorted_entities, new_tokens) for cons in sorted_constraints]
+
+    return dict(name=name, entities=entities_string, user_ordered_entities=user_ordered_entities_string, constraints=sorted_constraints_string)
 
 
 def get_entities_string(entities, new_tokens):

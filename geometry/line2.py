@@ -3,7 +3,7 @@ import matplotlib.lines as lines
 import numpy as np
 import numpy.random as npr
 
-from geometry.curve import Curve
+from geometry.curve2 import Curve
 from geometry.opencv_colors import CV2_COLORS
 
 

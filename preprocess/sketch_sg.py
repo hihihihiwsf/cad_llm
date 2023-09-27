@@ -28,6 +28,7 @@ class SketchSG(SketchBase):
         super().__init__()
         self.sketch = sketch
         self.sketch_name = sketch_name
+        self.constraint_list = [0,15,11,16,4,10,25,13,5,9,24,7,6]
 
     def convert(self):
         """Convert to SketchDL obj format"""
@@ -65,6 +66,73 @@ class SketchSG(SketchBase):
 
         vertices = np.array([(pt.x, pt.y) for pt in self.point_map.values()])
         return dict(name=self.sketch_name, vertices=vertices, curves=curves)
+    
+    def convert_with_constraints(self):
+        """Convert to SketchDL obj format"""
+        super().convert(None)
+
+        curves = []
+        curve_ids = []
+        
+        constraints = []
+        constraints_idx = []
+        # [ Line, Arc, Circle ]
+        curve_type_counts = np.zeros(3, dtype=np.long)
+        construction_count = 0
+        for idx in self.sketch.entities.keys():
+            ent = self.sketch.entities[idx]
+            # Ignore construction lines
+            if ent.isConstruction:
+                construction_count += 1
+                continue
+            curve = None
+            if isinstance(ent, Line):
+                curve = self.convert_line(ent)
+                curve_type_counts[0] += 1
+            elif isinstance(ent, Arc):
+                curve = self.convert_arc(ent)
+                curve_type_counts[1] += 1
+            elif isinstance(ent, Circle):
+                curve = self.convert_circle(ent)
+                curve_type_counts[2] += 1
+            if curve:
+                curves.append(curve)
+                curve_ids.append(idx)
+        curve_count = np.sum(curve_type_counts)
+        # Return if the sketch doesn't have any curves
+        if curve_count == 0 or len(self.point_map) == 0:
+            # If we have construction geometry in an empty sketch
+            # We want to return None and not write an obj
+            # as this is expected behaviour from SketchGraphs
+            if construction_count != 0:
+                return None
+
+        for cons in self.sketch.constraints.values():
+            constraint = []
+            constraint_type = cons.constraint_type.value
+            if constraint_type not in self.constraint_list:
+                continue
+            constraint.append(constraint_type)
+
+            _param = []
+            for each_param in cons.parameters:
+                param_label = each_param.value
+
+                param_label = param_label.split('.')
+
+                if param_label[0] not in curve_ids:
+                    break
+                
+                trans_id = curve_ids.index(param_label[0])
+                _param.append(trans_id)
+            
+            if len(_param)>0:
+                constraint.extend(_param)
+                constraints.append(constraint)
+             
+        vertices = np.array([(pt.x, pt.y) for pt in self.point_map.values()])
+        
+        return dict(name=self.sketch_name, vertices=vertices, curves=curves, constraints=constraints)
 
     def convert_line(self, line: Line):
         """Convert a single line"""

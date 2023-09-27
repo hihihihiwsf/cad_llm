@@ -6,7 +6,7 @@ import numpy.random as npr
 
 import math
 import geometry.geom_utils as geom_utils
-from geometry.curve import Curve
+from geometry.curve2 import Curve
 from geometry.line import Line
 from geometry.opencv_colors import CV2_COLORS
 

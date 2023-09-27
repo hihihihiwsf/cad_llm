@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.patches as patches
-from geometry.curve import Curve
+from geometry.curve2 import Curve
 import cv2
 from geometry.opencv_colors import CV2_COLORS
 

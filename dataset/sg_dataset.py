@@ -26,6 +26,7 @@ class SketchGraphsDataset(Dataset):
         self.order = args.train_order if split == "train" else "sorted"
         assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
+        self.constrain_col ="constraints"
 
         # Sanity check text format
         entity_string = self.data[0][self.entities_col][0]

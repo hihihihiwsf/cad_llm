@@ -9,6 +9,8 @@ import numpy as np
 from geometry.parse import get_curves
 from PIL import Image, ImageDraw
 
+from geometry import parse2
+
 def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
     batch_size = len(input_curves)
 
@@ -76,7 +78,7 @@ def visualize_sample(input_curves, box_lim):
     return out
 
 def visualize_sample_handraw(entities, box_lim):
-    input_curves = [get_curves(ent) for ent in entities]
+    input_curves = [parse2.get_curves(ent) for ent in entities]
     batch_size = len(input_curves)
     
     dpi = 100
