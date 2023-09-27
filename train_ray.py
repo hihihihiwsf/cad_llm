@@ -47,6 +47,9 @@ def train_on_ray_cluster():
 
     tokenizer_cls = get_tokenizer_cls(args.tokenizer_name)
 
+    extra_val_percentages = [20, 40, 60, 80] if args.add_extra_val_sets else []
+    val_names = Byt5DataModule.val_dataloader_names(extra_val_percentages)  # Send names to model for logging
+
     # Configure LightningModule and LightningDataModule classes and kwargs
     data_class = Byt5DataModule
     data_class_kwargs = {
@@ -59,6 +62,7 @@ def train_on_ray_cluster():
         "input_s3_bucket": args.input_s3_bucket,
         "dataset_path": args.local_dataset_dir,
         "num_dataloader_workers": min(args.num_dataloader_workers, args.num_cpus_per_worker),
+        "extra_val_percentages": extra_val_percentages,
     }
 
     model_class = ByT5v2
@@ -73,6 +77,7 @@ def train_on_ray_cluster():
         "local_samples_path": local_samples_path,
         "remote_samples_path": remote_samples_path,
         "tokenizer": tokenizer,
+        "val_names": val_names,
     }
 
     strategy_kwargs = {}
@@ -93,6 +98,7 @@ def train_on_ray_cluster():
         "max_epochs": args.max_epochs,
         "accelerator": "auto",
         "log_every_n_steps": args.log_every_n_steps,
+        "val_check_interval": args.val_check_interval,
     }
 
     if args.mix_precision:

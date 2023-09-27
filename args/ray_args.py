@@ -165,6 +165,19 @@ def get_ray_args():
         default=100,
         help="Trainer arg indicating how often to log"
     )
+    parser.add_argument(
+        "--val_check_interval",
+        type=float,
+        default=1.0,
+        help="Trainer arg indicating how often to run validation"
+    )
+    parser.add_argument(
+        "--add_extra_val_sets",
+        type=int,
+        default=1,
+        help="Whether to add extra validation sets for different split ratios"
+    )
+
 
     ray_args, _ = parser.parse_known_args()
     

@@ -26,23 +26,24 @@ from eval_metrics.top1_entity_metric import Top1EntityMetric
 from eval_metrics.validity_metric import ValidityMetric
 from torch.nn import ModuleDict
 
+
 class ByT5v2(pl.LightningModule):
     def __init__(self, model_name, lr, batch_size, max_length, tokenizer, local_samples_path,
-                 remote_samples_path):
+                 remote_samples_path, val_names):
         super().__init__()
         self.save_hyperparameters()
 
         self.lr = lr
         self.batch_size = batch_size  # to fix logging warning
         self.max_length = max_length
+        self.tokenizer = tokenizer
         self.local_samples_path = local_samples_path
         self.remote_samples_path = remote_samples_path
-        self.tokenizer = tokenizer
+        self.val_names = val_names
 
         self.model = T5ForConditionalGeneration.from_pretrained(model_name)
         self.adjust_model_to_tokenizer()
 
-        self.val_names = ["val", "val_20", "val_40", "val_60", "val_80"]
         self._reset_sample_infos()
 
         self.val_name_to_full_sketch_metric = ModuleDict({name: Top1FullSketchMetric() for name in self.val_names})
@@ -75,7 +76,7 @@ class ByT5v2(pl.LightningModule):
                  batch_size=self.batch_size)
         return loss
 
-    def validation_step(self, batch, batch_idx, dataloader_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         val_name = self.val_names[dataloader_idx]
 
         if val_name == "val":

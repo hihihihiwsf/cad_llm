@@ -20,7 +20,7 @@ from functools import partial
 
 class Byt5DataModule(pl.LightningDataModule):
     def __init__(self, model_name, batch_size, max_length, min_ratio, max_ratio, input_s3_bucket, dataset_path,
-                 num_dataloader_workers, tokenizer_cls):
+                 num_dataloader_workers, tokenizer_cls, extra_val_percentages):
         super().__init__()
         self.save_hyperparameters()
 
@@ -33,6 +33,7 @@ class Byt5DataModule(pl.LightningDataModule):
         self.dataset_path = dataset_path
         self.num_dataloader_workers = num_dataloader_workers
         self.tokenizer_cls = tokenizer_cls
+        self.extra_val_percentages = extra_val_percentages
 
         self.tokenizer = None
         self.collator = None
@@ -63,7 +64,7 @@ class Byt5DataModule(pl.LightningDataModule):
         ds["train"] = ds["train"].with_transform(transform)
         ds["val"] = ds["val"].with_transform(transform)
 
-        for p in [20, 40, 60, 80]:
+        for p in self.extra_val_percentages:
             cur_ratio_transform = partial(self.batch_split_entities, min_ratio=p/100, max_ratio=p/100)
             ds[f"val_{p}"] = ds["val"].with_transform(cur_ratio_transform)
 
@@ -73,13 +74,12 @@ class Byt5DataModule(pl.LightningDataModule):
         return self._get_dataloader(ds=self.ds["train"], shuffle=True)
 
     def val_dataloader(self):
-        return [
-            self._get_dataloader(ds=self.ds["val"], shuffle=False),
-            self._get_dataloader(ds=self.ds["val_20"], shuffle=False),
-            self._get_dataloader(ds=self.ds["val_40"], shuffle=False),
-            self._get_dataloader(ds=self.ds["val_60"], shuffle=False),
-            self._get_dataloader(ds=self.ds["val_80"], shuffle=False),
-        ]
+        val_names = self.val_dataloader_names(self.extra_val_percentages)
+        return [self._get_dataloader(ds=self.ds[val_name], shuffle=False) for val_name in val_names]
+
+    @staticmethod
+    def val_dataloader_names(extra_val_percentages):
+        return ["val"] + [f"val_{p}" for p in extra_val_percentages]
 
     def _get_dataloader(self, ds, shuffle):
         return DataLoader(ds, batch_size=self.batch_size, shuffle=shuffle, collate_fn=self.collator,
