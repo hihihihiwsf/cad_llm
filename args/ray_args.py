@@ -58,15 +58,15 @@ def get_ray_args():
         help="Number of batches to accumulate gradients over"
     )
     parser.add_argument(
-        "--input_s3_bucket",
+        "--input_s3_uri",
         type=str, 
-        default="cad-llm-katzm/dataset/deepmind_entities_v1",
+        default="None",
         help="Name of the input S3 bucket"
     )
     parser.add_argument(
-        "--output_s3_bucket", 
+        "--output_s3_uri", 
         type=str, 
-        default="cad-llm-katzm/ray-training-output",
+        default="s3://cad-llm-katzm/ray-training-output",
         help="Name of the output S3 bucket"
     )
     parser.add_argument(
@@ -178,6 +178,12 @@ def get_ray_args():
         help="Whether to add extra validation sets for different split ratios"
     )
 
+    parser.add_argument(
+        "--dry_run",
+        type=int,
+        default=0,
+        help="If 1, dry run. The model runs locally and the local dataset already exists and does not need to be downloaded from S3"
+    )
 
     ray_args, _ = parser.parse_known_args()
     

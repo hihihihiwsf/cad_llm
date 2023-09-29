@@ -59,7 +59,7 @@ def train_on_ray_cluster():
         "max_length": args.max_length,
         "min_ratio": args.min_split_ratio,
         "max_ratio": args.max_split_ratio,
-        "input_s3_bucket": args.input_s3_bucket,
+        "input_s3_uri": args.input_s3_uri,
         "dataset_path": args.local_dataset_dir,
         "num_dataloader_workers": min(args.num_dataloader_workers, args.num_cpus_per_worker),
         "extra_val_percentages": extra_val_percentages,
@@ -68,7 +68,7 @@ def train_on_ray_cluster():
     model_class = ByT5v2
     tokenizer = tokenizer_cls.from_pretrained(args.model_name)
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
-    remote_samples_path = f"s3://{args.output_s3_bucket}/{exp_name}/samples"
+    remote_samples_path = f"{args.output_s3_uri}/{exp_name}/samples"
     model_class_kwargs = {
         "model_name": args.model_name,
         "lr": args.lr,
@@ -99,6 +99,7 @@ def train_on_ray_cluster():
         "accelerator": "auto",
         "log_every_n_steps": args.log_every_n_steps,
         "val_check_interval": args.val_check_interval,
+        "devices": "1" if args.dry_run else "auto",
     }
 
     if args.mix_precision:
@@ -125,8 +126,8 @@ def train_on_ray_cluster():
         data_class_kwargs=data_class_kwargs,
         trainer_kwargs=trainer_kwargs,
         checkpointing_kwargs=checkpointing_kwargs,
-        input_s3_bucket=args.input_s3_bucket,
-        output_s3_bucket=args.output_s3_bucket,
+        s3_data_uri=args.input_s3_uri,
+        s3_results_uri=args.output_s3_uri,
         local_data_dir=args.local_dataset_dir,
         local_results_dir=args.local_results_dir,
         max_failures=args.max_failures,
@@ -134,7 +135,11 @@ def train_on_ray_cluster():
     )
 
     # Run the experiment on the Ray cluster
-    result = experiment.run()
+    if args.dry_run:
+        result = experiment.fit_dry_run()
+    else:
+        result = experiment.fit()
+        
     print("Validation Loss: ", result.metrics["val_loss"])
 
 

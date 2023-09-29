@@ -12,7 +12,7 @@ def main(dataset_path, model_name, tokenizer_name):
         max_length=10000,
         min_ratio=0.2,
         max_ratio=0.8,
-        input_s3_bucket="",
+        input_s3_uri="",
         dataset_path=dataset_path,
         num_dataloader_workers=8,
         tokenizer_cls=tokenizer_cls
