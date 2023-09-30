@@ -2,7 +2,7 @@ import numpy as np
 from pdb import set_trace as st
 
 def convert_constraint(constraint, entities, new_tokens):
-    string_type = str(40+constraint[0])
+    string_type = str(constraint[0])
     
     constraint_entities = [entities[cons] for cons in constraint[1:]]
 
@@ -11,6 +11,23 @@ def convert_constraint(constraint, entities, new_tokens):
     string_constraint = ' '.join([item.replace(' ', ',') for item in string_constraint]).strip()
     
     return string_constraint
+
+def dep_sort_constraint(constraint, gather_idx, dedupled_ent_list, filter):
+    sort_cons = []
+    sort_cons.append(constraint[0])
+    dedup_idx = list(dedupled_ent_list)
+    for j, cons in enumerate(constraint[1:]): 
+        if cons in filter:
+            cons = filter.index(cons)
+        else:
+            return 
+        sort_id = gather_idx.index(cons)
+        if sort_id not in dedupled_ent_list:
+            return
+        sort_id = dedup_idx.index(sort_id)
+        sort_cons.append(sort_id)
+         
+    return sort_cons
 
 def dep_sort_constraint(constraint, gather_idx, dedupled_ent_list, filter):
     sort_cons = []
@@ -39,7 +56,7 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     curves = sketch_dict["curves"]
     constraints = sketch_dict['constraints']
     
-    
+   
     # quantize vertices
     vertices = normalize_and_quantize_vertices(vertices=vertices, n_bits=quantize_bits)
 
@@ -86,15 +103,15 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     
 
     sorted_constraints = [dep_sort_constraint(constrain, gather_idx, deduped_ent_indices, filter) for constrain in constraints]
-
     sorted_constraints = [item for item in sorted_constraints if item]
     # convert to strings
     entities_string = get_entities_string(sorted_entities, new_tokens=new_tokens)
     user_ordered_entities_string = get_entities_string(user_ordered_entities, new_tokens=new_tokens)
-
-    sorted_constraints_string = [convert_constraint(cons, sorted_entities, new_tokens) for cons in sorted_constraints]
-
-    return dict(name=name, entities=entities_string, user_ordered_entities=user_ordered_entities_string, constraints=sorted_constraints_string)
+    import pdb; pdb.set_trace()
+    sorted_constraints_string = ['1'+convert_constraint(cons, sorted_entities, new_tokens) for cons in sorted_constraints]
+    
+          
+    return dict(name=name, entities=entities_string, user_ordered_entities=user_ordered_entities_string, constraints = sorted_constraints, constraints_string=sorted_constraints_string)
 
 
 def get_entities_string(entities, new_tokens):
@@ -106,7 +123,8 @@ def get_entities_string(entities, new_tokens):
         for ent in entities:
             all_points = []
             for p in ent:
-                all_points.append(" ".join(str(x) for x in p))
+                
+                all_points.append(",".join(str(x+33) for x in p))
             str_entities.append(",".join(p for p in all_points) + ";")
 
             

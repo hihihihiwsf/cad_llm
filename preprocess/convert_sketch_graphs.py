@@ -88,7 +88,7 @@ def get_split_name(path):
         split_name = "val"
     return split_name
 
-from IPython import embed
+
 def convert_sketch(index, seq, split_name, quantize_bits, new_tokens):
     """Convert a sketch from the SketchGraphs dataset"""
     sketch = sketch_from_sequence(seq)
@@ -128,7 +128,7 @@ def convert_split(file, split_name, filter_filenames, limit, quantize_bits, new_
 
 def save_splits(output_dir, split_to_sketches):
     for split_name, sketches in split_to_sketches.items():
-        filename = output_dir / f"sg_str_{split_name}.json"
+        filename = output_dir / f"{split_name}.json"
         with open(filename, "w") as f:
             json.dump(sketches, f)
 

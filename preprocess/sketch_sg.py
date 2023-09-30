@@ -15,6 +15,29 @@ importlib.reload(sketch_base)
 from sketch_base import SketchBase
 
 from sketchgraphs.data._entity import Arc, Circle, Line
+import enum
+
+class Token(enum.IntEnum):
+    """Enumeration indicating the non-parameter value tokens of ConstraintModel.
+
+    At the moment, only categorical constraints are considered.
+    """
+    Pad = 0
+    Start = 1
+    Stop = 2
+    Coincident = 65
+    Concentric = 66
+    Equal = 67
+    Fix = 68
+    Horizontal = 69
+    Midpoint = 70
+    Normal = 71
+    Offset = 72
+    Parallel = 73
+    Perpendicular = 74
+    Quadrant = 75
+    Tangent = 76
+    Vertical = 77
 
 
 class SketchSG(SketchBase):
@@ -28,7 +51,7 @@ class SketchSG(SketchBase):
         super().__init__()
         self.sketch = sketch
         self.sketch_name = sketch_name
-        self.constraint_list = [0,15,11,16,4,10,25,13,5,9,24,7,6]
+        self.constraint_list = [0,15,11,16,4,10,25,13,5,9,24,7,6] # 13
 
     def convert(self):
         """Convert to SketchDL obj format"""
@@ -77,7 +100,7 @@ class SketchSG(SketchBase):
         constraints = []
         constraints_idx = []
         # [ Line, Arc, Circle ]
-        curve_type_counts = np.zeros(3, dtype=np.long)
+        curve_type_counts = np.zeros(3, dtype=np.longlong)
         construction_count = 0
         for idx in self.sketch.entities.keys():
             ent = self.sketch.entities[idx]
@@ -109,9 +132,12 @@ class SketchSG(SketchBase):
 
         for cons in self.sketch.constraints.values():
             constraint = []
-            constraint_type = cons.constraint_type.value
-            if constraint_type not in self.constraint_list:
+            
+            constraint_name = cons.constraint_type.name
+            constraint_ori = cons.constraint_type.value
+            if constraint_ori not in self.constraint_list:
                 continue
+            constraint_type = Token[constraint_name]
             constraint.append(constraint_type)
 
             _param = []

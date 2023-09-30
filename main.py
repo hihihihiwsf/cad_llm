@@ -8,7 +8,7 @@ try:
 except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
-from dataset.sg_dataset_imageconditional import get_sketchgraphs_dataloader, SketchDataModule
+from dataset.sg_dataset_for_constraint import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
 from models import conditional_vl_align, conditional_vision_only
 from models.vl_t5_biencoder import VLT5Model
