@@ -62,7 +62,7 @@ python launch.py --help
 3. Create a Ray cluster by running the following command:
 
     ```python
-    python3 -m adsk_ailab_ray.cluster.create --worker_node_types p3.16xlarge,p3dn.24xlarge --tag_value CADGPT
+    python3 -m adsk_ailab_ray.cluster.create --worker_node_types p3.16xlarge,p3dn.24xlarge --use_spot_workers --tag_value CADGPT
     ```
    Adjust the `--worker_node_types` parameter as needed to specify the desired worker node types.
 
@@ -70,17 +70,15 @@ python launch.py --help
 4. Submit a model training job using the provided command:
 
    ```bash
-   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt"}' -- python train_ray.py --max_epochs 100 --num_gpus 16 --exp_name test_cadllm --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy fsdp --model_name google/byt5-base
+   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 100 --num_gpus 16 --worker_nodes_type p3.16xlarge --worker_nodes_life_cycle normal  --exp_name test_cadllm_$USER --dataset /tmp/data --results_dir /tmp/ray_results --strategy ddp --model_name google/byt5-small --batch_size 8
    ```
 
    Adjust the command parameters as needed. The `fsdp`, `deepspeed` and `ddp` strategies are supported.
 
-   For comet export your api key:
+   To use comet, make sure to export your api key before submitting a job:
    ```bash
    export COMET_API_KEY="your_comet_key"
    ```
-   and add env_vars to runtime-env-json: ```--runtime-env-json=
-'{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "$COMET_API_KEY"}}' --comet 1```
 
 
 5. Monitor the cluster and job status using the Ray dashboard. Access the dashboard by opening the following URL in your web browser:
@@ -130,11 +128,11 @@ python -m adsk_ailab_ray.cluster.create --worker_node_types p5.48xlarge --use_sp
 
 Submit a job to train `google/byt5-xl` (3.7 billion parameters)
 ```bash
-   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt"}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy fsdp --mix_precession --model_name google/byt5-xl
+   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy fsdp --mix_precession --model_name google/byt5-xl
 ```
 
 Submit a job to train `google/byt5-xxl` (13 billion parameters)
 ```bash
-   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt"}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy deepspeed --mix_precession --model_name google/byt5-xxl
+   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy deepspeed --mix_precession --model_name google/byt5-xxl
 ```
 Note: when using spot instances, make sure to pass `--max_failures 100` when submitting a job, thus the training job will be automatically restarted if the spot instances are terminated.

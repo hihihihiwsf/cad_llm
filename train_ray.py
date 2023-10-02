@@ -8,7 +8,6 @@ from pathlib import Path
 from adsk_ailab_ray.ray_lightning import RayLightningExperiment
 from pytorch_lightning.loggers.csv_logs import CSVLogger
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
-from pytorch_lightning.loggers import CometLogger
 
 from args.ray_args import get_ray_args
 from dataset.byt5_datamodule import Byt5DataModule
@@ -22,22 +21,11 @@ from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 from torch.distributed.fsdp import MixedPrecision
 import json
 
-
-def get_loggers(exp_name, use_comet, comet_workspace, comet_project_name):
-    loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]
-
-    if use_comet:
-        comet_logger = CometLogger(
-            workspace=comet_workspace,
-            project_name=comet_project_name,
-            experiment_name=exp_name,
-            log_code=False,
-            log_git_metadata=False,
-            log_git_patch=False,
-        )
-        loggers.append(comet_logger)
-
-    return loggers
+from functools import partial
+import torch
+from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
+from torch.distributed.fsdp import MixedPrecision
+import json
 
 
 def train_on_ray_cluster():
@@ -59,7 +47,7 @@ def train_on_ray_cluster():
         "max_length": args.max_length,
         "min_ratio": args.min_split_ratio,
         "max_ratio": args.max_split_ratio,
-        "input_s3_uri": args.input_s3_uri,
+        "s3_data_uri": args.s3_data_uri,
         "dataset_path": args.local_dataset_dir,
         "num_dataloader_workers": min(args.num_dataloader_workers, args.num_cpus_per_worker),
         "extra_val_percentages": extra_val_percentages,
@@ -68,7 +56,7 @@ def train_on_ray_cluster():
     model_class = ByT5v2
     tokenizer = tokenizer_cls.from_pretrained(args.model_name)
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
-    remote_samples_path = f"{args.output_s3_uri}/{exp_name}/samples"
+    remote_samples_path = f"{args.s3_results_uri}/{exp_name}/samples"
     model_class_kwargs = {
         "model_name": args.model_name,
         "lr": args.lr,
@@ -90,8 +78,8 @@ def train_on_ray_cluster():
         strategy_kwargs["stage"] = 2
 
     # Configure lightning trainer kwargs
-    loggers = get_loggers(exp_name, args.comet, comet_workspace=args.comet_workspace,
-                          comet_project_name=args.comet_project_name)
+    loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]  # Comet is integrated into RayLightningExperiment
+
     trainer_kwargs = {
         "accumulate_grad_batches": args.grad_accu,
         "logger": loggers,
@@ -112,6 +100,15 @@ def train_on_ray_cluster():
         "save_top_k": 1
     }
 
+    comet_experiment_kwargs = {
+        "workspace": args.comet_workspace,
+        "project_name": args.comet_project_name,
+        "experiment_key": args.comet_experiment_key,
+        "log_code": False,
+        "log_git_metadata": False,
+        "log_git_patch": False
+    }
+
     # Define an Experiment
     experiment = RayLightningExperiment(
         exp_name=exp_name,
@@ -126,12 +123,15 @@ def train_on_ray_cluster():
         data_class_kwargs=data_class_kwargs,
         trainer_kwargs=trainer_kwargs,
         checkpointing_kwargs=checkpointing_kwargs,
-        s3_data_uri=args.input_s3_uri,
-        s3_results_uri=args.output_s3_uri,
+        s3_data_uri=args.s3_data_uri,
+        s3_results_uri=args.s3_results_uri,
         local_data_dir=args.local_dataset_dir,
         local_results_dir=args.local_results_dir,
         max_failures=args.max_failures,
         ckpt_path=args.ckpt_path,
+        worker_nodes_type=args.worker_nodes_type,
+        worker_nodes_life_cycle=args.worker_nodes_life_cycle,
+        comet_experiment_kwargs=comet_experiment_kwargs
     )
 
     # Run the experiment on the Ray cluster

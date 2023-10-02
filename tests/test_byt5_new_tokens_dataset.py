@@ -22,7 +22,7 @@ class TestByt5NewTokensDataModule(unittest.TestCase):
             num_dataloader_workers=1,
             min_ratio=0.2,
             max_ratio=0.8,
-            input_s3_uri="",
+            s3_data_uri="",
         )
 
         datamodule.setup(stage="fit")
@@ -58,7 +58,7 @@ class TestByt5NewTokensDataModule(unittest.TestCase):
             num_dataloader_workers=1,
             min_ratio=0.2,
             max_ratio=0.8,
-            input_s3_uri="",
+            s3_data_uri="",
         )
         datamodule.setup(stage="fit")
         val_dataloaders = datamodule.val_dataloader()

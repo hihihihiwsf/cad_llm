@@ -71,7 +71,7 @@ class SketchGraphsDataModule(pl.LightningDataModule):
         self.ray_args = ray_args
 
     def prepare_data(self):
-        aws_s3_sync(self.ray_args.input_s3_uri, self.args.dataset)
+        aws_s3_sync(self.ray_args.s3_data_uri, self.args.dataset)
 
     def train_dataloader(self):
         return get_sketchgraphs_dataloader(

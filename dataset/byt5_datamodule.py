@@ -19,7 +19,7 @@ from functools import partial
 
 
 class Byt5DataModule(pl.LightningDataModule):
-    def __init__(self, model_name, batch_size, max_length, min_ratio, max_ratio, input_s3_uri, dataset_path,
+    def __init__(self, model_name, batch_size, max_length, min_ratio, max_ratio, s3_data_uri, dataset_path,
                  num_dataloader_workers, tokenizer_cls, extra_val_percentages):
         super().__init__()
         self.save_hyperparameters()
@@ -29,7 +29,7 @@ class Byt5DataModule(pl.LightningDataModule):
         self.max_length = max_length
         self.min_ratio = min_ratio
         self.max_ratio = max_ratio
-        self.input_s3_uri = input_s3_uri
+        self.s3_data_uri = s3_data_uri
         self.dataset_path = dataset_path
         self.num_dataloader_workers = num_dataloader_workers
         self.tokenizer_cls = tokenizer_cls
@@ -43,7 +43,7 @@ class Byt5DataModule(pl.LightningDataModule):
         # Download tokenizer
         self.tokenizer_cls.from_pretrained(self.model_name)
         # Download data
-        aws_s3_sync(self.input_s3_uri, self.dataset_path)
+        aws_s3_sync(self.s3_data_uri, self.dataset_path)
 
     def setup(self, stage):
         self.tokenizer = self.tokenizer_cls.from_pretrained(self.model_name)

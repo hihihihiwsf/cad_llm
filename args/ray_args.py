@@ -28,6 +28,18 @@ def get_ray_args():
         help="The number of CPUs to use per GPU"
     )
     parser.add_argument(
+        "--worker_nodes_type",
+        type=str,
+        default=None,
+        help="The type of worker nodes to use. e.g. 'p3.2xlarge'"
+    )
+    parser.add_argument(
+        "--worker_nodes_life_cycle",
+        type=str,
+        default=None,
+        help="The life cycle of worker nodes to use. e.g. 'spot' or 'normal'"
+    )
+    parser.add_argument(
         "--strategy", 
         type=str, 
         default="ddp", 
@@ -58,13 +70,13 @@ def get_ray_args():
         help="Number of batches to accumulate gradients over"
     )
     parser.add_argument(
-        "--input_s3_uri",
+        "--s3_data_uri",
         type=str, 
-        default="None",
+        default="s3://cad-llm-katzm/dataset/deepmind_entities_v1",
         help="Name of the input S3 bucket"
     )
     parser.add_argument(
-        "--output_s3_uri", 
+        "--s3_results_uri", 
         type=str, 
         default="s3://cad-llm-katzm/ray-training-output",
         help="Name of the output S3 bucket"
@@ -72,20 +84,14 @@ def get_ray_args():
     parser.add_argument(
         "--local_results_dir",
         type=str,
-        default="/home/ray/ray_results",
+        default="/tmp/ray_results",
         help="Local directory to save checkpoints and logs"
     )
     parser.add_argument(
         "--local_dataset_dir",
         type=str,
-        default="/home/ray/data",
+        default="/tmp/data",
         help="Local directory to save dataset"
-    )
-    parser.add_argument(
-        "--comet",
-        type=int,
-        default=0,
-        help="Use comet.ml for experiment tracking"
     )
     parser.add_argument(
         "--comet_workspace",
@@ -98,6 +104,12 @@ def get_ray_args():
         type=str,
         default="byt5-ray",
         help="Comet project name"
+    )
+    parser.add_argument(
+        "--comet_experiment_key",
+        type=str,
+        default=None,
+        help="Comet exitsing experiment key"
     )
     parser.add_argument(
         "--model_name",
