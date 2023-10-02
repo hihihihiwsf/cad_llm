@@ -30,7 +30,7 @@ from transformers.optimization import Adafactor, AdafactorSchedule
 
 class ByT5v2(pl.LightningModule):
     def __init__(self, model_name, lr, batch_size, max_length, tokenizer, local_samples_path,
-                 remote_samples_path, val_names, adafactor):
+                 remote_samples_path, val_names, use_adafactor):
         super().__init__()
         self.save_hyperparameters()
 
@@ -41,7 +41,7 @@ class ByT5v2(pl.LightningModule):
         self.local_samples_path = local_samples_path
         self.remote_samples_path = remote_samples_path
         self.val_names = val_names
-        self.adafactor = adafactor
+        self.use_adafactor = use_adafactor
 
         self.model = T5ForConditionalGeneration.from_pretrained(model_name)
         self.adjust_model_to_tokenizer()
@@ -144,11 +144,7 @@ class ByT5v2(pl.LightningModule):
         return {col: val for col, val in batch.items() if col in cols}
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
-        return optimizer
-
-    def configure_optimizers(self):
-        if not self.adafactor:
+        if not self.use_adafactor:
             optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
             return optimizer
 

@@ -78,7 +78,7 @@ def train_on_ray_cluster():
         "remote_samples_path": remote_samples_path,
         "tokenizer": tokenizer,
         "val_names": val_names,
-        "adafactor": args.adafactor,
+        "use_adafactor": args.use_adafactor,
     }
 
     strategy_kwargs = {}
