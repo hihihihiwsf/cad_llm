@@ -70,7 +70,7 @@ python launch.py --help
 4. Submit a model training job using the provided command:
 
    ```bash
-   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 100 --num_gpus 16 --worker_nodes_type p3.16xlarge --worker_nodes_life_cycle normal  --exp_name test_cadllm_$USER --dataset /tmp/data --results_dir /tmp/ray_results --strategy ddp --model_name google/byt5-small --batch_size 8
+   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 100 --num_gpus 16 --worker_nodes_type p3.16xlarge --worker_nodes_life_cycle normal  --exp_name test_cadllm_$USER --s3_data_uri s3://cad-llm-katzm/dataset/deepmind_entities_v1 --dataset /tmp/data --results_dir /tmp/ray_results --strategy ddp --model_name google/byt5-small --batch_size 8
    ```
 
    Adjust the command parameters as needed. The `fsdp`, `deepspeed` and `ddp` strategies are supported.
@@ -128,11 +128,11 @@ python -m adsk_ailab_ray.cluster.create --worker_node_types p5.48xlarge --use_sp
 
 Submit a job to train `google/byt5-xl` (3.7 billion parameters)
 ```bash
-   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy fsdp --mix_precession --model_name google/byt5-xl
+   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --s3_data_uri s3://cad-llm-katzm/dataset/deepmind_entities_v1 --dataset /tmp/data --results_dir /tmp/ray_results --strategy fsdp --mix_precession --model_name google/byt5-xl
 ```
 
 Submit a job to train `google/byt5-xxl` (13 billion parameters)
 ```bash
-   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --dataset /home/ray/data --results_dir /home/ray/ray_results --strategy deepspeed --mix_precession --model_name google/byt5-xxl
+   ray job submit --address 'http://localhost:8265' --working-dir . --runtime-env-json='{"pip": "requirements_ray.txt", "env_vars": {"COMET_API_KEY": "'"$COMET_API_KEY"'"}}' -- python train_ray.py --max_epochs 1 --num_gpus 8 --exp_name test_byte5-xl --s3_data_uri s3://cad-llm-katzm/dataset/deepmind_entities_v1 --dataset /tmp/data --results_dir /tmp/ray_results --strategy deepspeed --mix_precession --model_name google/byt5-xxl
 ```
 Note: when using spot instances, make sure to pass `--max_failures 100` when submitting a job, thus the training job will be automatically restarted if the spot instances are terminated.

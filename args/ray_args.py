@@ -72,7 +72,7 @@ def get_ray_args():
     parser.add_argument(
         "--s3_data_uri",
         type=str, 
-        default="s3://cad-llm-katzm/dataset/deepmind_entities_v1",
+        default=None,
         help="Name of the input S3 bucket"
     )
     parser.add_argument(
