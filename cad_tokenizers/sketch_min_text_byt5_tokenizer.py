@@ -5,6 +5,7 @@ from transformers import ByT5Tokenizer
 from preprocess.preprocess_utils import point_entity_from_flat_points
 
 from cad_tokenizers.sketch_tokenizer_base import SketchTokenizerBase
+from cad_tokenizers.cad_tokenizers_utils import register_tokenizer
 
 
 class SketchMinTextTokenizerBase(SketchTokenizerBase):
@@ -67,6 +68,7 @@ class SketchMinTextTokenizerBase(SketchTokenizerBase):
         return entity
 
 
+@register_tokenizer("sketch_min_text_byt5_tokenizer")
 class SketchMinTextByt5Tokenizer(ByT5Tokenizer, SketchMinTextTokenizerBase):
     """
     Usage: SketchMinTextByt5Tokenizer.from_pretrained(model_name)
