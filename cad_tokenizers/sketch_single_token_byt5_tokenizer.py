@@ -2,7 +2,6 @@ from transformers import ByT5Tokenizer
 
 from preprocess.preprocess_utils import sort_points, point_entity_from_flat_points
 from cad_tokenizers.sketch_tokenizer_base import SketchTokenizerBase
-from cad_tokenizers.cad_tokenizers_utils import register_tokenizer
 
 
 class SketchSingleTokenTokenizer(SketchTokenizerBase):
@@ -72,6 +71,5 @@ class SketchSingleTokenTokenizer(SketchTokenizerBase):
         return point_entity
 
 
-@register_tokenizer("single_token_byt5")
 class SketchSingleTokenByt5Tokenizer(SketchSingleTokenTokenizer, ByT5Tokenizer):
     pass

@@ -8,8 +8,6 @@ from transformers.utils.hub import TRANSFORMERS_CACHE
 from adsk_ailab_ray.tools.aws import aws_s3_sync, aws_s3_cp
 import deepspeed
 
-from model_utils import register_model
-
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -61,7 +59,6 @@ def download_model_weights(model_id, model_bucket_uri, model_download_dir):
         aws_s3_sync(model_bucket_uri, model_download_dir)
 
 
-@register_model("llama2")
 class Llama2Model(pl.LightningModule):
     def __init__(self, model_id, model_bucket_uri, model_download_dir, model_checkpoint_path, vocab_size, no_grad_ckpt=False, num_training_steps=1000, lr=5e-6, strategy='deepspeed'):
         super().__init__()

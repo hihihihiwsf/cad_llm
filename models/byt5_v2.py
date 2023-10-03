@@ -25,11 +25,9 @@ from eval_metrics.top1_full_sketch_metric import Top1FullSketchMetric
 from eval_metrics.top1_entity_metric import Top1EntityMetric
 from eval_metrics.validity_metric import ValidityMetric
 from torch.nn import ModuleDict
-from model_utils import register_model
 
 
 
-@register_model("byt5_v2")
 class ByT5v2(pl.LightningModule):
     def __init__(self, model_name, lr, batch_size, max_length, tokenizer, local_samples_path,
                  remote_samples_path, val_names):
