@@ -122,8 +122,8 @@ def train_on_ray_cluster():
         local_results_dir=args.local_results_dir,
         max_failures=args.max_failures,
         ckpt_path=args.ckpt_path,
-        worker_nodes_type=args.worker_nodes_type,
-        worker_nodes_life_cycle=args.worker_nodes_life_cycle,
+        worker_nodes_type=args.worker_node_types,
+        worker_nodes_life_cycle=int(args.use_spot_workers),
         comet_experiment_kwargs=comet_experiment_kwargs
     )
 
