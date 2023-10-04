@@ -148,7 +148,7 @@ def filter_main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tok
         split_to_sketches[split_name] = sketches
 
     split_to_sketches = deduplicate_splits(split_to_sketches)
-
+    import pdb; pdb.set_trace()
     save_splits(output_dir, split_to_sketches)
 
     print(f"Processing Time: {time.time() - start_time} secs")
@@ -161,7 +161,7 @@ def main(sg_file, output_dir, limit, quantize_bits, new_tokens, split_name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="/home/ubuntu/vitruvion/data/sg_strings",
+    parser.add_argument("--input", type=str, default="/home/ubuntu/vitr_data/data/sg_strings",
                         help="Input folder containing the SketchGraphs filter sequence .npy files")
     parser.add_argument("--output", type=str, default='/home/ubuntu/sifan/data/sg_strings_v6_with_constraints/',
                         help="Output folder to save the data [default: output]")

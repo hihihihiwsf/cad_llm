@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset_for_constraint import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models import conditional_vl_align, conditional_vision_only
+from models import conditional_vl_align, conditional_vision_only, vlt5, vlt5_v2_tri
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -62,9 +62,10 @@ def main():
 
     if args.arch == "conditional_vision_only":
         architecture = conditional_vision_only
-    else:
+    elif args.arch == "conditional_vl_align":
         architecture = conditional_vl_align
     
+    architecture = vlt5_v2_tri
     if not args.untrained_model:
         model = architecture.ByT5Model(args=args, vit_mae=None, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
@@ -123,7 +124,8 @@ def main():
         #ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt'
         #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         #ckpt_path = '/home/ubuntu/sifan/results/conditional_vl_align/best.ckpt'
-        ckpt_path = 's3://cad-llm-katzm/jobs/sifan-precise-image-conditional-vision-only-09-20-23-1129/checkpoints/model/precise_image_conditional_vision_only/best.ckpt'
+        #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-precise-image-conditional-vision-only-09-20-23-1129/checkpoints/model/precise_image_conditional_vision_only/best.ckpt'
+        ckpt_path = '/home/ubuntu/sifan/results/test_constraint_vlt5/best.ckpt'
         trainer.test(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
 
 

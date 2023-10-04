@@ -1,7 +1,7 @@
 import numpy as np
 from pdb import set_trace as st
 
-def convert_constraint(constraint, entities, new_tokens):
+def convert_constraint_string(constraint, entities, new_tokens):
     string_type = str(constraint[0])
     
     constraint_entities = [entities[cons] for cons in constraint[1:]]
@@ -11,6 +11,7 @@ def convert_constraint(constraint, entities, new_tokens):
     string_constraint = ' '.join([item.replace(' ', ',') for item in string_constraint]).strip()
     
     return string_constraint
+
 
 def dep_sort_constraint(constraint, gather_idx, dedupled_ent_list, filter):
     sort_cons = []
@@ -107,11 +108,12 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     # convert to strings
     entities_string = get_entities_string(sorted_entities, new_tokens=new_tokens)
     user_ordered_entities_string = get_entities_string(user_ordered_entities, new_tokens=new_tokens)
-    import pdb; pdb.set_trace()
-    sorted_constraints_string = ['1'+convert_constraint(cons, sorted_entities, new_tokens) for cons in sorted_constraints]
     
-          
-    return dict(name=name, entities=entities_string, user_ordered_entities=user_ordered_entities_string, constraints = sorted_constraints, constraints_string=sorted_constraints_string)
+    indexed_entities = [f'e{i},'+ent for i, ent in enumerate(entities_string)]
+    indexed_constraints = ";".join([",".join(['e' + str(i) for i in item[1:]]+[str(item[0])]) for item in sorted_constraints]) + ";"
+    sorted_constraints_string = ['1'+convert_constraint_string(cons, sorted_entities, new_tokens) for cons in sorted_constraints]
+        
+    return dict(name=name, entities = entities_string, indexed_entities=indexed_entities, user_ordered_entities=user_ordered_entities_string, constraints = indexed_constraints, constraints_string=sorted_constraints_string)
 
 
 def get_entities_string(entities, new_tokens):
@@ -127,7 +129,6 @@ def get_entities_string(entities, new_tokens):
                 all_points.append(",".join(str(x+33) for x in p))
             str_entities.append(",".join(p for p in all_points) + ";")
 
-            
         # str_entities = [",".join([str(x) for x in ent]) + ";" for ent in flat_entities]
     else:
         str_entities = ["".join([f"<{x}>" for x in ent]) + ";" for ent in flat_entities]

@@ -130,6 +130,7 @@ class SketchSG(SketchBase):
             if construction_count != 0:
                 return None
 
+        constraints_param_len = [1,2]
         for cons in self.sketch.constraints.values():
             constraint = []
             
@@ -137,7 +138,7 @@ class SketchSG(SketchBase):
             constraint_ori = cons.constraint_type.value
             if constraint_ori not in self.constraint_list:
                 continue
-            constraint_type = Token[constraint_name]
+            constraint_type = Token[constraint_name].value
             constraint.append(constraint_type)
 
             _param = []
@@ -151,13 +152,17 @@ class SketchSG(SketchBase):
                 
                 trans_id = curve_ids.index(param_label[0])
                 _param.append(trans_id)
+
             
             if len(_param)>0:
+                lst = len(_param)
+                if lst not in constraints_param_len:
+                    
+                    print(lst)
                 constraint.extend(_param)
                 constraints.append(constraint)
              
         vertices = np.array([(pt.x, pt.y) for pt in self.point_map.values()])
-        
         return dict(name=self.sketch_name, vertices=vertices, curves=curves, constraints=constraints)
 
     def convert_line(self, line: Line):

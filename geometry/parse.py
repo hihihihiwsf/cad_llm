@@ -6,6 +6,28 @@ from geometry.line import Line
 from preprocess.preprocessing import sort_points
 
 
+def get_pair_constraints(entities_string, sort=True):
+    constraint_strings = [s.replace(" ", "") + ';' for s in entities_string.split(';') if s]
+    points_constraints = [sort_constraints(constraint) for constraint in constraint_strings]
+    
+    return points_constraints
+
+def sort_constraints(constraint_string):
+    l_len = [2,3]
+    data = constraint_string[:-1].split(',')
+    if len(data) not in l_len:
+        return None
+    e_items = [item for item in data if isinstance(item, str) and item.startswith('e')]
+    numbers = [item for item in data if item.strip().isdigit()]
+    if len(numbers)<1:
+        return None
+    if len(numbers)>1 or int(numbers[0])<65 or int(numbers[0])>77:
+        return None
+    sorted_parts = sorted(e_items) + numbers
+    return ','.join(sorted_parts)+';'
+
+
+
 def get_point_entities(entities_string, sort=True):
     """
     Convert a string describing multiple entities to a list of point entities
@@ -17,6 +39,7 @@ def get_point_entities(entities_string, sort=True):
     if sort:
         point_entities = [sort_points(points) for points in point_entities]
     return point_entities
+
 
 
 def get_point_entity(entity_string):

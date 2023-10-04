@@ -17,7 +17,7 @@ from models.vis_recon import VisRecon
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
 from util import get_quantized_range
-from geometry.parse import get_curves, get_point_entities
+from geometry.parse import get_curves, get_point_entities, get_pair_constraints
 from geometry.visualization import visualize_batch
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
@@ -54,15 +54,7 @@ class ByT5Model(pl.LightningModule):
         self.batch_size = self.args.batch_size  # to fix logging warning
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
-        self.box_lim = max(self.quantized_range)  # for visualization
-        
-        
-        # m = VisRecon(args=args)
-        # #m.load_from_checkpoint('/home/ec2-user/results/sifan_mae/checkpoints/best.ckpt')   #patch 32: sifan-mae-ps-32-scratch-07-04-23-2320/      vitmae_deepmind/   
-        # m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        # self.vit_mae = m.model 
-        # self.vit_mae.requires_grad_(False)
-        
+        self.box_lim = max(self.quantized_range)  # for visualizationx
 
         self.vit_mae = vit_mae
         if vit_mae is not None:
@@ -173,9 +165,6 @@ class ByT5Model(pl.LightningModule):
         
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-
-        cols = ["attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
         
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
@@ -234,18 +223,17 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         # # Convert string entities to curves and check validity
-        validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+        # validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
+        # self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
 
-        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
-
-        # # Plot sketches
-        if batch_idx < 5:
-            self.log_samples(batch=batch, batch_idx=batch_idx)
-        
+        self.log(f"{validate}_precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
         return loss
 
 
@@ -259,10 +247,10 @@ class ByT5Model(pl.LightningModule):
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
 
-        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
-        batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
+        batch["point_samples"] = [get_pair_constraints(string_sample) for string_sample in batch["string_samples"]]
+        batch["point_labels"] = [get_pair_constraints(string_label) for string_label in batch["string_labels"]]
 
-        batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
+        #batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
 
     def log_samples(self, batch, batch_idx):
         label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]

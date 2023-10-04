@@ -27,6 +27,7 @@ class SketchGraphsDataset(Dataset):
         assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
         self.constrain_col ="constraints"
+        self.index_entities_col = "indexed_entities"
 
         # Sanity check text format
         entity_string = self.data[0][self.entities_col][0]
@@ -49,13 +50,16 @@ class SketchGraphsDataset(Dataset):
         Returns (input_text, output_text)
         """
         sketch_dict = self.data[index]
-        entities = sketch_dict[self.entities_col]
+        entities = sketch_dict[self.index_entities_col]
         constraints = sketch_dict[self.constrain_col]
         
-        
         input_text = "".join([ent for i, ent in enumerate(entities)])
-        sketch_dict['entity_text'] = input_text 
-
+        sketch_dict['input_text'] = input_text 
+        sketch_dict['output_text'] = constraints
+        
+        ent_string = sketch_dict[self.entities_col]
+        ent_string = "".join([ent for i, ent in enumerate(ent_string)])
+        sketch_dict['entities'] = ent_string
         return sketch_dict
 
     def get_mask(self, n):
@@ -88,7 +92,7 @@ class SketchGraphsCollator:
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
-        input_strings = ['<sep>' + sketch['input_text'] for sketch in sketch_dicts]
+        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
@@ -97,15 +101,15 @@ class SketchGraphsCollator:
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
 
-        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        point_inputs = [get_point_entities(sketch["entities"]) for sketch in sketch_dicts]
 
         list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         
-        point_outputs = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts]
+        # point_outputs = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts]
 
-        list_of_out_img = visualize_sample_cv(point_entities=point_outputs, box_lim=64 + 3)
-        output_images = self.vitmae_preprocess(list_of_out_img, return_tensors="pt")
+        # list_of_out_img = visualize_sample_cv(point_entities=point_outputs, box_lim=64 + 3)
+        # output_images = self.vitmae_preprocess(list_of_out_img, return_tensors="pt")
         
         # batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
         # images = []
@@ -123,7 +127,6 @@ class SketchGraphsCollator:
             "labels": labels,
             "sketches": sketch_dicts,
             "images": batch_images.pixel_values,
-            "output_images": output_images.pixel_values,
         }
         return batch
 
