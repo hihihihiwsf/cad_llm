@@ -28,13 +28,13 @@ def get_ray_args():
         help="The number of CPUs to use per GPU"
     )
     parser.add_argument(
-        "--worker_nodes_type",
+        "--worker_node_type",
         type=str,
         default=None,
         help="The type of worker nodes to use. e.g. 'p3.2xlarge'"
     )
     parser.add_argument(
-        "--worker_nodes_life_cycle",
+        "--worker_node_life_cycle",
         type=str,
         default=None,
         help="The life cycle of worker nodes to use. e.g. 'spot' or 'normal'"
