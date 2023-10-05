@@ -60,10 +60,13 @@ def download_model_weights(model_id, model_bucket_uri, model_download_dir):
 
 
 class Llama2Model(pl.LightningModule):
-    def __init__(self, model_id, model_bucket_uri, model_download_dir, model_checkpoint_path, vocab_size, no_grad_ckpt=False, num_training_steps=1000, lr=5e-6, strategy='deepspeed'):
+    def __init__(self, model_name, model_bucket_uri, model_download_dir, 
+                 model_checkpoint_path, vocab_size, no_grad_ckpt=False, 
+                 num_training_steps=1000, lr=5e-6, strategy='deepspeed', batch_size=2, max_length=192,
+                 local_samples_path=None, remote_samples_path=None, val_names=None, tokenizer=None):
         super().__init__()
 
-        self.model_id = model_id
+        self.model_id = model_name
         self.model_bucket_uri = model_bucket_uri
         self.model_download_dir = model_download_dir
         self.model_checkpoint_path = model_checkpoint_path
@@ -72,6 +75,7 @@ class Llama2Model(pl.LightningModule):
         self.num_training_steps = num_training_steps
         self.lr = lr
         self.strategy = strategy
+        self.max_length = max_length
 
         download_model_weights(self.model_id, self.model_bucket_uri, self.model_download_dir)
 
@@ -127,6 +131,7 @@ class Llama2Model(pl.LightningModule):
     def get_tokenizer(model_checkpoint_path):
         # Context for legacy=True: https://github.com/huggingface/transformers/issues/25176
         tokenizer = AutoTokenizer.from_pretrained(model_checkpoint_path, legacy=False)
+        print('HERE IS THE TOKENIZER::::::', tokenizer)
         tokenizer.pad_token = tokenizer.eos_token
         # tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
 

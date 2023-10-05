@@ -15,6 +15,7 @@ from args.ray_args import get_ray_args
 from cad_tokenizers.cad_tokenizers_utils import get_tokenizer_cls
 from dataset.byt5_datamodule import Byt5DataModule
 from models.byt5_v2 import ByT5v2
+from models.llama2 import Llama2Model, get_model_bucket_uri, get_model_download_dir, get_model_checkpoint_and_refs_dir, download_model_weights
 
 
 def train_on_ray_cluster():
@@ -42,8 +43,20 @@ def train_on_ray_cluster():
         "extra_val_percentages": extra_val_percentages,
     }
 
-    model_class = ByT5v2
-    tokenizer = tokenizer_cls.from_pretrained(args.model_name)
+    model_class = Llama2Model
+    if "llama" in args.model_name.lower():
+        model_id = args.model_name
+        model_bucket_uri = get_model_bucket_uri(model_id)
+        model_download_dir = get_model_download_dir(model_id)
+        model_checkpoint_path, _ = get_model_checkpoint_and_refs_dir(model_id)
+
+        download_model_weights(model_id, model_bucket_uri, model_download_dir)
+
+        model_config = Llama2Model.get_config(model_checkpoint_path)
+        tokenizer = Llama2Model.get_tokenizer(model_checkpoint_path)
+        print('TOKEEEEEENENNNNNIIIIIZZZER', tokenizer)
+        
+    tokenizer = tokenizer_cls.from_pretrained("t5-small", token="")
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
     remote_samples_path = f"{args.s3_results_uri}/{exp_name}/samples"
     model_class_kwargs = {
@@ -118,8 +131,8 @@ def train_on_ray_cluster():
         local_results_dir=args.local_results_dir,
         max_failures=args.max_failures,
         ckpt_path=args.ckpt_path,
-        worker_node_type=args.worker_node_type,
-        worker_node_life_cycle=args.worker_node_life_cycle,
+        worker_nodes_type=args.worker_node_type,
+        worker_nodes_life_cycle=args.worker_node_life_cycle,
         comet_experiment_kwargs=comet_experiment_kwargs
     )
 
