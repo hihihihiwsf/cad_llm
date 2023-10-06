@@ -23,6 +23,20 @@ def train_on_ray_cluster():
 
     exp_name = args.exp_name + "_" + time.strftime("%Y%m%d-%H%M%S")
 
+    model_class = Llama2Model
+    # if "llama" in args.model_name.lower():
+    model_id = args.model_name
+    model_bucket_uri = get_model_bucket_uri(model_id)
+    model_download_dir = get_model_download_dir(model_id)
+    model_checkpoint_path, _ = get_model_checkpoint_and_refs_dir(model_id)
+
+    download_model_weights(model_id, model_bucket_uri, model_download_dir)
+
+    model_config = Llama2Model.get_config(model_checkpoint_path)
+    tokenizer = Llama2Model.get_tokenizer(model_checkpoint_path)
+    print('TOKEEEEEENENNNNNIIIIIZZZER'*100, tokenizer)
+    
+    
     tokenizer_cls = get_tokenizer_cls(args.tokenizer_name)
 
     extra_val_percentages = [20, 40, 60, 80] if args.add_extra_val_sets else []
@@ -43,20 +57,9 @@ def train_on_ray_cluster():
         "extra_val_percentages": extra_val_percentages,
     }
 
-    model_class = Llama2Model
-    if "llama" in args.model_name.lower():
-        model_id = args.model_name
-        model_bucket_uri = get_model_bucket_uri(model_id)
-        model_download_dir = get_model_download_dir(model_id)
-        model_checkpoint_path, _ = get_model_checkpoint_and_refs_dir(model_id)
 
-        download_model_weights(model_id, model_bucket_uri, model_download_dir)
-
-        model_config = Llama2Model.get_config(model_checkpoint_path)
-        tokenizer = Llama2Model.get_tokenizer(model_checkpoint_path)
-        print('TOKEEEEEENENNNNNIIIIIZZZER', tokenizer)
         
-    tokenizer = tokenizer_cls.from_pretrained("t5-small", token="")
+    tokenizer = tokenizer_cls.from_pretrained(args.model_name)
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
     remote_samples_path = f"{args.s3_results_uri}/{exp_name}/samples"
     model_class_kwargs = {
@@ -68,6 +71,10 @@ def train_on_ray_cluster():
         "remote_samples_path": remote_samples_path,
         "tokenizer": tokenizer,
         "val_names": val_names,
+        "model_bucket_uri": model_bucket_uri,
+        "model_download_dir": model_download_dir,
+        "model_checkpoint_path": model_checkpoint_path,
+        "vocab_size": len(tokenizer),
     }
 
     strategy_kwargs = {}
@@ -131,8 +138,8 @@ def train_on_ray_cluster():
         local_results_dir=args.local_results_dir,
         max_failures=args.max_failures,
         ckpt_path=args.ckpt_path,
-        worker_nodes_type=args.worker_node_type,
-        worker_nodes_life_cycle=args.worker_node_life_cycle,
+        worker_node_type=args.worker_node_type,
+        worker_node_life_cycle=args.worker_node_life_cycle,
         comet_experiment_kwargs=comet_experiment_kwargs
     )
 

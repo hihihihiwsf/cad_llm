@@ -131,7 +131,6 @@ class Llama2Model(pl.LightningModule):
     def get_tokenizer(model_checkpoint_path):
         # Context for legacy=True: https://github.com/huggingface/transformers/issues/25176
         tokenizer = AutoTokenizer.from_pretrained(model_checkpoint_path, legacy=False)
-        print('HERE IS THE TOKENIZER::::::', tokenizer)
         tokenizer.pad_token = tokenizer.eos_token
         # tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
 

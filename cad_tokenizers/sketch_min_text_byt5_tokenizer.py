@@ -1,6 +1,6 @@
 import json
 
-from transformers import ByT5Tokenizer
+from transformers import ByT5Tokenizer, LlamaTokenizerFast
 
 from preprocess.preprocess_utils import point_entity_from_flat_points
 
@@ -67,7 +67,7 @@ class SketchMinTextTokenizerBase(SketchTokenizerBase):
         return entity
 
 
-class SketchMinTextByt5Tokenizer(ByT5Tokenizer, SketchMinTextTokenizerBase):
+class SketchMinTextByt5Tokenizer(LlamaTokenizerFast, SketchMinTextTokenizerBase):
     """
     Usage: SketchMinTextByt5Tokenizer.from_pretrained(model_name)
     """
