@@ -16,7 +16,7 @@ from cad_tokenizers.cad_tokenizers_utils import get_tokenizer_cls
 from dataset.byt5_datamodule import Byt5DataModule
 from models.byt5_v2 import ByT5v2
 from models.llama2 import Llama2Model, get_model_bucket_uri, get_model_download_dir, get_model_checkpoint_and_refs_dir, download_model_weights
-
+import json
 
 def train_on_ray_cluster():
     args = get_ray_args()
@@ -84,7 +84,13 @@ def train_on_ray_cluster():
         if args.cpu_offload:
             strategy_kwargs["cpu_offload"] = True
     elif args.strategy == "deepspeed":
-        strategy_kwargs["stage"] = 2
+        args['ds_config'] = "deepspeed_configs/zero_3_llama_2_7b.json"
+        deepspeed_config_path = str(Path(__file__).resolve().parent / 'llama2_model' / args['ds_config'])
+        with open(deepspeed_config_path, 'r') as f:
+            deepspeed_config = json.loads(f.read())
+
+        strategy_kwargs = {"config": deepspeed_config}
+        # strategy_kwargs["stage"] = 2
 
     # Configure lightning trainer kwargs
     loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]  # Comet is integrated into RayLightningExperiment
