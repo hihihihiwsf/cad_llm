@@ -84,8 +84,7 @@ def train_on_ray_cluster():
         if args.cpu_offload:
             strategy_kwargs["cpu_offload"] = True
     elif args.strategy == "deepspeed":
-        args['ds_config'] = "deepspeed_configs/zero_3_llama_2_7b.json"
-        deepspeed_config_path = str(Path(__file__).resolve().parent / 'llama2_model' / args['ds_config'])
+        deepspeed_config_path = str(Path(__file__).resolve().parent / 'deepspeed_configs/zero_3_llama_2_7b.json')
         with open(deepspeed_config_path, 'r') as f:
             deepspeed_config = json.loads(f.read())
 
