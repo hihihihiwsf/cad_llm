@@ -118,12 +118,12 @@ def train_on_ray_cluster():
         "log_git_patch": False
     }
 
-    print('WE ARE BEFORE MODULE' * 100)
-    asd = Byt5DataModule(**data_class_kwargs)
-    dm = asd.get_dataset()
-    print('DS SIZE' * 20)
-    print(len(dm['train']))
-    print('WE ARE AFTER MODULE' * 100)
+    # print('WE ARE BEFORE MODULE' * 100)
+    # asd = Byt5DataModule(**data_class_kwargs)
+    # dm = asd.get_dataset()
+    # print('DS SIZE' * 20)
+    # print(len(dm['train']))
+    # print('WE ARE AFTER MODULE' * 100)
     
     # Define an Experiment
     experiment = RayLightningExperiment(
