@@ -34,6 +34,7 @@ def train_on_ray_cluster():
 
     model_config = Llama2Model.get_config(model_checkpoint_path)
     tokenizer = Llama2Model.get_tokenizer(model_checkpoint_path)
+    tokenizer.pad_token = tokenizer.eos_token
     print('TOKEEEEEENENNNNNIIIIIZZZER'*100, tokenizer)
     
     
@@ -60,6 +61,7 @@ def train_on_ray_cluster():
 
         
     tokenizer = tokenizer_cls.from_pretrained(args.model_name)
+    tokenizer.pad_token = tokenizer.eos_token
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
     remote_samples_path = f"{args.s3_results_uri}/{exp_name}/samples"
     model_class_kwargs = {
