@@ -38,6 +38,7 @@ class ByT5v2(pl.LightningModule):
         self.batch_size = batch_size  # to fix logging warning
         self.max_length = max_length
         self.tokenizer = tokenizer
+        self.tokenizer.pad_token = tokenizer.eos_token
         self.local_samples_path = local_samples_path
         self.remote_samples_path = remote_samples_path
         self.val_names = val_names
