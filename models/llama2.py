@@ -93,7 +93,7 @@ class Llama2Model(pl.LightningModule):
             self.model.gradient_checkpointing_enable()
 
     def training_step(self, batch):
-        outputs = self.model(**batch)
+        outputs = self.model(**self._get_model_batch(batch))
         loss = outputs.loss
 
         self.log("train_loss", loss, prog_bar=True, on_epoch=True)
@@ -101,7 +101,7 @@ class Llama2Model(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
-        outputs = self.model(**val_batch)
+        outputs = self.model(**self._get_model_batch(val_batch))
         loss = outputs.loss
         self.log("val_loss", loss, prog_bar=True, on_epoch=True, sync_dist=True)
 
@@ -135,3 +135,7 @@ class Llama2Model(pl.LightningModule):
         # tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
 
         return tokenizer
+
+    def _get_model_batch(self, batch):
+        cols = ["input_ids", "attention_mask", "labels"]
+        return {col: val for col, val in batch.items() if col in cols}
