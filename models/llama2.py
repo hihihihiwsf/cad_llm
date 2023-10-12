@@ -104,7 +104,6 @@ class Llama2Model(pl.LightningModule):
     def validation_step(self, val_batch, batch_idx):
         print("val batch train"*100, val_batch['input_ids'].shape, val_batch['labels'].shape)
         outputs = self.model(**self._get_model_batch(val_batch))
-        return 2
         # loss = outputs.loss
         # self.log("val_loss", loss, prog_bar=True, on_epoch=True, sync_dist=True)
 
