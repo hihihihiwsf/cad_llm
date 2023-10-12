@@ -1,11 +1,29 @@
 class SketchStringsCollator:
-    def __init__(self, tokenizer, max_length=None, additional_cols=False):
+    def __init__(self, tokenizer, max_length=None, additional_cols=False, model_name=None):
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.additional_cols = additional_cols
+        self.model_name = model_name
 
     def tokenize(self, strings):
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+    
+
+    def llama_collate_fn(self,batch, tokenizer, max_length):
+        SPECIAL_TOKENS = ["<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+        input_sequences = [f"<START_Q>{item['input_text']}<END_Q>"
+                        f"<START_A>{item['output_text']}<END_A>" 
+                        for item in batch]
+        out_batch = tokenizer(
+            input_sequences,
+            padding="max_length",
+            max_length=max_length,
+            truncation=True,
+            return_tensors="pt",
+        )
+        out_batch["labels"] = out_batch["input_ids"].clone()
+
+        return out_batch
 
     def __call__(self, examples):
         # Collate input_text and output_text columns
@@ -13,6 +31,9 @@ class SketchStringsCollator:
         output_text = [example['output_text'] for example in examples]
         name = [example['name'] for example in examples]
 
+        if 'llama' in self.model_name.lower():
+            return self.llama_collate_fn(examples, self.tokenizer, self.max_length)
+        
         # Encode input and output
         tokenized_input = self.tokenize(input_text)
 

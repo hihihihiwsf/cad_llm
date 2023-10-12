@@ -17,6 +17,23 @@ from dataset.sketch_strings_collator import SketchStringsCollator
 
 from functools import partial
 
+SPECIAL_TOKENS = ["<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+
+
+def collate_fn(batch, tokenizer, max_length):
+    input_sequences = [f"<START_Q>{item['question']}<END_Q>"
+                       f"<START_A>{item['answer']}<END_A>" 
+                       for item in batch]
+    out_batch = tokenizer(
+        input_sequences,
+        padding="max_length",
+        max_length=max_length,
+        truncation=True,
+        return_tensors="pt",
+    )
+    out_batch["labels"] = out_batch["input_ids"].clone()
+
+    return out_batch
 
 class Byt5DataModule(pl.LightningDataModule):
     def __init__(self, model_name, batch_size, max_length, min_ratio, max_ratio, s3_data_uri, dataset_path,
@@ -49,7 +66,7 @@ class Byt5DataModule(pl.LightningDataModule):
         self.tokenizer = self.tokenizer_cls.from_pretrained(self.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.max_length,
-                                              additional_cols=["entities", "input_entities", "output_entities"])
+                                              additional_cols=["entities", "input_entities", "output_entities"], model_name=self.model_name)
         self.ds = self.get_dataset()
 
     def get_dataset(self):
