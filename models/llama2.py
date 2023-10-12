@@ -141,5 +141,5 @@ class Llama2Model(pl.LightningModule):
         return tokenizer
 
     def _get_model_batch(self, batch):
-        cols = ["input_ids", "attention_mask"]
+        cols = ["input_ids", "attention_mask", "labels"]
         return {col: val for col, val in batch.items() if col in cols}
