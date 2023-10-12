@@ -61,8 +61,8 @@ def download_model_weights(model_id, model_bucket_uri, model_download_dir):
 
 class Llama2Model(pl.LightningModule):
     def __init__(self, model_name, model_bucket_uri, model_download_dir, 
-                 model_checkpoint_path, vocab_size, no_grad_ckpt=False, 
-                 num_training_steps=1000, lr=5e-6, strategy='deepspeed', batch_size=2, max_length=192,
+                 model_checkpoint_path, batch_size, vocab_size, no_grad_ckpt=False, 
+                 num_training_steps=1000, lr=5e-6, strategy='deepspeed', max_length=192,
                  local_samples_path=None, remote_samples_path=None, val_names=None, tokenizer=None):
         super().__init__()
 
