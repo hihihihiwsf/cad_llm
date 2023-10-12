@@ -97,7 +97,8 @@ class Llama2Model(pl.LightningModule):
         outputs = self.model(**self._get_model_batch(batch))
         loss = outputs.loss
 
-        self.log("train_loss", loss, prog_bar=True, on_epoch=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=False, logger=True,
+                 batch_size=self.batch_size)
 
         return loss
 
