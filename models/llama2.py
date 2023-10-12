@@ -76,6 +76,7 @@ class Llama2Model(pl.LightningModule):
         self.lr = lr
         self.strategy = strategy
         self.max_length = max_length
+        self.batch_size = batch_size
 
         download_model_weights(self.model_id, self.model_bucket_uri, self.model_download_dir)
 
