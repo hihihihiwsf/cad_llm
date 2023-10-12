@@ -121,7 +121,8 @@ class Llama2Model(pl.LightningModule):
             num_training_steps=self.num_training_steps,
         )
 
-        return [optimizer], [lr_scheduler]
+        # return [optimizer], [lr_scheduler]
+        return torch.optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
     
     @staticmethod
     def get_config(model_checkpoint_path):
