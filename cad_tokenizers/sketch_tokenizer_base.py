@@ -1,7 +1,7 @@
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizerFast
 
 
-class SketchTokenizerBase(PreTrainedTokenizer):
+class SketchTokenizerBase(PreTrainedTokenizerFast):
     """
     Abstract class that use minimal text representation to tokenize sketch entities
     """
