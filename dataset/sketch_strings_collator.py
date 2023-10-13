@@ -10,8 +10,9 @@ class SketchStringsCollator:
     
 
     def llama_collate_fn(self,batch, tokenizer, max_length):
-        SPECIAL_TOKENS = ["<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
-        input_sequences = [f"<START_Q>{item['input_text']}<END_Q>"
+        SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+        input_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Q is the incomplete sketch, and A is the remianing"
+                        f"<START_Q>{item['input_text']}<END_Q>"
                         f"<START_A>{item['output_text']}<END_A>" 
                         for item in batch]
         out_batch = tokenizer(
