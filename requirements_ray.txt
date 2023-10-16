@@ -7,3 +7,4 @@ transformers
 tensorboardX
 matplotlib
 opencv-python
+sentencepiece
