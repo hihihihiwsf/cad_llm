@@ -67,7 +67,7 @@ class SketchMinTextTokenizerBase(SketchTokenizerBase):
         return entity
 
 
-class SketchMinTextByt5Tokenizer(CodeLlamaTokenizer, SketchMinTextTokenizerBase):
+class SketchMinTextByt5Tokenizer(LlamaTokenizerFast, SketchMinTextTokenizerBase):
     """
     Usage: SketchMinTextByt5Tokenizer.from_pretrained(model_name)
     """

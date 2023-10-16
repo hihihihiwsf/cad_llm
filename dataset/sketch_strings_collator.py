@@ -10,18 +10,18 @@ class SketchStringsCollator:
     
 
     def llama_collate_fn(self,batch, tokenizer, max_length):
-        # SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
-        # input_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Q is the incomplete sketch, and A is the remaining sketch."
-        #                 f"<START_Q>{item['input_text']}<END_Q>"
-        #                 f"<START_A>{item['output_text']}<END_A>" 
-        #                 for item in batch]
-        
-        input_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Complete the sketch given the input sketch."
-                f"{item['input_text']}"
-                " <FILL_ME> "
-                f"<START_A>{item['output_text']}<END_A>"
-                for item in batch]
-        print(input_sequences[0])
+        SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+        input_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Q is the incomplete sketch, and A is the remaining sketch."
+                        f"<START_Q>{item['input_text']}<END_Q>"
+                        f"<START_A>{item['output_text']}<END_A>" 
+                        for item in batch]
+        tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
+        # input_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Complete the sketch given the input sketch."
+        #         f"{item['input_text']}"
+        #         " <FILL_ME> "
+        #         f"<START_A>{item['output_text']}<END_A>"
+        #         for item in batch]
+        # print(input_sequences[0])
         out_batch = tokenizer(
             input_sequences,
             padding=True,
