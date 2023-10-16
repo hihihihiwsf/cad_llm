@@ -5,7 +5,7 @@ class SketchStringsCollator:
         self.additional_cols = additional_cols
         self.model_name = model_name
         SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
-        tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
+        # tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
         self.tokenizer = tokenizer
 
     def tokenize(self, strings):
