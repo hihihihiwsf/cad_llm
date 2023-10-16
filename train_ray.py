@@ -62,6 +62,10 @@ def train_on_ray_cluster():
         
     tokenizer = tokenizer_cls.from_pretrained(args.model_name)
     tokenizer.pad_token = tokenizer.eos_token
+    SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+    tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
+    
+    
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
     remote_samples_path = f"{args.s3_results_uri}/{exp_name}/samples"
     model_class_kwargs = {

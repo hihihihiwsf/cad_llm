@@ -65,6 +65,9 @@ class Byt5DataModule(pl.LightningDataModule):
     def setup(self, stage):
         self.tokenizer = self.tokenizer_cls.from_pretrained(self.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
+        SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+        self.tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
+        
         self.collator = SketchStringsCollator(tokenizer=self.tokenizer, max_length=self.max_length,
                                               additional_cols=["entities", "input_entities", "output_entities"], model_name=self.model_name)
         self.ds = self.get_dataset()
