@@ -3,6 +3,10 @@ import pytorch_lightning as pl
 import torch
 from pathlib import Path
 import os
+from eval_metrics.top1_full_sketch_metric import Top1FullSketchMetric
+from eval_metrics.top1_entity_metric import Top1EntityMetric
+from eval_metrics.validity_metric import ValidityMetric
+from torch.nn import ModuleDict
 
 from transformers.utils.hub import TRANSFORMERS_CACHE
 from adsk_ailab_ray.tools.aws import aws_s3_sync, aws_s3_cp
@@ -77,6 +81,11 @@ class Llama2Model(pl.LightningModule):
         self.strategy = strategy
         self.max_length = max_length
         self.batch_size = batch_size
+        self.val_names = val_names
+        
+        self.val_name_to_full_sketch_metric = ModuleDict({name: Top1FullSketchMetric() for name in self.val_names})
+        self.val_name_to_top1_entity_metric = ModuleDict({name: Top1EntityMetric() for name in self.val_names})
+        self.val_name_to_validity_metric = ModuleDict({name: ValidityMetric() for name in self.val_names})
 
         download_model_weights(self.model_id, self.model_bucket_uri, self.model_download_dir)
 
@@ -145,7 +154,16 @@ class Llama2Model(pl.LightningModule):
 
         # return [optimizer], [lr_scheduler]
         return torch.optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
-    
+
+    def _update_metrics(self, val_name, batch_pred, batch_true):
+        for pred, true in zip(batch_pred, batch_true):
+            pred = set(tuple(sorted([tuple(p) for p in ent])) for ent in pred if ent)
+            true = set(tuple(sorted([tuple(p) for p in ent])) for ent in true if ent)
+
+            self.val_name_to_full_sketch_metric[val_name].update(pred, true)
+            self.val_name_to_top1_entity_metric[val_name].update(pred, true)
+            self.val_name_to_validity_metric[val_name].update(pred)
+            
     @staticmethod
     def get_config(model_checkpoint_path):
         # Context for legacy=True: https://github.com/huggingface/transformers/issues/25176
