@@ -19,6 +19,11 @@ class SketchStringsCollator:
                         f"<START_A>{item['output_text']}<END_A>" 
                         for item in batch]
         
+        prefix_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Q is the incomplete sketch, and A is the remaining sketch."
+                f"<START_Q>{item['input_text']}<END_Q>"
+                f"<START_A>" 
+                for item in batch]
+        
         # input_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Complete the sketch given the input sketch."
         #         f"{item['input_text']}"
         #         " <FILL_ME> "
@@ -32,7 +37,21 @@ class SketchStringsCollator:
             truncation=True,
             return_tensors="pt",
         )
+        
+        
         out_batch["labels"] = out_batch["input_ids"].clone()
+        
+        generation_batch = tokenizer(
+            prefix_sequences,
+            padding=True,
+            max_length=max_length,
+            truncation=True,
+            return_tensors="pt",
+        )
+        
+        out_batch['generation_input_ids'] = generation_batch['input_ids']
+        out_batch['generation_attention_mask'] = generation_batch['attention_mask']
+        
 
         return out_batch
 
@@ -51,7 +70,7 @@ class SketchStringsCollator:
         tokenized_output = self.tokenize(output_text)
         labels = tokenized_output.input_ids
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
-        labels[labels == self.tokenizer.pad_token_id] = -100
+        # labels[labels == self.tokenizer.pad_token_id] = -100
 
         batch = {
             "input_ids": tokenized_input.input_ids,

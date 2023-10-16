@@ -26,7 +26,7 @@ def collate_fn(batch, tokenizer, max_length):
                        for item in batch]
     out_batch = tokenizer(
         input_sequences,
-        padding="max_length",
+        padding=True,
         max_length=max_length,
         truncation=True,
         return_tensors="pt",
