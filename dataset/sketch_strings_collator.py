@@ -62,24 +62,28 @@ class SketchStringsCollator:
         name = [example['name'] for example in examples]
 
         if 'llama' in self.model_name.lower():
-            return self.llama_collate_fn(examples, self.tokenizer, self.max_length)
+            batch = self.llama_collate_fn(examples, self.tokenizer, self.max_length)
+            batch["input_text"]: input_text
+            batch["output_text"]: output_text
+            batch["name"]: name
         
-        # Encode input and output
-        tokenized_input = self.tokenize(input_text)
+        else:
+            # Encode input and output
+            tokenized_input = self.tokenize(input_text)
 
-        tokenized_output = self.tokenize(output_text)
-        labels = tokenized_output.input_ids
-        # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
-        # labels[labels == self.tokenizer.pad_token_id] = -100
+            tokenized_output = self.tokenize(output_text)
+            labels = tokenized_output.input_ids
+            # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
+            # labels[labels == self.tokenizer.pad_token_id] = -100
 
-        batch = {
-            "input_ids": tokenized_input.input_ids,
-            "attention_mask": tokenized_input.attention_mask,
-            "labels": labels,
-            "input_text": input_text,
-            "output_text": output_text,
-            "name": name,
-        }
+            batch = {
+                "input_ids": tokenized_input.input_ids,
+                "attention_mask": tokenized_input.attention_mask,
+                "labels": labels,
+                "input_text": input_text,
+                "output_text": output_text,
+                "name": name,
+            }
 
         if self.additional_cols:
             for col in self.additional_cols:
