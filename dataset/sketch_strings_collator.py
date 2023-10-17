@@ -49,11 +49,17 @@ class SketchStringsCollator:
             return_tensors="pt",
         )
         
-        out_batch['generation_input_ids'] = generation_batch['input_ids']
-        out_batch['generation_attention_mask'] = generation_batch['attention_mask']
+        
+        res = {
+            "input_ids": out_batch["input_ids"],
+            "attention_mask": out_batch["attention_mask"],
+            "labels": out_batch["input_ids"],
+            "generation_input_ids": generation_batch['input_ids'],
+            "generation_attention_mask": generation_batch['attention_mask'],
+        }
         
 
-        return out_batch
+        return res
 
     def __call__(self, examples):
         # Collate input_text and output_text columns
@@ -63,11 +69,9 @@ class SketchStringsCollator:
 
         if 'llama' in self.model_name.lower():
             batch = self.llama_collate_fn(examples, self.tokenizer, self.max_length)
-            print("BATCH"*100)
-            print(type(batch))
-            # batch["input_text"] = input_text
-            # batch["output_text"] = output_text
-            # batch["name"] = name
+            batch["input_text"] = input_text
+            batch["output_text"] = output_text
+            batch["name"] = name
             # return batch
         
         else:
