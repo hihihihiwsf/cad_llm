@@ -63,9 +63,9 @@ class SketchStringsCollator:
 
         if 'llama' in self.model_name.lower():
             batch = self.llama_collate_fn(examples, self.tokenizer, self.max_length)
-            batch["input_text"] = input_text
-            batch["output_text"] = output_text
-            batch["name"] = name
+            # batch["input_text"] = input_text
+            # batch["output_text"] = output_text
+            # batch["name"] = name
             return batch
         
         else:
