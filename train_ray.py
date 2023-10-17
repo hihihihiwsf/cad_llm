@@ -127,8 +127,8 @@ def train_on_ray_cluster():
     if args.dry_run:
         result = experiment.fit_dry_run()
     else:
-        result = experiment.run()
-        
+        result = experiment.fit()
+
     print("Validation Loss: ", result.metrics["val_loss"])
 
 
