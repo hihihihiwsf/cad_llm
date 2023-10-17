@@ -131,14 +131,19 @@ class Llama2Model(pl.LightningModule):
 
         self._update_metrics(val_name, batch_pred, batch_true)
 
+        for val_name in self.val_names:
+            self.log_metric(name=f"{val_name}_top1_full_sketch", metric=self.val_name_to_full_sketch_metric[val_name])
+            self.log_metric(name=f"{val_name}_top1_entity", metric=self.val_name_to_top1_entity_metric[val_name])
+            self.log_metric(name=f"{val_name}_validity", metric=self.val_name_to_validity_metric[val_name])
+            
         # Log all samples for later metric extraction
-        for i in range(len(batch_pred)):
-            self.sample_infos[val_name].append({
-                "true": batch_true[i],
-                "pred": batch_pred[i],
-                "prompt": val_batch["input_entities"][i],
-                "name": val_batch["name"][i],
-            })
+        # for i in range(len(batch_pred)):
+        #     self.sample_infos[val_name].append({
+        #         "true": batch_true[i],
+        #         "pred": batch_pred[i],
+        #         "prompt": val_batch["input_entities"][i],
+        #         "name": val_batch["name"][i],
+        #     })
 
     def configure_optimizers(self):
             
@@ -164,7 +169,11 @@ class Llama2Model(pl.LightningModule):
             self.val_name_to_full_sketch_metric[val_name].update(pred, true)
             self.val_name_to_top1_entity_metric[val_name].update(pred, true)
             self.val_name_to_validity_metric[val_name].update(pred)
-            
+
+    def log_metric(self, name, metric):
+        self.log(name, metric.compute(), on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 add_dataloader_idx=False)
+        
     @staticmethod
     def get_config(model_checkpoint_path):
         # Context for legacy=True: https://github.com/huggingface/transformers/issues/25176
