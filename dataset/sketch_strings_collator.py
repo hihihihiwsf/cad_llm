@@ -66,7 +66,7 @@ class SketchStringsCollator:
             # batch["input_text"] = input_text
             # batch["output_text"] = output_text
             # batch["name"] = name
-            return batch
+            # return batch
         
         else:
             # Encode input and output
