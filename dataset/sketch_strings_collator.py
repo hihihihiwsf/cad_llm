@@ -61,7 +61,7 @@ class SketchStringsCollator:
         output_text = [example['output_text'] for example in examples]
         name = [example['name'] for example in examples]
 
-        if 'llama' in self.model_name.lower():
+        if 'blahblah' in self.model_name.lower():
             batch = self.llama_collate_fn(examples, self.tokenizer, self.max_length)
             batch["input_text"] = input_text
             batch["output_text"] = output_text
@@ -79,7 +79,7 @@ class SketchStringsCollator:
             batch = {
                 "input_ids": tokenized_input.input_ids,
                 "attention_mask": tokenized_input.attention_mask,
-                "labels": labels,
+                "labels": tokenized_input.input_ids,
                 "input_text": input_text,
                 "output_text": output_text,
                 "name": name,
