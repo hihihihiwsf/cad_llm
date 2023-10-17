@@ -124,21 +124,21 @@ class Llama2Model(pl.LightningModule):
         # Generate samples for all validation sets
         # Recursively unwrap the model from potential distributed training containers
         # generate_func = unwrap_model(self.model).generate
-        # pred_tokens = self.model.generate(input_ids=val_batch["generation_input_ids"], attention_mask=val_batch["generation_attention_mask"],
-        #                             do_sample=False, max_new_tokens=self.max_length+10)
-        # batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
-        # batch_true = val_batch["output_entities"]
+        pred_tokens = self.model.generate(input_ids=val_batch["generation_input_ids"], attention_mask=val_batch["generation_attention_mask"],
+                                    do_sample=False, max_new_tokens=self.max_length+10)
+        batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
+        batch_true = val_batch["output_entities"]
 
-        # self._update_metrics(val_name, batch_pred, batch_true)
+        self._update_metrics(val_name, batch_pred, batch_true)
 
-        # # Log all samples for later metric extraction
-        # for i in range(len(batch_pred)):
-        #     self.sample_infos[val_name].append({
-        #         "true": batch_true[i],
-        #         "pred": batch_pred[i],
-        #         "prompt": val_batch["input_entities"][i],
-        #         "name": val_batch["name"][i],
-        #     })
+        # Log all samples for later metric extraction
+        for i in range(len(batch_pred)):
+            self.sample_infos[val_name].append({
+                "true": batch_true[i],
+                "pred": batch_pred[i],
+                "prompt": val_batch["input_entities"][i],
+                "name": val_batch["name"][i],
+            })
 
     def configure_optimizers(self):
             
