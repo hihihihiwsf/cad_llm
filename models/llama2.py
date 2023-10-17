@@ -127,6 +127,7 @@ class Llama2Model(pl.LightningModule):
         pred_tokens = self.model.generate(input_ids=val_batch["generation_input_ids"], attention_mask=val_batch["generation_attention_mask"],
                                     do_sample=False, max_new_tokens=int(self.max_length/2))
         batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
+        print(batch_pred[0])
         batch_true = val_batch["output_entities"]
 
         self._update_metrics(val_name, batch_pred, batch_true)
