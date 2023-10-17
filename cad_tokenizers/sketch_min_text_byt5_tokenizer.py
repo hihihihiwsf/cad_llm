@@ -48,7 +48,7 @@ class SketchMinTextTokenizerBase(SketchTokenizerBase):
 
         except Exception as e:
             if safe:
-                print(f"Warning: ignoring parsing failure for {text}: {e}")
+                # print(f"Warning: ignoring parsing failure for {text}: {e}")
                 entities = []
             else:
                 raise e
