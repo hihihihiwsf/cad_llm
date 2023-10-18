@@ -65,11 +65,10 @@ class SketchGraphsDataset(Dataset):
 
         # Convert input_list_with_mask to a single string
         constraints_with_mask_str = ''.join(constraints_with_mask)
-        
         input_text = "".join([ent for i, ent in enumerate(entities)])
-        sketch_dict['input_text'] = input_text 
+        
+        sketch_dict['input_text'] = input_text+'<sep>'+constraints_with_mask_str +'<sep>'
         sketch_dict['output_text'] = constraints
-        sketch_dict['constraints_mask'] = constraints_with_mask_str
         
         ent_string = sketch_dict[self.entities_col]
         ent_string = "".join([ent for i, ent in enumerate(ent_string)])
@@ -92,12 +91,6 @@ class SketchGraphsDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
-def get_positions(tokenized_list, target_value=31):
-    """
-    Return positions of all occurrences of target_value in tokenized_list.
-    """
-    return [i for i, value in enumerate(tokenized_list) if value == target_value]
-
 
 class SketchGraphsCollator:
     def __init__(self, tokenizer, max_length=None, args=None):
@@ -114,11 +107,9 @@ class SketchGraphsCollator:
     def __call__(self, sketch_dicts):
         input_strings = [sketch['input_text'] for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
-        constraint_masks = [sketch['constraints_mask'] for sketch in sketch_dicts]
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
 
-        
         labels = tokenized_output.input_ids
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
@@ -127,21 +118,6 @@ class SketchGraphsCollator:
 
         list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
-        
-        # point_outputs = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts]
-
-        # list_of_out_img = visualize_sample_cv(point_entities=point_outputs, box_lim=64 + 3)
-        # output_images = self.vitmae_preprocess(list_of_out_img, return_tensors="pt")
-        
-        # batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
-        # images = []
-        # for img in list_of_img:
-        #     images.append(self.clip_preprocess(img))
-        #     batch_images = torch.tensor(np.stack(images))
-
-        # for im in list_of_img:
-        #     im.close()
-        
               
         batch = {
             "input_ids": tokenized_input.input_ids,

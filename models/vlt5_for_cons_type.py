@@ -291,8 +291,6 @@ class ByT5Model(pl.LightningModule):
             sequence_output = sequence_output.to(self.lm_head.weight.device)
 
         if self.model.config.tie_word_embeddings:
-            # Rescale output before projecting on vocab
-            # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/transformer.py#L586
             sequence_output = sequence_output * (self.model.model_dim**-0.5)
 
         lm_logits = self.model.lm_head(sequence_output)
@@ -469,20 +467,7 @@ class ByT5Model(pl.LightningModule):
         return
         
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
-        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())+list(self.vision_projection.parameters())
-        # # optimizer = Adafactor(
-        #         params,
-        #         lr=None,
-        #         eps=(1e-30, 1e-3),
-        #         clip_threshold=1.0,
-        #         decay_rate=-0.8,
-        #         beta1=None,
-        #         weight_decay=0.0,
-        #         relative_step=True, #
-        #         scale_parameter=True, #
-        #         warmup_init=True, #
-        #     )
+
         optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer

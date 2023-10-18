@@ -140,15 +140,19 @@ def filter_main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tok
     start_time = time.time()
 
     split_to_sketches = {}
+    list_cons_len = {}
     for sg_file in sg_files:
         split_name = get_split_name(sg_file)
         filter_filenames = split_to_filenames[split_name]
         sketches = convert_split(file=sg_file, split_name=split_name, filter_filenames=filter_filenames,
                                  limit=limit, quantize_bits=quantize_bits, new_tokens=new_tokens)
         split_to_sketches[split_name] = sketches
-
+        list_cons_len[split_name] = count_constraint_length(sketches)
+        
     split_to_sketches = deduplicate_splits(split_to_sketches)
     import pdb; pdb.set_trace()
+    draw_list_leng(list_cons_len['train'], 'train')
+    
     save_splits(output_dir, split_to_sketches)
 
     print(f"Processing Time: {time.time() - start_time} secs")
@@ -157,7 +161,22 @@ def main(sg_file, output_dir, limit, quantize_bits, new_tokens, split_name):
     sketches = convert_split(file=sg_file, split_name=split_name, 
                                 limit=limit, quantize_bits=quantize_bits, new_tokens=new_tokens)
     
+def count_constraint_length(sketch):
+    list_cons_length = []
+    for each_s in tqdm(sketch):
+        len_c = each_s['constraint_length']
+        list_cons_length.append(len_c)
+    return list_cons_length
 
+import matplotlib.pyplot as plt
+def draw_list_leng(data, split):
+    plt.figure(figsize=(10,6))
+    plt.hist(data, bins=50, edgecolor='black')  # you can change the number of bins as required
+    plt.title('Distribution of Numbers')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    plt.savefig(f'{split}_constraints_length.png')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

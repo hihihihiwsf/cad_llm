@@ -56,7 +56,7 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     vertices = sketch_dict["vertices"]
     curves = sketch_dict["curves"]
     constraints = sketch_dict['constraints']
-    
+    c_leng = sketch_dict['constraint_length']
    
     # quantize vertices
     vertices = normalize_and_quantize_vertices(vertices=vertices, n_bits=quantize_bits)
@@ -113,7 +113,7 @@ def preprocess_sketch(sketch_dict, quantize_bits, new_tokens=False):
     indexed_constraints = ";".join([",".join(['e' + str(i) for i in item[1:]]+[str(item[0])]) for item in sorted_constraints]) + ";"
     sorted_constraints_string = ['1'+convert_constraint_string(cons, sorted_entities, new_tokens) for cons in sorted_constraints]
         
-    return dict(name=name, entities = entities_string, indexed_entities=indexed_entities, user_ordered_entities=user_ordered_entities_string, constraints = indexed_constraints, constraints_string=sorted_constraints_string)
+    return dict(name=name, entities = entities_string, indexed_entities=indexed_entities, user_ordered_entities=user_ordered_entities_string, constraints = indexed_constraints, constraints_string=sorted_constraints_string, constraint_length=c_leng)
 
 
 def get_entities_string(entities, new_tokens):

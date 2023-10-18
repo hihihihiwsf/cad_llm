@@ -131,6 +131,7 @@ class SketchSG(SketchBase):
                 return None
 
         constraints_param_len = [1,2]
+        length=0
         for cons in self.sketch.constraints.values():
             constraint = []
             
@@ -157,13 +158,13 @@ class SketchSG(SketchBase):
             if len(_param)>0:
                 lst = len(_param)
                 if lst not in constraints_param_len:
-                    
                     print(lst)
+                length += lst+1
                 constraint.extend(_param)
                 constraints.append(constraint)
              
         vertices = np.array([(pt.x, pt.y) for pt in self.point_map.values()])
-        return dict(name=self.sketch_name, vertices=vertices, curves=curves, constraints=constraints)
+        return dict(name=self.sketch_name, vertices=vertices, curves=curves, constraints=constraints, constraint_length=length)
 
     def convert_line(self, line: Line):
         """Convert a single line"""

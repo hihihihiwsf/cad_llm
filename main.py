@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset.sg_dataset_for_constraint import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models import conditional_vl_align, conditional_vision_only, vlt5, vlt5_v2_tri
+from models import conditional_vl_align, conditional_vision_only, vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -65,7 +65,7 @@ def main():
     elif args.arch == "conditional_vl_align":
         architecture = conditional_vl_align
     
-    architecture = vlt5_v2_tri
+    architecture = vlt5_for_cons_type
     if not args.untrained_model:
         model = architecture.ByT5Model(args=args, vit_mae=None, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
@@ -115,7 +115,7 @@ def main():
         
         print("Start training")
         trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt')
-        trainer.test(model, dataloaders=sketchdata.test_dataloader(), ckpt_path='best')
+        trainer.test(model, dataloaders=sketchdata.test_dataloader())
        
     else:
         # loading the model from exp_name/best.ckpt
@@ -125,7 +125,7 @@ def main():
         #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         #ckpt_path = '/home/ubuntu/sifan/results/conditional_vl_align/best.ckpt'
         #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-precise-image-conditional-vision-only-09-20-23-1129/checkpoints/model/precise_image_conditional_vision_only/best.ckpt'
-        ckpt_path = '/home/ubuntu/sifan/results/test_constraint_vlt5/best.ckpt'
+        ckpt_path = '/home/ubuntu/sifan/results/train_constraint_vlt5_maxlen_197/best.ckpt' #/home/ubuntu/sifan/results/test_constraint_vlt5/best.ckpt'
         trainer.test(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
 
 
