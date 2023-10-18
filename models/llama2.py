@@ -128,6 +128,7 @@ class Llama2Model(pl.LightningModule):
                                     do_sample=False, max_new_tokens=int(self.max_length/2))
         batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
         print(pred_tokens)
+        import pdb; pdb.set_trace()
         batch_true = val_batch["output_entities"]
 
         self._update_metrics(val_name, batch_pred, batch_true)
