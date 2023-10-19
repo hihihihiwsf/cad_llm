@@ -8,6 +8,8 @@ def calculate_f1(labels, samples):
     """
     f1 = []
     eps = 1e-6
+    if all(isinstance(sublist, list) and not sublist for sublist in samples):
+        return 0,0,0
     for label_entities, sample_entities in zip(labels, samples):
         if not sample_entities:
             continue

@@ -51,6 +51,9 @@ def main():
     # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
+    special_tokens_dict = {'additional_special_tokens':["e" + str(i) for i in range(0, 31)]}
+    tokenizer.add_special_tokens(special_tokens_dict)
+    
 
     print("Loading data...")
     sketchdata = SketchDataModule(tokenizer, args)
@@ -67,7 +70,7 @@ def main():
     
     architecture = vlt5_for_cons_type
     if not args.untrained_model:
-        model = architecture.ByT5Model(args=args, vit_mae=None, num_train_steps=total_train_steps)
+        model = architecture.ByT5Model(args=args, vit_mae=None, tokenizer=tokenizer, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
     else:
         print("train_mae", args.untrained_model)

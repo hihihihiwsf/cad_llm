@@ -10,6 +10,27 @@ import torch
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 import pytorch_lightning as pl
+import enum
+
+class Token(enum.IntEnum):
+    """Enumeration indicating the non-parameter value tokens of ConstraintModel.
+
+    At the moment, only categorical constraints are considered.
+    """
+
+    Coincident = 65
+    Concentric = 66
+    Equal = 67
+    Fix = 68
+    Horizontal = 69
+    Midpoint = 70
+    Normal = 71
+    Offset = 72
+    Parallel = 73
+    Perpendicular = 74
+    Quadrant = 75
+    Tangent = 76
+    Vertical = 77
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
@@ -67,7 +88,9 @@ class SketchGraphsDataset(Dataset):
         constraints_with_mask_str = ''.join(constraints_with_mask)
         
         input_text = "".join([ent for i, ent in enumerate(entities)])
-        sketch_dict['input_text'] = input_text 
+        type_token = np.arange(len(Token))+65
+        type_token_string = ','.join(map(str,type_token))
+        sketch_dict['input_text'] = input_text #+'</s>'+type_token_string+'</s>'
         sketch_dict['output_text'] = constraints
         sketch_dict['constraints_mask'] = constraints_with_mask_str
         
@@ -104,8 +127,7 @@ class SketchGraphsCollator:
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.args = args
-        # _, self.clip_preprocess = clip.load("ViT-B/32")
-        # self.clip_preprocess = CLIPImageProcessor.from_pretrained(self.args.clipmodel)
+        
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
     def tokenize(self, strings):

@@ -43,7 +43,7 @@ from transformers.modeling_outputs import (
 )
 
 import matplotlib.pyplot as plt
-
+import time
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
@@ -62,7 +62,7 @@ class BlipTextPooler(nn.Module):
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae, num_train_steps):
+    def __init__(self, args, vit_mae, tokenizer,num_train_steps):
         super().__init__()
         self.save_hyperparameters()
         self.num_train_steps = num_train_steps
@@ -81,8 +81,9 @@ class ByT5Model(pl.LightningModule):
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        # self.tokenizer.add_special_tokens(["<IMAGE>"])
+        self.tokenizer = tokenizer
+        self.model.resize_token_embeddings(len(self.tokenizer))
+        
         self.projection_dim = 1024
         self.text_embed_dim = self.model.config.d_model
         
@@ -127,6 +128,7 @@ class ByT5Model(pl.LightningModule):
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
         '''img encoder'''
+        img_st = time.time()
         # image_features = self.clip_model.encode_image(batch['images'])
         # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
         oi = self.vis_model.vit(batch['images'], output_hidden_states=True) 
@@ -142,6 +144,7 @@ class ByT5Model(pl.LightningModule):
         image_embeds = self.vision_projection(_image_embeds[:,0])
         image_for_llm = self.gelu(self.layernorm(image_embeds))
         # image_for_llm = self.layernorm(image_for_llm)
+        img_et = time.time()
 
 
         '''txt encoder'''
@@ -186,23 +189,25 @@ class ByT5Model(pl.LightningModule):
         if model_batch['labels'] is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
+        txt_et = time.time()
+
+        
+        # '''image decoder pixel loss'''
+        # img_hidden_state = self.layernorm(output_embed)
+        # self.post_layernorm=self.vis_model.vit.layernorm
+        # img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        # if last_hidden_state.shape[1]-img_hidden_state.shape[1]>0:
+        #     mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        #     img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
+        # else:
+        #     img_hidden_state = img_hidden_state[:, :last_hidden_state.shape[1], :]
+        # #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        
+        # img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
+        # img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         
-        '''image decoder pixel loss'''
-        img_hidden_state = self.layernorm(output_embed)
-        self.post_layernorm=self.vis_model.vit.layernorm
-        img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
-        if last_hidden_state.shape[1]-img_hidden_state.shape[1]>0:
-            mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-            img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
-        else:
-            img_hidden_state = img_hidden_state[:, :last_hidden_state.shape[1], :]
-        #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
-        
-        img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
-        
-        
+        '''contrastive loss'''
         # normalized features
         image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
@@ -211,14 +216,16 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
-        '''contrastive loss'''
-        contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
-        loss = txt_loss + img_loss + contrastive_loss
+        contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
+        con_et = time.time()
+
+        
+        loss = txt_loss +  contrastive_loss
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-        self.log("img_loss", img_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+        # self.log("img_loss", img_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
         self.log("contrastive_loss", contrastive_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         self.log("txt_loss", txt_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
@@ -301,19 +308,19 @@ class ByT5Model(pl.LightningModule):
             txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
         
         
-        '''image decoder pixel loss'''
-        img_hidden_state = self.layernorm(output_embed)
-        self.post_layernorm = self.vis_model.vit.layernorm
-        img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state))) #
-        if last_hidden_state.shape[1]-img_hidden_state.shape[1]>0:
-            mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-            img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
-        else:
-            img_hidden_state = img_hidden_state[:, :last_hidden_state.shape[1], :]
-        #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
+        # '''image decoder pixel loss'''
+        # img_hidden_state = self.layernorm(output_embed)
+        # self.post_layernorm = self.vis_model.vit.layernorm
+        # img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state))) #
+        # if last_hidden_state.shape[1]-img_hidden_state.shape[1]>0:
+        #     mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        #     img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
+        # else:
+        #     img_hidden_state = img_hidden_state[:, :last_hidden_state.shape[1], :]
+        # #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
-        img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+        # img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
+        # img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         
         # normalized features
@@ -327,7 +334,7 @@ class ByT5Model(pl.LightningModule):
         '''contrastive loss'''
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
-        loss = txt_loss + img_loss + contrastive_loss
+        loss = txt_loss +  contrastive_loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
