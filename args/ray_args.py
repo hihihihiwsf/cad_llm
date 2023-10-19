@@ -94,6 +94,12 @@ def get_ray_args():
         help="Local directory to save dataset"
     )
     parser.add_argument(
+        "--ray_checkpointing_every_n_train_steps",
+        type=int,
+        default=500,
+        help="Number of optimizer steps between ray checkpoints"
+    )
+    parser.add_argument(
         "--comet_workspace",
         type=str,
         default="cad_llm",
@@ -189,7 +195,6 @@ def get_ray_args():
         default=1,
         help="Whether to add extra validation sets for different split ratios"
     )
-
     parser.add_argument(
         "--dry_run",
         type=int,

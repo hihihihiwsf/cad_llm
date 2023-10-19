@@ -112,6 +112,7 @@ def train_on_ray_cluster():
         data_class_kwargs=data_class_kwargs,
         trainer_kwargs=trainer_kwargs,
         checkpointing_kwargs=checkpointing_kwargs,
+        ray_checkpointing_every_n_train_steps=args.ray_checkpointing_every_n_train_steps,
         s3_data_uri=args.s3_data_uri,
         s3_results_uri=args.s3_results_uri,
         local_data_dir=args.local_dataset_dir,
