@@ -33,7 +33,7 @@ import transformers
 from transformers.optimization import Adafactor, AdafactorSchedule
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae, num_train_steps,tokenizer):
+    def __init__(self, args, vit_mae, tokenizer,num_train_steps):
         super().__init__()
         self.save_hyperparameters()
 
@@ -43,7 +43,7 @@ class ByT5Model(pl.LightningModule):
         #     model._init_weights(model)  # maybe redundant
         # else:
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
-
+        self.num_train_steps=num_train_steps
         self.model = model
         self.tokenizer = tokenizer
         self.model.resize_token_embeddings(len(self.tokenizer))
@@ -187,7 +187,7 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters()) #+ list(self.vis_model.parameters())
+        #params = list(self.model.parameters()) + list(self.mapper.parameters()) #+ list(self.vis_model.parameters())
         #params2= list(self.embed_patch.parameters()) + list(self.layernorm.parameters())+list(self.post_layernorm.parameters())
         # optimizer = Adafactor(
         #         params,
@@ -201,13 +201,13 @@ class ByT5Model(pl.LightningModule):
         #         scale_parameter=True, #
         #         warmup_init=True, #
         #     )
-        optimizer = optim.AdamW(params, lr=self.lr, weight_decay=0.05)
+        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr, weight_decay=0.05)
         #optimizer = Adafactor(params+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
 
         if not self.args.cosinedecay:
             return optimizer
             
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.num_train_steps, verbose=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
         #lr_scheduler = AdafactorSchedule(optimizer)
         return {
