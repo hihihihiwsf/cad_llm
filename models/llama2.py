@@ -126,7 +126,16 @@ class Llama2Model(pl.LightningModule):
         # generate_func = unwrap_model(self.model).generate
         pred_tokens = self.model.generate(input_ids=val_batch["generation_input_ids"], attention_mask=val_batch["generation_attention_mask"],
                                     do_sample=False, max_new_tokens=int(self.max_length/2))
+        
+        #cropping the strings from <START_A>
+        cropped_pred_tokens = torch.ones_like(pred_tokens) * self.tokenizer.pad_token_id
+        for i, r in enumerate(cropped_pred_tokens):
+            start_A_pos  = (r == self.tokenizer.tokenize("<START_A>")[1]).nonzero(as_tuple=False).item()
+            cropped_pred_tokens[i, start_A_pos:] = pred_tokens[i, start_A_pos:]
+        pred_tokens = cropped_pred_tokens
+                
         batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
+        
         print(self.tokenizer.batch_decode(pred_tokens, skip_special_tokens=False))
         batch_true = val_batch["output_entities"]
 
