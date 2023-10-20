@@ -19,7 +19,7 @@ class SketchStringsCollator:
                         f"<START_A>{item['output_text']}<END_A>" 
                         for item in batch]
 
-        prefix_sequences = [
+        prefix_sequences = [" '''ONLY OUTPUT THE ANSWER. DO NOT REPEAT THE QUESTION.''' "
                 f"<START_Q>{item['input_text']}<END_Q>"
                 f"<START_A>" 
                 for item in batch]
