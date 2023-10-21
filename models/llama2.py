@@ -132,7 +132,7 @@ class Llama2Model(pl.LightningModule):
         for i, r in enumerate(cropped_pred_tokens):
             print('r', r.shape, r)
             print('token', self.tokenizer.encode("<START_A>")[1])
-            start_A_pos  = (r == self.tokenizer.encode("<START_A>")[1]).nonzero(as_tuple=False).item()
+            start_A_pos  = (r == self.tokenizer.encode("<START_A>")[1]).nonzero(as_tuple=False)
             print('start pos', start_A_pos)
             cropped_pred_tokens[i, start_A_pos:] = pred_tokens[i, start_A_pos:]
         pred_tokens = cropped_pred_tokens
