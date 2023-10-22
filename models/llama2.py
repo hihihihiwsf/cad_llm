@@ -129,17 +129,16 @@ class Llama2Model(pl.LightningModule):
         
         #cropping the strings from <START_A>
         cropped_pred_tokens = torch.ones_like(pred_tokens) * self.tokenizer.pad_token_id
-        for i, r in enumerate(cropped_pred_tokens):
-            print('r', r.shape, r)
+        for i, r in enumerate(pred_tokens):
             print('token', self.tokenizer.encode("<START_A>")[1])
             start_A_pos  = (r == self.tokenizer.encode("<START_A>")[1]).nonzero(as_tuple=False)
             if len(start_A_pos) == 0:
                 start_A_pos = 0
             else:
                 start_A_pos = start_A_pos.item()
-            
+            start_A_pos = min(start_A_pos, self.max_length-2)
             print('start pos', start_A_pos)
-            cropped_pred_tokens[i, start_A_pos:] = pred_tokens[i, start_A_pos:]
+            cropped_pred_tokens[i, start_A_pos+1:] = pred_tokens[i, start_A_pos+1:]
         pred_tokens = cropped_pred_tokens
                 
         batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
