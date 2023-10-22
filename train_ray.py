@@ -108,8 +108,8 @@ def train_on_ray_cluster():
         "log_every_n_steps": args.log_every_n_steps,
         "val_check_interval": args.val_check_interval,
         "devices": "1" if args.dry_run else "auto",
-        "limit_train_batches":0.005,
-        "limit_val_batches": 0.01
+        # "limit_train_batches":0.005,
+        # "limit_val_batches": 0.01
     }
 
     if args.mix_precision:
