@@ -135,7 +135,7 @@ class Llama2Model(pl.LightningModule):
                 start_A_pos = 0
             else:
                 start_A_pos = start_A_pos.item()
-            start_A_pos = min(start_A_pos, r.shape[1]-1)
+            start_A_pos = min(start_A_pos, pred_tokens.shape[1]-1)
             cropped_pred_tokens[i, start_A_pos:] = pred_tokens[i, start_A_pos:]
         pred_tokens = cropped_pred_tokens
                 
