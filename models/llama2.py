@@ -125,7 +125,7 @@ class Llama2Model(pl.LightningModule):
         # Recursively unwrap the model from potential distributed training containers
         # generate_func = unwrap_model(self.model).generate
         pred_tokens = self.model.generate(input_ids=val_batch["generation_input_ids"], attention_mask=val_batch["generation_attention_mask"],
-                                    do_sample=False, max_new_tokens=int(self.max_length/2))
+                                    do_sample=False, max_new_tokens=self.max_length)
         
         #cropping the strings from <START_A>
         cropped_pred_tokens = torch.ones_like(pred_tokens) * self.tokenizer.pad_token_id
@@ -135,8 +135,8 @@ class Llama2Model(pl.LightningModule):
                 start_A_pos = 0
             else:
                 start_A_pos = start_A_pos.item()
-            start_A_pos = min(start_A_pos, self.max_length-2)
-            cropped_pred_tokens[i, start_A_pos+1:] = pred_tokens[i, start_A_pos+1:]
+            start_A_pos = min(start_A_pos, r.shape[1]-1)
+            cropped_pred_tokens[i, start_A_pos:] = pred_tokens[i, start_A_pos:]
         pred_tokens = cropped_pred_tokens
                 
         batch_pred = self.tokenizer.batch_decode_to_entities(pred_tokens, skip_special_tokens=True)
