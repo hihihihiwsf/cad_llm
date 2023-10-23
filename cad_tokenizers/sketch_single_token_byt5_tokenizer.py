@@ -63,7 +63,7 @@ class SketchSingleTokenTokenizer(SketchTokenizerBase):
                 point_entity = sort_points(point_entity)
         except ValueError as e:
             if safe:
-                print(f"Warning: ignoring parsing failure for {text}: {e}")
+                # print(f"Warning: ignoring parsing failure for {text}: {e}")
                 return []
             else:
                 raise e
