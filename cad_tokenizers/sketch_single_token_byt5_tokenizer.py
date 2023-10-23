@@ -71,5 +71,5 @@ class SketchSingleTokenTokenizer(SketchTokenizerBase):
         return point_entity
 
 
-class SketchSingleTokenByt5Tokenizer(SketchSingleTokenTokenizer, ByT5Tokenizer):
+class SketchSingleTokenByt5Tokenizer(LlamaTokenizerFast, SketchSingleTokenTokenizer):
     pass
