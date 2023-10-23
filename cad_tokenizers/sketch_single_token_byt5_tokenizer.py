@@ -1,4 +1,4 @@
-from transformers import ByT5Tokenizer
+from transformers import ByT5Tokenizer, LlamaTokenizerFast
 
 from preprocess.preprocess_utils import sort_points, point_entity_from_flat_points
 from cad_tokenizers.sketch_tokenizer_base import SketchTokenizerBase
