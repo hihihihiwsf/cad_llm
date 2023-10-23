@@ -27,7 +27,7 @@ class SketchSingleTokenTokenizer(SketchTokenizerBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.add_tokens(self.NEW_TOKENS)
+        self.add_tokens(self.NEW_TOKENS, special_tokens=True)
 
     def entities_to_str(self, entities, is_prompt=False):
         entity_string_list = [self.entity_to_str(entity) for entity in entities]
