@@ -379,7 +379,14 @@ class ByT5Model(pl.LightningModule):
         batch["samples"] = generate_func(encoder_outputs=batch["encoder_outputs"], attention_mask=batch["attention_mask"],
                                          do_sample=False, max_new_tokens=self.args.max_length+10)
 
-        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+        output_string = self.tokenizer.batch_decode(batch["samples"])
+        
+        additional_special_tokens = self.tokenizer.special_tokens_map.get('additional_special_tokens', [])
+        tokens_to_remove = [token for key, token in self.tokenizer.special_tokens_map.items() if key != 'additional_special_tokens' and token not in additional_special_tokens]
+        for token in tokens_to_remove:
+            output_string = [s.replace(token,'') for s in output_string]
+        
+        batch["string_samples"] = output_string
         batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
 
         batch["point_samples"] = [get_pair_constraints(string_sample) for string_sample in batch["string_samples"]]

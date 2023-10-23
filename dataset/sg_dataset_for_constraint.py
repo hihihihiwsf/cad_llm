@@ -61,6 +61,7 @@ class SketchGraphsDataset(Dataset):
             assert entity_string[0] == "<", error_message
             assert "," not in self.data[0][self.entities_col][0], error_message
 
+        self.args=args
         self.min_input_percent = args.min_input_percent
         self.max_input_percent = args.max_input_percent
         assert self.min_input_percent >= 0 and self.max_input_percent <= 1
@@ -90,7 +91,10 @@ class SketchGraphsDataset(Dataset):
         input_text = "".join([ent for i, ent in enumerate(entities)])
         type_token = np.arange(len(Token))+65
         type_token_string = ','.join(map(str,type_token))
-        sketch_dict['input_text'] = input_text #+'</s>'+type_token_string+'</s>'
+        if self.args.type_token:
+            sketch_dict['input_text'] = input_text +'</s>'+type_token_string+'</s>'
+        else:
+            sketch_dict['input_text'] = input_text
         sketch_dict['output_text'] = constraints
         sketch_dict['constraints_mask'] = constraints_with_mask_str
         
@@ -131,6 +135,7 @@ class SketchGraphsCollator:
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
     def tokenize(self, strings):
+        #return self.tokenizer(strings)
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
@@ -163,7 +168,8 @@ class SketchGraphsCollator:
 
         # for im in list_of_img:
         #     im.close()
-        
+        # input_tokenized_lengths = [len(i) for i in tokenized_input.input_ids]
+        # output_tokenized_lengths = [len(i) if isinstance(i, list) else 0 for i in tokenized_output.input_ids]
               
         batch = {
             "input_ids": tokenized_input.input_ids,
@@ -172,7 +178,7 @@ class SketchGraphsCollator:
             "sketches": sketch_dicts,
             "images": batch_images.pixel_values,
         }
-        return batch
+        return batch    # , input_tokenized_lengths, output_tokenized_lengths
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):

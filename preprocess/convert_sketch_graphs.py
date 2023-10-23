@@ -151,7 +151,7 @@ def filter_main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tok
         
     split_to_sketches = deduplicate_splits(split_to_sketches)
     import pdb; pdb.set_trace()
-    draw_list_leng(list_cons_len['train'], 'train')
+    #draw_list_leng(list_cons_len['train'], 'train')
     
     save_splits(output_dir, split_to_sketches)
 
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=str, default="/home/ubuntu/vitr_data/data/sg_strings",
                         help="Input folder containing the SketchGraphs filter sequence .npy files")
-    parser.add_argument("--output", type=str, default='/home/ubuntu/sifan/data/sg_strings_v6_with_constraints/',
+    parser.add_argument("--output", type=str, default='/home/ubuntu/sifan/data/sg_strings_v7_with_constraints/',
                         help="Output folder to save the data [default: output]")
     parser.add_argument("--filter", type=str, default="/home/ubuntu/sifan/cad_llm/split_to_filenames_v4.json",
                         help="File containing indices of deduped sketches ('train_test.json')")

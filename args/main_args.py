@@ -7,7 +7,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="/home/ubuntu/sifan/results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="/home/ubuntu/sifan/data/sg_strings_v6_with_constraints", help="Dataset path")
+    parser.add_argument("--dataset", type=str, default="/home/ubuntu/sifan/data/sg_strings_v7_with_constraints", help="Dataset path")
     parser.add_argument("--num_workers", type=int, default=64, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
@@ -24,7 +24,7 @@ def get_parser():
                         help="Minimal percentage of sketch entities to choose as input")
     parser.add_argument("--max_input_percent", type=float, default=0.8,
                         help="Maximal percentage of sketch entities to choose as input")
-    parser.add_argument("--max_length", type=int, default=96,
+    parser.add_argument("--max_length", type=int, default=192,
                         help="Maximal input length in tokens. Longer sequences will be truncated.")
     parser.add_argument("--train_order", type=str, default="sorted", choices=("sorted", "user", "random"),
                         help="Choose between sorted/user order for entities in the sketch")
@@ -39,6 +39,7 @@ def get_parser():
     parser.add_argument("--arch", default="conditional_vl_align")
     parser.add_argument("--data_aug", type=int, default=0)
     parser.add_argument("--hand_draw", type=int, default=0)
+    parser.add_argument("--type_token", type=int, default=0)
     return parser
 
 

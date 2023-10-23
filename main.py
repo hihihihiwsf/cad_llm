@@ -57,6 +57,33 @@ def main():
 
     print("Loading data...")
     sketchdata = SketchDataModule(tokenizer, args)
+    
+    '''
+    tokenized_length
+    import matplotlib.pyplot as plt
+    all_input_lengths = []
+    all_output_lengths = []
+    for _, input_lengths, output_lengths in sketchdata.val_dataloader():
+            all_input_lengths.extend(input_lengths)
+            all_output_lengths.extend(output_lengths)
+    plt.figure(figsize=(12, 5))
+
+    plt.subplot(1, 2, 1)
+    plt.hist(all_input_lengths, bins=30, color='blue', alpha=0.7)
+    plt.title('Input Token Length Distribution')
+    plt.xlabel('Length')
+    plt.ylabel('Number of Samples')
+
+    plt.subplot(1, 2, 2)
+    plt.hist(all_output_lengths, bins=30, color='red', alpha=0.7)
+    plt.title('Output Token Length Distribution')
+    plt.xlabel('Length')
+    plt.ylabel('Number of Samples')
+
+    plt.tight_layout()
+    plt.savefig("val_input_output_length.png")
+    '''
+    
     num_train_batches = len(sketchdata.train_dataloader())
     num_gpus = torch.cuda.device_count()
     total_train_steps = get_total_train_steps(num_train_batches, num_gpus, args.epochs)
@@ -104,16 +131,9 @@ def main():
     )
     
     if not args.eval: 
-        # tuner = Tuner(trainer)
-        # lr_finder=tuner.lr_find(model)
-        # print(lr_finder.results)
-        # fig = lr_finder.plot(suggest=True)
-        # fig.savefig('lr_finder.png')
-        # new_lr = lr_finder.suggestion()
-        # model.hparams.lr = new_lr
         
         print("Start training")
-        trainer.fit(model, datamodule=sketchdata) #, ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt')
+        trainer.fit(model, datamodule=sketchdata) #, ckpt_path='/home/ubuntu/sifan/results/contraint_with_embedding/last.ckpt')
         trainer.test(model, dataloaders=sketchdata.test_dataloader())
        
     else:
@@ -124,7 +144,9 @@ def main():
         #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         #ckpt_path = '/home/ubuntu/sifan/results/conditional_vl_align/best.ckpt'
         #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-precise-image-conditional-vision-only-09-20-23-1129/checkpoints/model/precise_image_conditional_vision_only/best.ckpt'
-        ckpt_path = '/home/ubuntu/sifan/results/train_constraint_vlt5_maxlen_197/best.ckpt' #/home/ubuntu/sifan/results/test_constraint_vlt5/best.ckpt'
+        #ckpt_path = '/home/ubuntu/sifan/results/train_constraint_vlt5_maxlen_197/best.ckpt' #/home/ubuntu/sifan/results/test_constraint_vlt5/best.ckpt'
+        #ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraints_notypeembedding/best.ckpt'
+        ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraint_with_embedding/best.ckpt'
         trainer.test(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
 
 
