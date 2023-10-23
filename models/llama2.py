@@ -129,7 +129,6 @@ class Llama2Model(pl.LightningModule):
         
         #cropping the strings from <START_A>
         cropped_pred_tokens = torch.ones_like(pred_tokens) * self.tokenizer.pad_token_id
-        breakpoint()
         for i, r in enumerate(pred_tokens):
             start_A_pos  = (r == self.tokenizer.encode("<START_A>")[1]).nonzero(as_tuple=False)
             if len(start_A_pos) == 0:
