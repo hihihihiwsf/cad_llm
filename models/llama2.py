@@ -173,8 +173,8 @@ class Llama2Model(pl.LightningModule):
             num_training_steps=self.num_training_steps,
         )
 
-        return [optimizer], [lr_scheduler]
-        # return torch.optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+        # return [optimizer], [lr_scheduler]
+        return torch.optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
 
     def _update_metrics(self, val_name, batch_pred, batch_true):
         for pred, true in zip(batch_pred, batch_true):
