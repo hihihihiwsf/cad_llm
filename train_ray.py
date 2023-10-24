@@ -137,7 +137,8 @@ def train_on_ray_cluster():
     # print('DS SIZE' * 20)
     # print(len(dm['train']))
     # print('WE ARE AFTER MODULE' * 100)
-    
+    print("FAIlURE IS HERE" * 20)
+    print(args.max_failures)
     # Define an Experiment
     experiment = RayLightningExperiment(
         exp_name=exp_name,
