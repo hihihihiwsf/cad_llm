@@ -122,6 +122,8 @@ class ByT5Model(pl.LightningModule):
         
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) #logit_scale_init_value=2.6592
 
+        self.prediction_len = []
+        self.target_len=[]
 
     def training_step(self, batch, batch_idx):
         cols = ["attention_mask", "labels"]
@@ -207,7 +209,7 @@ class ByT5Model(pl.LightningModule):
         # img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         
-        '''contrastive loss'''
+        '''contrastive loss
         # normalized features
         image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
@@ -219,15 +221,15 @@ class ByT5Model(pl.LightningModule):
         
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         con_et = time.time()
-
+        '''
         
-        loss = txt_loss +  contrastive_loss
+        loss = txt_loss #+  contrastive_loss
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         # self.log("img_loss", img_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
         #          batch_size=self.batch_size, sync_dist=True)
-        self.log("contrastive_loss", contrastive_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+        # self.log("contrastive_loss", contrastive_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
         self.log("txt_loss", txt_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
@@ -322,7 +324,7 @@ class ByT5Model(pl.LightningModule):
         # img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
         # img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
-        
+        '''contrastive loss
         # normalized features
         image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
@@ -331,10 +333,10 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
-        '''contrastive loss'''
-        contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
-        loss = txt_loss +  contrastive_loss
+        contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
+        '''
+        loss = txt_loss #+  contrastive_loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
@@ -346,7 +348,12 @@ class ByT5Model(pl.LightningModule):
         batch['encoder_outputs'] = encoder_outputs
         
         self.generate_constraints(batch)
-
+        
+        pred_len = [len(bat) for bat in batch["point_samples"]]
+        tar_len = [len(bat) for bat in batch["point_labels"]]
+        self.prediction_len.extend(pred_len)
+        self.target_len.extend(tar_len)
+        
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
@@ -370,6 +377,7 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
+        
         
         return loss
 

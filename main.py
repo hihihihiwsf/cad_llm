@@ -140,15 +140,32 @@ def main():
         # loading the model from exp_name/best.ckpt
         print("Start evaluating")
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
-        #ckpt_path='s3://cad-llm-katzm/jobs/sifan-sg-multimodal-09-05-23-1459/checkpoints/model/sg_multimodal/best.ckpt'
-        #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
-        #ckpt_path = '/home/ubuntu/sifan/results/conditional_vl_align/best.ckpt'
-        #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-precise-image-conditional-vision-only-09-20-23-1129/checkpoints/model/precise_image_conditional_vision_only/best.ckpt'
-        #ckpt_path = '/home/ubuntu/sifan/results/train_constraint_vlt5_maxlen_197/best.ckpt' #/home/ubuntu/sifan/results/test_constraint_vlt5/best.ckpt'
-        #ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraints_notypeembedding/best.ckpt'
+
         ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraint_with_embedding/best.ckpt'
         trainer.test(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
+        
+    all_input_lengths = model.prediction_len
+    all_output_lengths = model.target_len
+    import matplotlib.pyplot as plt
+    # Plot histograms
+    plt.figure(figsize=(12, 5))
 
+    plt.subplot(1, 2, 1)
+    plt.hist(all_input_lengths, bins=30, color='blue', alpha=0.7)
+    plt.title('CadLIP Prediction Token Length Distribution')
+    plt.xlabel('Length')
+    plt.ylabel('Number of Samples')
+
+    plt.subplot(1, 2, 2)
+    plt.hist(all_output_lengths, bins=30, color='red', alpha=0.7)
+    plt.title('Cadlip Label Token Length Distribution')
+    plt.xlabel('Length')
+    plt.ylabel('Number of Samples')
+
+    plt.tight_layout()
+    print("plt draw images")
+    plt.savefig("cadlip_pred_label_distribution.png")
+    import pdb;pdb.set_trace()
 
 if __name__ == "__main__":
     main()
