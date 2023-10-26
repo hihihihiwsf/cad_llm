@@ -53,7 +53,6 @@ class SketchGraphsDataset(Dataset):
         constraints = sketch_dict[self.constrain_col]
         
         
-
         mask = self.get_mask(len(entities))
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
@@ -92,7 +91,7 @@ class SketchGraphsCollator:
         return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
-        input_strings = ['<sep>' + sketch['input_text'] for sketch in sketch_dicts]
+        input_strings = [sketch['input_text'] for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)

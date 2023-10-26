@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset import sg_dataset_for_constraint, sg_dataset, sg_dataset_imageconditional #import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models import conditional_vl_align, conditional_vision_only, vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type
+from models import conditional_vl_align, conditional_vision_only, vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type, vlt5_v2_tri_2_wo_IDL
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -51,8 +51,9 @@ def main():
     # pl.utilities.seed.seed_everything(args.seed)
     pl.seed_everything(args.seed)
     tokenizer=AutoTokenizer.from_pretrained(args.model_name)
-    special_tokens_dict = {'additional_special_tokens':["e" + str(i) for i in range(0, 31)]}
-    tokenizer.add_special_tokens(special_tokens_dict)
+    if args.constraint_model:
+        special_tokens_dict = {'additional_special_tokens':["e" + str(i) for i in range(0, 31)]}
+        tokenizer.add_special_tokens(special_tokens_dict)
     
 
     print("Loading data...")
@@ -95,12 +96,13 @@ def main():
 
     print("Loading model...")
 
-    if args.arch == "conditional_vision_only":
-        architecture = conditional_vision_only
-    elif args.arch == "conditional_vl_align":
-        architecture = conditional_vl_align
+    if args.arch == "vlt5_for_cons_type":
+        architecture = vlt5_for_cons_type
+    elif args.arch == "vlt5_v2_tri":  #### multimodal tri loss model
+        architecture = vlt5_v2_tri
+    elif args.arch == "vlt5_wo_IDL":
+        architecture = vlt5_v2_tri_2_wo_IDL
     
-    architecture = vlt5_for_cons_type
     if not args.untrained_model:
         model = architecture.ByT5Model(args=args, vit_mae=None, tokenizer=tokenizer, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
@@ -146,7 +148,8 @@ def main():
         print("Start evaluating")
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
 
-        ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraint_with_embedding/best.ckpt'
+        #ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraint_with_embedding/best.ckpt'
+        ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         trainer.test(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
         
     all_input_lengths = model.prediction_len
