@@ -8,7 +8,7 @@ try:
 except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
-from dataset.sg_dataset_for_constraint import get_sketchgraphs_dataloader, SketchDataModule
+from dataset import sg_dataset_for_constraint, sg_dataset, sg_dataset_imageconditional #import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
 from models import conditional_vl_align, conditional_vision_only, vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type
 from models.vl_t5_biencoder import VLT5Model
@@ -56,7 +56,12 @@ def main():
     
 
     print("Loading data...")
-    sketchdata = SketchDataModule(tokenizer, args)
+    if args.constraint_model:
+        dataset = sg_dataset_for_constraint
+    else:
+        dataset = sg_dataset
+        
+    sketchdata = dataset.SketchDataModule(tokenizer, args)
     
     '''
     tokenized_length

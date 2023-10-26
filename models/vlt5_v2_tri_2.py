@@ -356,8 +356,12 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
-        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"{validate}_precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
         return loss
@@ -471,27 +475,4 @@ class ByT5Model(pl.LightningModule):
             }
         }
             
-        #scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=int(self.args.epochs * 1.15), verbose=True)
-        #scheduler2 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=int(self.args.epochs * 1.15), verbose=True)
-
-        # scheduler_A = {
-        #     "optimizer": optimizer1,
-        #     "lr_scheduler": {
-        #         "scheduler": scheduler,
-        #         "interval": "epoch",
-        #         "frequency": 1,
-        #     }
-        # }
-        # scheduler_B = {
-        #     "optimizer": optimizer2,
-        #     "lr_scheduler": {
-        #         "scheduler": scheduler2,
-        #         "interval": "epoch",
-        #         "frequency": 1,
-        #     }
-        # }
-    
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,verbose=True)
-        #lr_scheduler = AdafactorSchedule(optimizer1)
-
 
