@@ -65,16 +65,16 @@ def download_model_weights(model_id, model_bucket_uri, model_download_dir):
 
 class Llama2Model(pl.LightningModule):
     def __init__(self, model_name, model_bucket_uri, model_download_dir, 
-                 model_checkpoint_path, batch_size, vocab_size, no_grad_ckpt=False, 
+                 model_checkpoint_path, batch_size, no_grad_ckpt=False, 
                  num_training_steps=1000, lr=5e-6, strategy='deepspeed', max_length=192,
-                 local_samples_path=None, remote_samples_path=None, val_names=None, tokenizer=None):
+                 local_samples_path=None, remote_samples_path=None, val_names=None, tokenizer_cls=None):
         super().__init__()
 
         self.model_id = model_name
         self.model_bucket_uri = model_bucket_uri
         self.model_download_dir = model_download_dir
         self.model_checkpoint_path = model_checkpoint_path
-        self.vocab_size = vocab_size
+        # self.vocab_size = vocab_size
         self.no_grad_ckpt = no_grad_ckpt
         self.num_training_steps = num_training_steps
         self.lr = lr
@@ -82,7 +82,7 @@ class Llama2Model(pl.LightningModule):
         self.max_length = max_length
         self.batch_size = batch_size
         self.val_names = val_names
-        self.tokenizer = tokenizer
+        self.tokenizer_cls = tokenizer_cls
         
         self.val_name_to_full_sketch_metric = ModuleDict({name: Top1FullSketchMetric() for name in self.val_names})
         self.val_name_to_top1_entity_metric = ModuleDict({name: Top1EntityMetric() for name in self.val_names})
@@ -90,6 +90,13 @@ class Llama2Model(pl.LightningModule):
 
         download_model_weights(self.model_id, self.model_bucket_uri, self.model_download_dir)
 
+        self.tokenizer = self.tokenizer_cls.from_pretrained(model_name)
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+        self.tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
+
+        self.vocab_size = len(self.tokenizer)
+        
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_checkpoint_path,
             trust_remote_code=True,

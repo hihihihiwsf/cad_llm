@@ -33,9 +33,9 @@ def train_on_ray_cluster():
     download_model_weights(model_id, model_bucket_uri, model_download_dir)
 
     model_config = Llama2Model.get_config(model_checkpoint_path)
-    tokenizer = Llama2Model.get_tokenizer(model_checkpoint_path)
-    tokenizer.pad_token = tokenizer.eos_token
-    print('TOKEEEEEENENNNNNIIIIIZZZER'*100, tokenizer)
+    # tokenizer = Llama2Model.get_tokenizer(model_checkpoint_path)
+    # tokenizer.pad_token = tokenizer.eos_token
+    # print('TOKEEEEEENENNNNNIIIIIZZZER'*100, tokenizer)
     
     
     tokenizer_cls = get_tokenizer_cls(args.tokenizer_name)
@@ -60,10 +60,10 @@ def train_on_ray_cluster():
 
 
         
-    tokenizer = tokenizer_cls.from_pretrained(args.model_name)
-    tokenizer.pad_token = tokenizer.eos_token
-    SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
-    tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
+    # tokenizer = tokenizer_cls.from_pretrained(args.model_name)
+    # tokenizer.pad_token = tokenizer.eos_token
+    # SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
+    # tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
     
     
     local_samples_path = Path(args.local_results_dir) / exp_name / "samples"
@@ -75,12 +75,12 @@ def train_on_ray_cluster():
         "max_length": args.max_length,
         "local_samples_path": local_samples_path,
         "remote_samples_path": remote_samples_path,
-        "tokenizer": tokenizer,
+        "tokenizer": tokenizer_cls,
         "val_names": val_names,
         "model_bucket_uri": model_bucket_uri,
         "model_download_dir": model_download_dir,
         "model_checkpoint_path": model_checkpoint_path,
-        "vocab_size": len(tokenizer),
+        # "vocab_size": len(tokenizer),
     }
 
     strategy_kwargs = {}
