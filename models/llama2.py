@@ -83,7 +83,7 @@ class Llama2Model(pl.LightningModule):
         self.max_length = max_length
         self.batch_size = batch_size
         self.val_names = val_names
-        self.tokenizer_cls_cls = tokenizer_cls_cls
+        self.tokenizer_cls = tokenizer_cls
         
         self.val_name_to_full_sketch_metric = ModuleDict({name: Top1FullSketchMetric() for name in self.val_names})
         self.val_name_to_top1_entity_metric = ModuleDict({name: Top1EntityMetric() for name in self.val_names})
