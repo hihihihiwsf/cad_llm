@@ -74,6 +74,7 @@ class Llama2Model(pl.LightningModule):
         self.model_bucket_uri = model_bucket_uri
         self.model_download_dir = model_download_dir
         self.model_checkpoint_path = model_checkpoint_path
+
         # self.vocab_size = vocab_size
         self.no_grad_ckpt = no_grad_ckpt
         self.num_training_steps = num_training_steps
@@ -82,7 +83,7 @@ class Llama2Model(pl.LightningModule):
         self.max_length = max_length
         self.batch_size = batch_size
         self.val_names = val_names
-        self.tokenizer_cls = tokenizer_cls
+        self.tokenizer_cls_cls = tokenizer_cls_cls
         
         self.val_name_to_full_sketch_metric = ModuleDict({name: Top1FullSketchMetric() for name in self.val_names})
         self.val_name_to_top1_entity_metric = ModuleDict({name: Top1EntityMetric() for name in self.val_names})
@@ -96,7 +97,7 @@ class Llama2Model(pl.LightningModule):
         self.tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
 
         self.vocab_size = len(self.tokenizer)
-        
+
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_checkpoint_path,
             trust_remote_code=True,
