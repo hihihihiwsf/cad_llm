@@ -10,7 +10,7 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset import sg_dataset_for_constraint, sg_dataset, sg_dataset_imageconditional #import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models import vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type, vlt5_v2_tri_2_wo_IDL, vlt5_wo_ITC
+from models import vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type, vlt5_v2_tri_2_wo_IDL, vlt5_wo_ITC, vlt5_wo_ITC_IDL
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -104,6 +104,8 @@ def main():
         architecture = vlt5_v2_tri_2_wo_IDL
     elif args.arch == "vlt5_wo_ITC":
         architecture = vlt5_wo_ITC
+    elif args.arch == "vlt5_wo_ITC_IDL":
+        architecture = vlt5_wo_ITC_IDL
     
     if not args.untrained_model:
         model = architecture.ByT5Model(args=args, vit_mae=None, tokenizer=tokenizer, num_train_steps=total_train_steps)
