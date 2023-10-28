@@ -25,6 +25,8 @@ class SketchStringsCollator:
                 f"<START_A>" 
                 for item in batch]
         
+        input_sequences = ['ABCABCABC' for item in batch]
+        prefix_sequences = input_sequences
         # input_sequences = ["<SYSTEM> You are a cad autocomplete assistant. Complete the sketch given the input sketch."
         #         f"{item['input_text']}"
         #         " <FILL_ME> "
