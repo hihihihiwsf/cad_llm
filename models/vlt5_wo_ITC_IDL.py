@@ -340,7 +340,10 @@ class ByT5Model(pl.LightningModule):
         encoder_outputs = BaseModelOutput(last_hidden_state=output_embed)
         batch['encoder_outputs'] = encoder_outputs
         
-        self.generate_constraints(batch)
+        if self.args.constraint_model:
+            self.generate_constraints(batch)
+        else:
+            self.generate_samples(batch)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
@@ -377,6 +380,7 @@ class ByT5Model(pl.LightningModule):
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
 
+        
         batch["point_samples"] = [get_pair_constraints(string_sample) for string_sample in batch["string_samples"]]
         batch["point_labels"] = [get_pair_constraints(string_label) for string_label in batch["string_labels"]]
 

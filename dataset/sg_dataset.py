@@ -101,7 +101,6 @@ class SketchGraphsCollator:
         labels[labels == self.tokenizer.pad_token_id] = -100
 
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
-
         list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
         batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         

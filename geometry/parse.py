@@ -80,8 +80,9 @@ def get_curve(points):
         elif len(points) == 4:
             curve = Circle(points)
         
-        if curve ==None:
-            print(points)
+        # if curve ==None:
+        #     print("curve is None:")
+        #     print(points)
     except Exception as e:
         pass
     return curve

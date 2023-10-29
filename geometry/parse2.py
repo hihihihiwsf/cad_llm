@@ -58,6 +58,7 @@ def get_curve(points):
             curve = Circle(points)
         
         if curve ==None:
+            print("curve is None:")
             print(points)
     except Exception as e:
         pass

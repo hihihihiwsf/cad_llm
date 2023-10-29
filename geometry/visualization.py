@@ -214,10 +214,11 @@ def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
     cell_size = size // quantize_bins
 
     curves = get_curves(point_entities)
-    for curve in curves:
-        if curve ==  None:
-            print(point_entities) 
-            assert all(curve for curve in curves)
+    # for curve in curves:
+    #     if curve ==  None:
+            # print("curve is None:")
+            # print(point_entities) 
+    assert all(curve for curve in curves)
 
     for curve in curves:
         curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)

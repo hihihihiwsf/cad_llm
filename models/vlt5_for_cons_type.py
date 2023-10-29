@@ -347,7 +347,10 @@ class ByT5Model(pl.LightningModule):
         encoder_outputs = BaseModelOutput(last_hidden_state=output_embed)
         batch['encoder_outputs'] = encoder_outputs
         
-        self.generate_constraints(batch)
+        if self.args.constraint_model:
+            self.generate_constraints(batch)
+        else:
+            self.generate_samples(batch)
         
         pred_len = [len(bat) for bat in batch["point_samples"]]
         tar_len = [len(bat) for bat in batch["point_labels"]]
