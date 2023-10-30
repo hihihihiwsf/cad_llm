@@ -5,7 +5,10 @@ class SketchStringsCollator:
         self.additional_cols = additional_cols
         self.model_name = model_name
         SPECIAL_TOKENS = ["<SYSTEM>", "<START_Q>", "<END_Q>", "<START_A>", "<END_A>"]
-        # tokenizer.add_tokens(SPECIAL_TOKENS, special_tokens=True)
+        self.system_prompt = """You are a CAD sketch autocomplete assistant. A drawing of a CAD sketch will be given to you and you try to complete it in a meaningful way.
+        \nThe drawing is represented by 3 types of entities: lines, curves, and circles.\n\nEach point is quantized to 6 bits, i.e. from 1 to 64 and it's shown with its x, y coordinates respectively.
+        A point example: x_1,y_1\nx_i is the x coordinate and y_i is the y coordinate of a point.\n\nA line is represented by a sequence of 2 points.\nA line example: x_1,y_1,x_2,y_2;\n\n
+        A curve is represented by a sequence of 3 points.\nA curve example: x_1,y_1,x_2,y_2,x_3,y_3;\n\nA circle is represented by a sequence of 4 points.\nA circle example: x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4"""
         self.tokenizer = tokenizer
 
     def tokenize(self, strings):
@@ -15,7 +18,7 @@ class SketchStringsCollator:
     def llama_collate_fn(self,batch, tokenizer, max_length):
         # "<SYSTEM> You are a cad autocomplete assistant. Q is the incomplete sketch, and A is the remaining sketch."
         # " '''ONLY OUTPUT THE ANSWER. DO NOT REPEAT THE QUESTION.''' "
-        input_sequences = [
+        input_sequences = [f"<SYSTEM>{self.system_prompt}"
                         f"<START_Q>{item['input_text']}<END_Q>"
                         f"<START_A>{item['output_text']}<END_A>" 
                         for item in batch]
@@ -35,7 +38,7 @@ class SketchStringsCollator:
         out_batch = tokenizer(
             input_sequences,
             padding=True,
-            max_length=max_length,
+            max_length=max_length + 250,
             truncation=True,
             return_tensors="pt",
         )
@@ -46,7 +49,7 @@ class SketchStringsCollator:
         generation_batch = tokenizer(
             prefix_sequences,
             padding=True,
-            max_length=max_length,
+            max_length=max_length + 250,
             truncation=True,
             return_tensors="pt",
         )
