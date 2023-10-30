@@ -211,7 +211,6 @@ class ByT5Model(pl.LightningModule):
         #logits_per_image = logits_per_text.t() # = similarity.t()
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         '''
-        
         loss = txt_loss + img_loss #+ contrastive_loss
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -327,11 +326,10 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
-        
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         '''
         
-        loss = txt_loss + img_loss 
+        loss = txt_loss + img_loss #ß+ contrastive_loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
