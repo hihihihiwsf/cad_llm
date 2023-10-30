@@ -18,7 +18,7 @@ class SketchStringsCollator:
     def llama_collate_fn(self,batch, tokenizer, max_length):
         # "<SYSTEM> You are a cad autocomplete assistant. Q is the incomplete sketch, and A is the remaining sketch."
         # " '''ONLY OUTPUT THE ANSWER. DO NOT REPEAT THE QUESTION.''' "
-        input_sequences = [f"<SYSTEM>{self.system_prompt}"
+        input_sequences = [
                         f"<START_Q>{item['input_text']}<END_Q>"
                         f"<START_A>{item['output_text']}<END_A>" 
                         for item in batch]
@@ -38,7 +38,7 @@ class SketchStringsCollator:
         out_batch = tokenizer(
             input_sequences,
             padding=True,
-            max_length=max_length + 250,
+            max_length=max_length,
             truncation=True,
             return_tensors="pt",
         )
@@ -49,7 +49,7 @@ class SketchStringsCollator:
         generation_batch = tokenizer(
             prefix_sequences,
             padding=True,
-            max_length=max_length + 250,
+            max_length=max_length,
             truncation=True,
             return_tensors="pt",
         )
