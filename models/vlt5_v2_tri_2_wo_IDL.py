@@ -341,7 +341,10 @@ class ByT5Model(pl.LightningModule):
         encoder_outputs = BaseModelOutput(last_hidden_state=output_embed)
         batch['encoder_outputs'] = encoder_outputs
         
-        self.generate_constraints(batch)
+        if self.args.constraint_model:
+            self.generate_constraints(batch)
+        else:
+            self.generate_samples(batch)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
