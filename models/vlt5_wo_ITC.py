@@ -195,10 +195,9 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        if self.args.constraint_model:
-            img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
-        else:
-            img_loss = self.forward_loss(batch['output_images'], img_res.logits)
+
+        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+
         
         '''contrastive loss
         # normalized features
@@ -312,10 +311,9 @@ class ByT5Model(pl.LightningModule):
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-        if self.args.constraint_model:
-            img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
-        else:
-            img_loss = self.forward_loss(batch['output_images'], img_res.logits)
+
+        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
+
         
         '''contrastive loss
         # normalized features

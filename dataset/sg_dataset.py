@@ -100,11 +100,8 @@ class SketchGraphsCollator:
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
 
-        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
-        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
-        batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         
-        point_outputs = [get_point_entities(sketch["input_text"]+sketch["output_text"]) for sketch in sketch_dicts] 
+        point_outputs = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts] 
         list_of_out_img = visualize_sample_cv(point_entities=point_outputs, box_lim=64 + 3)
         output_images = self.vitmae_preprocess(list_of_out_img, return_tensors="pt")
         
@@ -123,8 +120,7 @@ class SketchGraphsCollator:
             "attention_mask": tokenized_input.attention_mask,
             "labels": labels,
             "sketches": sketch_dicts,
-            "images": batch_images.pixel_values,
-            "output_images": output_images.pixel_values,
+            "images": output_images.pixel_values,
         }
         return batch
 

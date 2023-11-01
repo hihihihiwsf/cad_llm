@@ -155,7 +155,7 @@ def main():
         #ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraint_with_embedding/best.ckpt'
         ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         trainer.test(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
-        
+    '''  
     all_input_lengths = model.prediction_len
     all_output_lengths = model.target_len
     import matplotlib.pyplot as plt
@@ -178,6 +178,6 @@ def main():
     print("plt draw images")
     plt.savefig("cadlip_pred_label_distribution.png")
     import pdb;pdb.set_trace()
-
+    '''
 if __name__ == "__main__":
     main()
