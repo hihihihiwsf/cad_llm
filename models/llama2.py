@@ -173,8 +173,8 @@ class Llama2Model(pl.LightningModule):
         # if self.strategy == 'deepspeed':
         #     optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(self.parameters(), lr=self.lr, betas=OPTIM_BETAS, weight_decay=OPTIM_WEIGHT_DECAY, eps=OPTIM_EPS)
         # else:
-        optimizer = torch.optim.AdamW(self.trainer.model.parameters(), lr=self.lr, betas=OPTIM_BETAS, weight_decay=OPTIM_WEIGHT_DECAY, eps=OPTIM_EPS)
-        # optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(self.parameters(), lr=self.lr, betas=OPTIM_BETAS, weight_decay=OPTIM_WEIGHT_DECAY, eps=OPTIM_EPS)
+        # optimizer = torch.optim.AdamW(self.trainer.model.parameters(), lr=self.lr, betas=OPTIM_BETAS, weight_decay=OPTIM_WEIGHT_DECAY, eps=OPTIM_EPS)
+        optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(self.parameters(), lr=self.lr, betas=OPTIM_BETAS, weight_decay=OPTIM_WEIGHT_DECAY, eps=OPTIM_EPS)
 
         lr_scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
