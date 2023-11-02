@@ -32,6 +32,11 @@ def launch_sagemaker():
         role = f"arn:aws:iam::{launch_args.aws_account}:role/mintSageMakerExecutionRole"
     else:
         role = sagemaker.get_execution_role(sagemaker_session)
+    tags = [
+        {"Key": "adsk:role", "Value": "CADGPT"}, 
+        {"Key": "adsk:projectName", "Value": "Autodesk Machine Learning Platform"},
+        {"Key": "adsk:moniker", "Value": "AILAB-C-UW2"}
+        ]
 
     gpu_counts = {
         "ml.p3.2xlarge": 1,
@@ -86,6 +91,7 @@ def launch_sagemaker():
         # checkpoint_s3_uri=checkpoint_s3_uri,
         use_spot_instances=launch_args.use_spot_instances,
         max_wait=max_wait,
+        tags=tags,
         debugger_hook_config=False  # Disable debugger
     )
 
