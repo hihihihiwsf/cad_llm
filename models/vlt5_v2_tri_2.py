@@ -43,7 +43,7 @@ from transformers.modeling_outputs import (
 )
 from transformers import ViTFeatureExtractor
 from torchvision.ops.focal_loss import sigmoid_focal_loss
-from lion_pytorch import Lion
+
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
