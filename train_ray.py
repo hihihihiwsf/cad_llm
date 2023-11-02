@@ -82,8 +82,8 @@ def train_on_ray_cluster():
         with open(deepspeed_config_path, 'r') as f:
             deepspeed_config = json.loads(f.read())
 
-        strategy_kwargs = {"config": deepspeed_config}
-        # strategy_kwargs["stage"] = 2
+        # strategy_kwargs = {"config": deepspeed_config}
+        strategy_kwargs["stage"] = 2
 
     # Configure lightning trainer kwargs
     loggers = [CSVLogger("logs"), TensorBoardLogger("logs")]  # Comet is integrated into RayLightningExperiment
