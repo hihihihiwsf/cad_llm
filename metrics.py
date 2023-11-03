@@ -1,5 +1,28 @@
 import torch
+import numpy as np
 
+def calculate_f1(labels, samples):
+    """
+    Count number of exact matches of decoded and sorted entities
+    """
+    f1 = []
+    eps = 1e-6
+    for label_entities, sample_entities in zip(labels, samples):
+        if not sample_entities:
+            continue
+        TP = 0
+        for ent in sample_entities:
+            if ent in label_entities:
+                TP += 1
+        FP = len(sample_entities) - TP
+        FN = len(label_entities) - TP
+        precision = (TP / (TP + FP)) + eps
+        recall = (TP / (TP + FN)) + eps
+        try:
+            f1.append(2 * precision * recall / (precision + recall))
+        except:
+           f1.append(0)
+    return np.mean(precision), np.mean(recall), np.mean(f1)
 
 def calculate_accuracy(labels, samples):
     """

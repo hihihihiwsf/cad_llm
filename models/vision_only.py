@@ -15,7 +15,7 @@ from transformers.modeling_utils import unwrap_model
 import sys
 from models.vis_recon import VisRecon
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
+from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch, visualize_sample
@@ -270,6 +270,13 @@ class VisionT5Model(pl.LightningModule):
         self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
+        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        self.log(f"f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
         if batch_idx < 5:
@@ -355,6 +362,13 @@ class VisionT5Model(pl.LightningModule):
         self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
+        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        self.log(f"f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
 
         # # Plot sketches
         if batch_idx < 5:
