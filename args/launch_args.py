@@ -10,10 +10,9 @@ import argparse
 def get_launch_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--aws_name",
+        "--aws_profile",
         type=str,
-        default="sifan",
-        help="Username to prepend to aws job name"
+        help="AWS profile name to use for credentials"
     )
     parser.add_argument(
         "--aws_account",
@@ -26,6 +25,12 @@ def get_launch_args():
         type=str,
         default="cad-llm-katzm",
         help="s3 bucket name"
+    )
+    parser.add_argument(
+        "--s3_dataset",
+        type=str,
+        default="deepmind_strings_v1_ascii1_max64",
+        help="Name of the dataset folder to use in s3"
     )
     parser.add_argument(
         "--instance_type",
