@@ -210,20 +210,91 @@ class VisionT5Model(pl.LightningModule):
         #pooled_output= last_hidden_state[:, 0, :]
         image_embeds = self.post_layernorm(last_hidden_state)
         
-        # new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
-        # class_token_out = torch.broadcast_to(image_embeds[:, :1, :], new_size)
+        image_embeds = image_embeds.permute(0,2,1)
+        image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
-        # # Merge image embedding with class tokens
-        # image_embeds = image_embeds[:, 1:, :] * class_token_out
-        # image_embeds = self.layer_norm(image_embeds)
+        image_for_llm = self.gelu(self.mapper(image_embeds.float()))
+        image_for_llm = self.layernorm(image_for_llm)
 
-        # Resize to [batch_size, num_patches, num_patches, hidden_size]
-        # new_size = (
-        #     image_embeds.shape[0],
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     int(np.sqrt(image_embeds.shape[1])),
-        #     image_embeds.shape[-1],
-        # )
+        txt_embedder = self.model.get_input_embeddings()
+        txt_embeddings = txt_embedder(batch['input_ids']) # size: (batch_size, seq_length, 1536)
+        
+        input_embed = image_for_llm #torch.concatenate((image_for_llm), dim=1)
+        # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
+        model_batch['inputs_embeds'] = input_embed
+
+
+        # adding ones to attention_mask
+        att = model_batch['attention_mask']
+        model_batch['attention_mask'] = torch.ones(att.shape[0], image_for_llm.shape[1]).to(input_embed.device)
+        # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
+
+        batch['attention_mask'] = model_batch['attention_mask']
+        batch['inputs_embeds'] = model_batch['inputs_embeds']
+
+        outputs = self.model(**model_batch)
+        loss = outputs.loss
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+        
+        
+        # Generate and process samples
+        self.generate_samples(batch)
+
+
+        # Calculate metrics
+        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        mx = 0
+        for i,j in zip(batch['string_samples'], batch['string_labels']):
+            out, l = i.split(";"), j.split(";")
+            # label_all_ent = j.split(";")
+            if set(out) == set(l):
+                mx += 1
+        top1_full_sketch = mx/len(batch['string_labels'])
+        self.log("top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+
+        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+
+        mx = 0
+        for i,j in zip(batch['string_samples'], batch['string_labels']):
+            label_all_ent = j.split(";")
+            first_ent = i.split(";")[0]
+            if first_ent in label_all_ent:
+                mx += 1
+        top1_ent = mx/len(batch['string_labels'])
+        self.log("top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        # Convert string entities to curves and check validity
+        validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
+        self.log("validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
+
+
+        # # Plot sketches
+        if batch_idx < 5:
+            self.log_samples(batch=batch, batch_idx=batch_idx)
+        
+        return loss
+    
+    def test_step(self, batch, batch_idx):
+        
+        cols = ["attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
+
+        
+        # image_features = self.clip_model.encode_image(batch['images'])
+        # batch['images'] = self.vitmae_preprocess(batch['images'], return_tensors="pt")
+        oi = self.vis_model.vit.encoder(self.vis_model.patchify(**batch['images'])) 
+        image_features = torch.sum(oi['last_hidden_state'], 1)        # oi = self.clip_model(**batch['images'])
+        # image_features = oi.image_embeds
+        # image_features = oi['pooler_output']
+
+        '''owl vit'''
+        last_hidden_state = oi['last_hidden_state']
+        #pooled_output= last_hidden_state[:, 0, :]
+        image_embeds = self.post_layernorm(last_hidden_state)
+        
         image_embeds = image_embeds.permute(0,2,1)
         image_embeds = self.gelu(self.embed_patch(image_embeds).permute(0,2,1))
 
@@ -291,6 +362,7 @@ class VisionT5Model(pl.LightningModule):
         
         return loss
 
+
     def generate_samples(self, batch):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
@@ -317,7 +389,7 @@ class VisionT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        params = list(self.model.parameters()) + list(self.mapper.parameters())
+        params = list(self.trainer.model.parameters())
         # optimizer = Adafactor(
         #         params,
         #         lr=None,
