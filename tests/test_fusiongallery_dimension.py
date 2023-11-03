@@ -94,7 +94,7 @@ class TestFusionGalleryDimension(unittest.TestCase):
         self.assertEqual(fg_cst_dict["orientation"], "AlignedDimensionOrientation")
         self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 0.4658581065527947)
 
-    def test_length_dimension_vertical(self):
+    def test_length_dimension_horizontal(self):
         cst = self.dm_constraints0[18]
         fg_cst = FusionGalleryDimension(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
@@ -104,8 +104,8 @@ class TestFusionGalleryDimension(unittest.TestCase):
         self.assertIn("entity_two", fg_cst_dict)
         self.assertIn(fg_cst_dict["entity_one"], self.points0)
         self.assertIn(fg_cst_dict["entity_two"], self.points0)
-        self.assertEqual(fg_cst_dict["orientation"], "VerticalDimensionOrientation")
-        # Vertical orientation should have y the same but not x
+        self.assertEqual(fg_cst_dict["orientation"], "HorizontalDimensionOrientation")
+        # Horizontal orientation should have y the same but not x
         self.assertAlmostEqual(
             self.points0[fg_cst_dict["entity_one"]]["y"],
             self.points0[fg_cst_dict["entity_two"]]["y"]
@@ -116,7 +116,7 @@ class TestFusionGalleryDimension(unittest.TestCase):
         )        
         self.assertAlmostEqual(fg_cst_dict["parameter"]["value"], 1.4945246179042941)
 
-    def test_length_dimension_horizontal(self):
+    def test_length_dimension_vertical(self):
         cst = self.dm_constraints0[19]
         fg_cst = FusionGalleryDimension(cst, self.points0, self.curves0, self.entity_map0)
         fg_cst_dict = fg_cst.to_dict()
@@ -126,8 +126,8 @@ class TestFusionGalleryDimension(unittest.TestCase):
         self.assertIn("entity_two", fg_cst_dict)
         self.assertIn(fg_cst_dict["entity_one"], self.points0)
         self.assertIn(fg_cst_dict["entity_two"], self.points0)
-        self.assertEqual(fg_cst_dict["orientation"], "HorizontalDimensionOrientation")
-        # Horizontal orientation should have x the same but not y
+        self.assertEqual(fg_cst_dict["orientation"], "VerticalDimensionOrientation")
+        # Vertical orientation should have x the same but not y
         self.assertAlmostEqual(
             self.points0[fg_cst_dict["entity_one"]]["x"],
             self.points0[fg_cst_dict["entity_two"]]["x"]
