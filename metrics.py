@@ -23,7 +23,7 @@ def calculate_f1(labels, samples):
             f1.append(2 * precision * recall / (precision + recall))
         except:
            f1.append(0)
-    return np.mean(f1)
+    return np.mean(precision), np.mean(recall), np.mean(f1)
 
 
 def calculate_first_ent_accuracy(labels, samples):

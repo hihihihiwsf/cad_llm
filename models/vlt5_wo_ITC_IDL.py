@@ -343,8 +343,12 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
-        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"{validate}_precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
         
