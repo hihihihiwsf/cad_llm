@@ -110,8 +110,8 @@ class FusionGalleryDimension(FusionGalleryBaseConstraint):
         # - AlignedDimensionOrientation
         # - HorizontalDimensionOrientation
         # - VerticalDimensionOrientation
-        is_horizontal = math.isclose(start_point["x"], end_point["x"])
-        is_vertical = math.isclose(start_point["y"], end_point["y"])
+        is_horizontal = math.isclose(start_point["y"], end_point["y"])
+        is_vertical = math.isclose(start_point["x"], end_point["x"])
         if is_vertical and is_horizontal:
             self.converter.log_failure("Orientation for SketchLinearDimension has coincident start/end points")
             return None
