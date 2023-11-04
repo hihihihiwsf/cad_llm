@@ -53,7 +53,7 @@ def visualize_sample(input_curves, box_lim):
         fig.set_size_inches(figure_size_inches)
         # fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
 
-        draw_curves(in_curve, ax=ax, box_lim=box_lim, color="black")
+        draw_curves(in_curve, ax=ax, box_lim=box_lim, color="black", draw_points=False)
         # draw_curves(label_curves[i], ax=ax, box_lim=box_lim, color="blue")
 
         fig.canvas.draw()
@@ -163,8 +163,8 @@ def visualize_sample_handraw2(entities, box_lim):
 
 
 def visualize_sample_cv(point_entities, box_lim):
-    dpi = 100
-    figure_size_inches = ( 224 / dpi, 224 / dpi)
+    dpi = 300#100
+    figure_size_inches = (10,10)#( 224 / dpi, 224 / dpi)
     out = []
     
     for entities in point_entities:
@@ -196,7 +196,7 @@ def handraw_curves(curves, ax, box_lim, color, draw_points=False):
         if curve and curve.good:
                 curve.hand_draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
    
-def draw_curves(curves, ax, box_lim, color, draw_points=False, hand_draw=False):
+def draw_curves(curves, ax, box_lim, color, draw_points=True, hand_draw=False):
     ax.set_xlim(left=-3, right=box_lim)
     ax.set_ylim(bottom=-3, top=box_lim)
     ax.set_xticks([])
@@ -206,7 +206,7 @@ def draw_curves(curves, ax, box_lim, color, draw_points=False, hand_draw=False):
 
     for curve in curves:
         if curve and curve.good:
-                curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)    #, hand_draw=hand_draw      
+                curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points,linewidth=2)    #, hand_draw=hand_draw      
 
 def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
 

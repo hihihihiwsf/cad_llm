@@ -108,6 +108,8 @@ class SketchGraphsCollator:
         else:
             hand_imgs = visualize_sample_cv(point_inputs, 64+3)
         
+        # for i in range(24):
+        #     hand_imgs[i].save(f'hand_imgs_{i}.png')
         if self.args.data_aug==1:
             shift_fraction = 6 / 128
             scale = 0.2

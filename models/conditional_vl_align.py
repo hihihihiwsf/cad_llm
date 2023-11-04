@@ -149,13 +149,13 @@ class ByT5Model(pl.LightningModule):
         im_en = time.time()
         # print("image_encoder time:", im_en-st)
 
-        '''txt encoder'''
+        '''txt encoder
         txt_encoder_output = self.model.encoder(batch['input_ids'], batch['attention_mask'],output_hidden_states=True)
         _txt_embeds = txt_encoder_output[0]
         
         text_embeds = self.textpooler(_txt_embeds)
         text_embeds = self.text_projection(text_embeds)
-        
+        '''
         #output_embed = torch.concatenate((torch.unsqueeze(image_for_llm, dim=1), _txt_embeds), dim=1)
         # input_embed = torch.concatenate((imm, image_for_llm.unsqueeze(1), code, txt_embeddings), dim=1)
         output_embed = image_for_llm

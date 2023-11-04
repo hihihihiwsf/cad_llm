@@ -24,7 +24,7 @@ class Circle(Curve):
         self.update_y(self.radius)
         self.update_y(-self.radius)
         
-    def draw(self, ax, draw_points=True, linewidth=1, color="red"):
+    def draw(self, ax, draw_points=True, linewidth=4, color="red"):
         assert self.good, "The curve is not in the good state"
         ap = patches.Circle(self.center, self.radius, lw=linewidth, fill=None, color=color)
         ax.add_patch(ap)
@@ -32,7 +32,7 @@ class Circle(Curve):
             self.draw_points(ax)
     
     # color should be red
-    def hand_draw(self, ax, draw_points=True, linewidth=1, color="black"):
+    def hand_draw(self, ax, draw_points=True, linewidth=4, color="black"):
         gap = npr.rand() * 360
         
         start = gap
@@ -57,7 +57,7 @@ class Circle(Curve):
             self.draw_points(ax)
             
 
-    def draw_np(self, np_image, draw_points=True, linewidth=2, color="red", cell_size=4):
+    def draw_np(self, np_image, draw_points=True, linewidth=4, color="red", cell_size=4):
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
 
         shifted_center = np.rint(self.shift_point(self.center, cell_size=cell_size)).astype(dtype=np.int32)

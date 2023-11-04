@@ -17,7 +17,7 @@ from models.vis_recon import VisRecon
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
 from util import get_quantized_range
-from geometry.parse import get_curves, get_point_entities, get_pair_constraints
+from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
@@ -42,8 +42,6 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 
-import matplotlib.pyplot as plt
-
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
@@ -62,10 +60,10 @@ class BlipTextPooler(nn.Module):
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae, tokenizer, num_train_steps):
+    def __init__(self, args, vit_mae):
         super().__init__()
         self.save_hyperparameters()
-        self.num_train_steps = num_train_steps
+        
         self.args = args
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
@@ -73,12 +71,16 @@ class ByT5Model(pl.LightningModule):
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
 
-        
+        # if args.untrained_model:
+        #     config = T5Config.from_pretrained(args.model_name)
+        #     model = T5ForConditionalGeneration(config)
+        #     model._init_weights(model)  # maybe redundant
+        # else:
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = tokenizer
-
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        # self.tokenizer.add_special_tokens(["<IMAGE>"])
         self.projection_dim = 1024
         self.text_embed_dim = self.model.config.d_model
         
@@ -107,7 +109,7 @@ class ByT5Model(pl.LightningModule):
         self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
-        self.post_layernorm = self.vis_model.vit.layernorm
+        #self.post_layernorm = self.vis_model.vit.layernorm
         self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
@@ -128,7 +130,7 @@ class ByT5Model(pl.LightningModule):
         oi = self.vis_model.vit(batch['images'], output_hidden_states=True) 
 
         last_hidden_state = oi['last_hidden_state']
-        #pooled_output= last_hidden_state[:, 0, :] 
+        #pooled_output= last_hidden_state[:, 0, :]
         _image_embeds = last_hidden_state #self.post_layernorm(last_hidden_state)
         
         '''patch embedding downsample 196 to 14'''
@@ -178,6 +180,7 @@ class ByT5Model(pl.LightningModule):
 
         lm_logits = self.model.lm_head(sequence_output)
 
+        loss = None
         if model_batch['labels'] is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
@@ -187,19 +190,14 @@ class ByT5Model(pl.LightningModule):
         img_hidden_state = self.layernorm(output_embed)
         self.post_layernorm=self.vis_model.vit.layernorm
         img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
-        if last_hidden_state.shape[1]-img_hidden_state.shape[1]>0:
-            mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-            img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
-        else:
-            img_hidden_state = img_hidden_state[:, :last_hidden_state.shape[1], :]
+        self.mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, self.mask), dim=1)
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-
-        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
-
+        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
-        '''contrastive loss'''
+        
         # normalized features
         image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
@@ -208,18 +206,12 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
+        '''contrastive loss'''
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
         loss = txt_loss + img_loss + contrastive_loss
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-        self.log("img_loss", img_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
-        self.log("contrastive_loss", contrastive_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
-        self.log("txt_loss", txt_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
-        
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -302,18 +294,13 @@ class ByT5Model(pl.LightningModule):
         '''image decoder pixel loss'''
         img_hidden_state = self.layernorm(output_embed)
         self.post_layernorm = self.vis_model.vit.layernorm
-        img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state))) #
-        if last_hidden_state.shape[1]-img_hidden_state.shape[1]>0:
-            mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
-            img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
-        else:
-            img_hidden_state = img_hidden_state[:, :last_hidden_state.shape[1], :]
+        img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
+        mask = nn.Parameter(torch.zeros(img_hidden_state.shape[0], last_hidden_state.shape[1]-img_hidden_state.shape[1], img_hidden_state.shape[2])).to(img_hidden_state.device)
+        img_hidden_state = torch.concat((img_hidden_state, mask), dim=1)
         #img_hidden_state = self.back_patch(img_hidden_state.permute(0,2,1))
         
         img_res = self.vis_model.decoder(img_hidden_state, ids_restore=oi.ids_restore)
-
-        img_loss = self.forward_loss(batch['images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
-
+        img_loss = self.forward_loss(batch['output_images'], img_res.logits) #img_res.logits: #(bs, 196, v_dim)
         
         
         # normalized features
@@ -338,10 +325,7 @@ class ByT5Model(pl.LightningModule):
         encoder_outputs = BaseModelOutput(last_hidden_state=output_embed)
         batch['encoder_outputs'] = encoder_outputs
         
-        if self.args.constraint_model:
-            self.generate_constraints(batch)
-        else:
-            self.generate_samples(batch)
+        self.generate_samples(batch)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
@@ -354,32 +338,17 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
         # # Convert string entities to curves and check validity
-        # validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
-        # self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-        #          batch_size=self.batch_size, sync_dist=True)
+        validity = calculate_validity(batch_sample_curves=batch["sample_curves"])
+        self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                 batch_size=self.batch_size, sync_dist=True)
 
-        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-            batch_size=self.batch_size, sync_dist=True)
-        self.log(f"{validate}_precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-            batch_size=self.batch_size, sync_dist=True)
-        self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
         
         return loss
 
-    def generate_constraints(self,batch):
-        # Recursively unwrap the model from potential distributed training containers
-        generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(encoder_outputs=batch["encoder_outputs"], attention_mask=batch["attention_mask"],
-                                         do_sample=False, max_new_tokens=self.args.max_length+10)
-
-        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
-        batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
-
-        batch["point_samples"] = [get_pair_constraints(string_sample) for string_sample in batch["string_samples"]]
-        batch["point_labels"] = [get_pair_constraints(string_label) for string_label in batch["string_labels"]]
 
     
     def generate_samples(self, batch):
@@ -410,9 +379,6 @@ class ByT5Model(pl.LightningModule):
             `torch.FloatTensor`: Pixel reconstruction loss.
         """
         target = self.vis_model.patchify(pixel_values)
-        
-        self.draw_pred_image(pixel_values, pred)
-        
         if self.vis_model.config.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
@@ -436,41 +402,21 @@ class ByT5Model(pl.LightningModule):
         fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
         fig.savefig(fig_path)
 
-    def draw_pred_image(self, pixel_values, pred):
-        
-        # mean = torch.Tensor(self.feature_extractor.image_mean).view(3,1,1)
-        # new_mean = mean*torch.ones(self.batch_size, 3,224,224)
-        # new_mean=new_mean.to(pred.device)
-        # std = torch.Tensor(self.feature_extractor.image_std).view(3,1,1)
-        # new_std = std*torch.ones(self.batch_size, 3,224,224)
-        # new_std=new_std.to(pred.device)
-        std = self.vitmae_preprocess.image_std
-        mean = self.vitmae_preprocess.image_mean
-
-        pred_pixel = self.vis_model.unpatchify(pred)
-        
-        plt.rcParams['figure.figsize'] = [24, 24]
-
-        plt.subplot(1, 4, 1)
-        self.show_image(pred_pixel[0].cpu(), mean, std, "pred")
-
-        plt.subplot(1, 4, 2)
-        self.show_image(pixel_values[0].cpu(), mean, std, "original")
-        plt.savefig("eval_generated_image.png")
-        
-    def show_image(self, image, mean, std,title='' ):
-        # image is [H, W, 3]
-        mean = torch.Tensor(mean)
-        std = torch.Tensor(std)
-        image = image.permute(1,2,0)
-        assert image.shape[2] == 3
-        plt.imshow(torch.clip((image * std + mean) * 255, 0, 255).int())
-        plt.title(title, fontsize=16)
-        plt.axis('off')
-        return
-        
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr)
+        params = list(self.trainer.model.parameters()) 
+        # optimizer = Adafactor(
+        #         params,
+        #         lr=None,
+        #         eps=(1e-30, 1e-3),
+        #         clip_threshold=1.0,
+        #         decay_rate=-0.8,
+        #         beta1=None,
+        #         weight_decay=0.0,
+        #         relative_step=True, #
+        #         scale_parameter=True, #
+        #         warmup_init=True, #
+        #     )
+        optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             
