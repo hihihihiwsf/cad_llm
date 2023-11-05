@@ -24,7 +24,7 @@ class Circle(Curve):
         self.update_y(self.radius)
         self.update_y(-self.radius)
         
-    def draw(self, ax, draw_points=True, linewidth=4, color="red"):
+    def draw(self, ax, draw_points=True, linewidth=4, color="red"): #color="red"
         assert self.good, "The curve is not in the good state"
         ap = patches.Circle(self.center, self.radius, lw=linewidth, fill=None, color=color)
         ax.add_patch(ap)
@@ -32,7 +32,7 @@ class Circle(Curve):
             self.draw_points(ax)
     
     # color should be red
-    def hand_draw(self, ax, draw_points=True, linewidth=4, color="black"):
+    def hand_draw(self, ax, draw_points=True, linewidth=4, color="red"):
         gap = npr.rand() * 360
         
         start = gap

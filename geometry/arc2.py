@@ -30,7 +30,7 @@ class Arc(Curve):
         self.update_y(self.end_point[1])
 
 
-    def draw(self, ax, draw_points=True, linewidth=2, color="green"):
+    def draw(self, ax, draw_points=True, linewidth=2, color="green"): #"green"
         if not self.good:
             # The points are co-linear, the arc is a line (probably due to quantization)
             xdata, ydata = zip(self.points[0], self.points[2])
@@ -60,7 +60,7 @@ class Arc(Curve):
             self.draw_points(ax)
 
     #color should be green
-    def hand_draw(self, ax, draw_points=True, linewidth=4, color="black"):  
+    def hand_draw(self, ax, draw_points=True, linewidth=4, color="green"):  
         if not self.good:
             xdata, ydata = zip(self.points[0], self.points[2])
             line = Line((self.points[0],self.points[2]))
@@ -97,7 +97,7 @@ class Arc(Curve):
         if draw_points:
             self.draw_points(ax)
     
-    def draw_np(self, np_image, draw_points=True, linewidth=2, color="green", cell_size=4):
+    def draw_np(self, np_image, draw_points=True, linewidth=2, color="green", cell_size=4): #"green"
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
 
         shifted_points = self.get_shifted_points(cell_size=cell_size)

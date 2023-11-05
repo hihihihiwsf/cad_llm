@@ -29,7 +29,7 @@ class Line(Curve):
         self.update_x(self.points[1][0])
         self.update_y(self.points[1][1])
 
-    def draw(self, ax, draw_points=True, linewidth=4, color="black"):
+    def draw(self, ax, draw_points=True, linewidth=4, color="blue"):
         pt0, pt1 = self.points
 
         linestyle = "-"
@@ -47,7 +47,7 @@ class Line(Curve):
         if draw_points:
             self.draw_points(ax)
 
-    def draw_np(self, np_image, draw_points=True, linewidth=4, color="blue", cell_size=4):
+    def draw_np(self, np_image, draw_points=True, linewidth=4, color="blue", cell_size=4):#
         """ Draw the line on a quantized grid with cell of size (cell_size, cell_size) """
 
         shifted_points = self.get_shifted_points(cell_size=cell_size)

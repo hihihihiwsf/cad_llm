@@ -123,8 +123,8 @@ def visualize_sample_handraw(entities, box_lim):
 def visualize_sample_handraw2(entities, box_lim):
     input_curves = [get_curves(ent) for ent in entities]
     batch_size = len(input_curves)
-    dpi = 100
-    figure_size_inches = ( 224 / dpi, 224 / dpi)
+    dpi = 300 #100
+    figure_size_inches = (10,10) #( 224 / dpi, 224 / dpi)
     out = []
     url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     
@@ -137,7 +137,7 @@ def visualize_sample_handraw2(entities, box_lim):
         fig.set_size_inches(figure_size_inches)
         # fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
 
-        draw_curves(in_curve, ax=ax, box_lim=box_lim, color="black", hand_draw=True)
+        draw_curves(in_curve, ax=ax, box_lim=box_lim, color="black", linewidth=4,hand_draw=True,draw_points=False)
         # draw_curves(label_curves[i], ax=ax, box_lim=box_lim, color="blue")
 
         fig.canvas.draw()
@@ -168,7 +168,7 @@ def visualize_sample_cv(point_entities, box_lim):
     out = []
     
     for entities in point_entities:
-        np_image = render_sketch_opencv(entities, size=224, quantize_bins=64)
+        np_image = render_sketch_opencv(entities, size=3000, quantize_bins=64,linewidth=40) #size=224
         pil_image = np_image[:, :, ::-1]  # BGR to RGB
         img = Image.fromarray(pil_image, mode='RGB')
         out.append(img)
@@ -196,7 +196,7 @@ def handraw_curves(curves, ax, box_lim, color, draw_points=False):
         if curve and curve.good:
                 curve.hand_draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points)
    
-def draw_curves(curves, ax, box_lim, color, draw_points=True, hand_draw=False):
+def draw_curves(curves, ax, box_lim, color, linewidth=2, draw_points=True, hand_draw=False):
     ax.set_xlim(left=-3, right=box_lim)
     ax.set_ylim(bottom=-3, top=box_lim)
     ax.set_xticks([])
@@ -206,9 +206,10 @@ def draw_curves(curves, ax, box_lim, color, draw_points=True, hand_draw=False):
 
     for curve in curves:
         if curve and curve.good:
-                curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points,linewidth=2)    #, hand_draw=hand_draw      
+                #curve.draw(ax=ax,  color=colors[curve.points.shape[0]], draw_points=draw_points, linewidth=8)    #, hand_draw=hand_draw      
+                curve.draw(ax=ax,  color=color, draw_points=draw_points, linewidth=linewidth)
 
-def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
+def render_sketch_opencv(point_entities, size, quantize_bins, linewidth):
 
     np_image = np.ones((size, size, 3), np.uint8) * 255
     cell_size = size // quantize_bins
@@ -221,7 +222,7 @@ def render_sketch_opencv(point_entities, size, quantize_bins, linewidth=2):
     assert all(curve for curve in curves)
 
     for curve in curves:
-        curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)
+        curve.draw_np(np_image, draw_points=False, linewidth=linewidth, cell_size=cell_size, color="black")
 
     return np_image
 
