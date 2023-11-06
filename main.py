@@ -10,9 +10,8 @@ except ImportError:
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
 from dataset import sg_dataset_for_constraint, sg_dataset, sg_dataset_imageconditional #import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
-from models import vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type, vlt5_v2_tri_2_wo_IDL, vlt5_wo_ITC, vlt5_wo_ITC_IDL
+from models import cad_lip, cadlip_for_constraint, cadlip_wo_IDL, cadlip_wo_ITC, cadlip_wo_ITC_IDL, vlt5, byt5
 from models import conditional_vision_only
-from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks, get_total_train_steps
@@ -63,34 +62,7 @@ def main():
     else:
         dataset = sg_dataset
     
-    dataset = sg_dataset_imageconditional
     sketchdata = dataset.SketchDataModule(tokenizer, args)
-    
-    '''
-    tokenized_length
-    import matplotlib.pyplot as plt
-    all_input_lengths = []
-    all_output_lengths = []
-    for _, input_lengths, output_lengths in sketchdata.val_dataloader():
-            all_input_lengths.extend(input_lengths)
-            all_output_lengths.extend(output_lengths)
-    plt.figure(figsize=(12, 5))
-
-    plt.subplot(1, 2, 1)
-    plt.hist(all_input_lengths, bins=30, color='blue', alpha=0.7)
-    plt.title('Input Token Length Distribution')
-    plt.xlabel('Length')
-    plt.ylabel('Number of Samples')
-
-    plt.subplot(1, 2, 2)
-    plt.hist(all_output_lengths, bins=30, color='red', alpha=0.7)
-    plt.title('Output Token Length Distribution')
-    plt.xlabel('Length')
-    plt.ylabel('Number of Samples')
-
-    plt.tight_layout()
-    plt.savefig("val_input_output_length.png")
-    '''
     
     num_train_batches = len(sketchdata.train_dataloader())
     num_gpus = torch.cuda.device_count()
@@ -99,15 +71,15 @@ def main():
     print("Loading model...")
 
     if args.arch == "vlt5_for_cons_type":
-        architecture = vlt5_for_cons_type
+        architecture = cadlip_for_constraint
     elif args.arch == "vlt5_v2_tri":  #### multimodal tri loss model
-        architecture = vlt5_v2_tri
+        architecture = cad_lip
     elif args.arch == "vlt5_wo_IDL":
-        architecture = vlt5_v2_tri_2_wo_IDL
+        architecture = cadlip_wo_IDL
     elif args.arch == "vlt5_wo_ITC":
-        architecture = vlt5_wo_ITC
+        architecture = cadlip_wo_ITC
     elif args.arch == "vlt5_wo_ITC_IDL":
-        architecture = vlt5_wo_ITC_IDL
+        architecture = cadlip_wo_ITC_IDL
     
     architecture=conditional_vision_only
     if not args.untrained_model:
