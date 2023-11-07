@@ -53,7 +53,9 @@ class Arc(Curve):
 
         if not self.good:
             # The points are co-linear, the arc is a line (probably due to quantization)
-            cv2.line(np_image, shifted_points[0], shifted_points[1], CV2_COLORS[color], thickness=linewidth)
+            start_point = tuple(int(round(coord)) for coord in shifted_points[0])
+            end_point = tuple(int(round(coord)) for coord in shifted_points[1])
+            cv2.line(np_image, start_point, end_point, CV2_COLORS[color], thickness=linewidth)
 
             if draw_points:
                 self.draw_points_np(np_image, cell_size)

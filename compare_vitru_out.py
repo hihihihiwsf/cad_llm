@@ -96,6 +96,13 @@ def arc_midpoint(arc):
     # Compute the new midpoint inside the arc
     mx = cx + dx * r
     my = cy + dy * r
+    x0=int(round(x0))
+    x2=int(round(x2))
+    mx=int(round(mx))
+    y0=int(round(y0))
+    y2=int(round(y2))
+    my=int(round(my))
+
     return ((x0, y0), (mx, my), (x2,y2))
     
 def convert_circle(string_ent):
