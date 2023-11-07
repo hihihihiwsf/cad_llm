@@ -224,6 +224,16 @@ class ByT5Model(pl.LightningModule):
         
         
     def evaluation_process(self, batch, batch_idx, validate):
+        
+        
+        '''draw some test samples to compare with vitruvion'''
+        
+        
+        
+        
+        
+        
+        ''''''
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
 
