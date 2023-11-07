@@ -168,7 +168,7 @@ def visualize_sample_cv(point_entities, box_lim):
     out = []
     
     for entities in point_entities:
-        np_image = render_sketch_opencv(entities, size=3000, quantize_bins=64,linewidth=40) #size=224
+        np_image = render_sketch_opencv(entities, size=224, quantize_bins=64,linewidth=40) #size=224
         pil_image = np_image[:, :, ::-1]  # BGR to RGB
         img = Image.fromarray(pil_image, mode='RGB')
         out.append(img)
@@ -217,8 +217,9 @@ def render_sketch_opencv(point_entities, size, quantize_bins, linewidth):
     curves = get_curves(point_entities)
     # for curve in curves:
     #     if curve ==  None:
-            # print("curve is None:")
-            # print(point_entities) 
+    #         print("curve is None:")
+    #         print(point_entities) 
+    #         #import pdb;pdb.set_trace()
     assert all(curve for curve in curves)
 
     for curve in curves:

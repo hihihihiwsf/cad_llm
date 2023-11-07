@@ -141,7 +141,7 @@ class SketchGraphsCollator:
     def __call__(self, sketch_dicts):
         input_strings = [sketch['input_text'] for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
-        constraint_masks = [sketch['constraints_mask'] for sketch in sketch_dicts]
+
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
 
@@ -154,9 +154,6 @@ class SketchGraphsCollator:
         list_of_img = visualize_sample_cv(point_entities=point_full, box_lim=64 + 3)
         batch_full_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         
-        point_outputs = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts]
-        list_of_out_img = visualize_sample_cv(point_entities=point_outputs, box_lim=64 + 3)
-        output_images = self.vitmae_preprocess(list_of_out_img, return_tensors="pt")
         
         # batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])
         # images = []
@@ -175,7 +172,6 @@ class SketchGraphsCollator:
             "labels": labels,
             "sketches": sketch_dicts,
             "images": batch_full_images.pixel_values,
-            "output_images": output_images.pixel_values,
         }
         return batch    # , input_tokenized_lengths, output_tokenized_lengths
 
