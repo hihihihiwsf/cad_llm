@@ -227,6 +227,7 @@ class ByT5Model(pl.LightningModule):
         model_batch={}
         
         '''draw some test samples to compare with vitruvion'''
+        model_batch={}
         import json
         import ast
         from compare_vitru_out import convert_circle, save_entities
@@ -237,33 +238,33 @@ class ByT5Model(pl.LightningModule):
         with open('/home/ubuntu/sifan/vitruvion/vitruvion_autocomplete_new_test_label.json', 'r') as f:
             test_label = json.load(f)
         
-        idx = [3,13,1,25,41,177,211,532,552,553,700,716,735,827,871,880,900,913,966,969,999,1001]
+        idx = np.range(0, 50)
         point_input_strings = [ast.literal_eval(pre) for pre in test_prefix]
         point_label = [ast.literal_eval(pre) for pre in test_label]
-        
-        # Convert each tuple to a string, with each number incremented by one
-        
-        def post(tupled_list):
-            incremented_strings = []
-            for tup in tupled_list:
-                if len(tup)>2:
-                    incremented_numbers = [str(item) for item in tup]
-                    incremented_string = ",".join(incremented_numbers)
-                    incremented_strings.append(incremented_string)
+            
 
-            # Join all stringified tuples with a semicolon
-            final_string = ";".join(incremented_strings) + ";"
-            return final_string
-
-        input_strings = [post(point_input) for id, point_input in enumerate(point_input_strings) if id in idx]
+        point_inputs = [convert_circle(sketch) for sketch in point_input_strings]
+        point_labels =[convert_circle(sketch) for sketch in point_label]
+        
+        
+        _point_inputs=[]
+        input_strings = []
+        _point_labels= []
+        for i in idx:
+            _point_labels.append(point_labels[i])
+            _point_inputs.append(point_inputs[i])
+            input_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in point_inputs[i]) + ';')
         tokenized_input = self.tokenizer(input_strings, max_length=self.args.max_length, padding=True, truncation=True, return_tensors="pt")
         model_batch['input_ids'] = tokenized_input.input_ids
         model_batch['attention_mask'] = tokenized_input.attention_mask
         
         
-        point_inputs = [convert_circle(sketch) for sketch in point_input_strings] 
-        in_img = [visualize_sample_cv(point_input, box_lim=64+3) for id, point_input in enumerate(point_inputs) if id in idx]
-        input_images = self.vitmae_preprocess(in_img, return_tensors="pt") 
+        prefix_img = visualize_sample_cv(_point_inputs, box_lim=64+3)
+        label_img = visualize_sample_cv(_point_labels, box_lim=64+3)
+        
+        #prefix_img[0].save('path_to_save_image.pdf', 'PDF', resolution=100.0)
+        
+        input_images = self.vitmae_preprocess(prefix_img, return_tensors="pt") 
         model_batch['images'] = input_images.pixel_values
         
         

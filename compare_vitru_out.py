@@ -43,6 +43,8 @@ def compute_metric(string_completed_entities, string_label_entities):
 
 def circle_to_four_points(circle):
     x,y,r = circle
+    x=x+1
+    y=y+1
     # Right point
     x1, y1 = x + r, y
     # Top point
@@ -67,7 +69,13 @@ def find_circle_center(x0, y0, x1, y1, x2, y2):
 def arc_midpoint(arc):
     # Find center of circle
     x0, y0, x1,y1, x2, y2 = arc
-
+    x0=x0+1
+    y0=y0+1
+    x1=x1+1
+    y1=y1+1
+    x2=x2+1
+    y2=y2+1
+    
     cx, cy = find_circle_center(x0, y0, x1, y1, x2, y2)
     
     # Determine the midpoint of the arc
@@ -107,7 +115,7 @@ def convert_circle(string_ent):
             continue
         elif len(string_ent[idx])==4:
             x1,y1,x2,y2 = string_ent[idx]
-            new_ent = ((x1,y1),(x2,y2))
+            new_ent = ((x1+1,y1+1),(x2+1,y2+1))
             new_string.append(new_ent)
         else:
             new_string.append(string_ent[idx])
