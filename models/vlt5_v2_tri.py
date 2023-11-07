@@ -60,7 +60,7 @@ class BlipTextPooler(nn.Module):
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae):
+    def __init__(self, args, vit_mae, tokenizer,num_train_steps):
         super().__init__()
         self.save_hyperparameters()
         
@@ -79,7 +79,7 @@ class ByT5Model(pl.LightningModule):
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.tokenizer = tokenizer
         # self.tokenizer.add_special_tokens(["<IMAGE>"])
         self.projection_dim = 1024
         self.text_embed_dim = self.model.config.d_model
@@ -109,7 +109,7 @@ class ByT5Model(pl.LightningModule):
         self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
-        #self.post_layernorm = self.vis_model.vit.layernorm
+        self.post_layernorm = self.vis_model.vit.layernorm##############unused
         self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
@@ -224,8 +224,53 @@ class ByT5Model(pl.LightningModule):
         
         
     def evaluation_process(self, batch, batch_idx, validate):
-        cols = ["attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
+        model_batch={}
+        
+        '''draw some test samples to compare with vitruvion'''
+        import json
+        import ast
+        from compare_vitru_out import convert_circle, save_entities
+        from preprocess.preprocessing import center_vertices
+        from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv
+        with open('/home/ubuntu/sifan/vitruvion/vitruvion_autocomplete_new_test_prefix.json', 'r') as f:
+            test_prefix = json.load(f)
+        with open('/home/ubuntu/sifan/vitruvion/vitruvion_autocomplete_new_test_label.json', 'r') as f:
+            test_label = json.load(f)
+        
+        idx = [3,13,1,25,41,177,211,532,552,553,700,716,735,827,871,880,900,913,966,969,999,1001]
+        point_input_strings = [ast.literal_eval(pre) for pre in test_prefix]
+        point_label = [ast.literal_eval(pre) for pre in test_label]
+        
+        # Convert each tuple to a string, with each number incremented by one
+        
+        def post(tupled_list):
+            incremented_strings = []
+            for tup in tupled_list:
+                if len(tup)>2:
+                    incremented_numbers = [str(item) for item in tup]
+                    incremented_string = ",".join(incremented_numbers)
+                    incremented_strings.append(incremented_string)
+
+            # Join all stringified tuples with a semicolon
+            final_string = ";".join(incremented_strings) + ";"
+            return final_string
+
+        input_strings = [post(point_input) for id, point_input in enumerate(point_input_strings) if id in idx]
+        tokenized_input = self.tokenizer(input_strings, max_length=self.args.max_length, padding=True, truncation=True, return_tensors="pt")
+        model_batch['input_ids'] = tokenized_input.input_ids
+        model_batch['attention_mask'] = tokenized_input.attention_mask
+        
+        
+        point_inputs = [convert_circle(sketch) for sketch in point_input_strings] 
+        in_img = [visualize_sample_cv(point_input, box_lim=64+3) for id, point_input in enumerate(point_inputs) if id in idx]
+        input_images = self.vitmae_preprocess(in_img, return_tensors="pt") 
+        model_batch['images'] = input_images.pixel_values
+        
+        
+        ''''''
+        
+        #cols = ["attention_mask", "labels"]
+        #model_batch = {col: val for col, val in batch.items() if col in cols}
 
         '''img encoder'''
         # image_features = self.clip_model.encode_image(batch['images'])
@@ -258,7 +303,7 @@ class ByT5Model(pl.LightningModule):
 
 
         # adding ones to attention_mask
-        att = model_batch['attention_mask']
+        att = batch['attention_mask']
         model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
         
@@ -291,7 +336,7 @@ class ByT5Model(pl.LightningModule):
             txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
         
         
-        '''image decoder pixel loss'''
+        '''image decoder pixel loss
         img_hidden_state = self.layernorm(output_embed)
         self.post_layernorm = self.vis_model.vit.layernorm
         img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
@@ -311,13 +356,13 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
-        '''contrastive loss'''
+        ###contrastive loss
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
         loss = txt_loss + img_loss + contrastive_loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-        
+        '''
         
         
         # Generate and process samples
@@ -404,18 +449,7 @@ class ByT5Model(pl.LightningModule):
 
     def configure_optimizers(self):
         params = list(self.trainer.model.parameters()) 
-        # optimizer = Adafactor(
-        #         params,
-        #         lr=None,
-        #         eps=(1e-30, 1e-3),
-        #         clip_threshold=1.0,
-        #         decay_rate=-0.8,
-        #         beta1=None,
-        #         weight_decay=0.0,
-        #         relative_step=True, #
-        #         scale_parameter=True, #
-        #         warmup_init=True, #
-        #     )
+
         optimizer = optim.AdamW(params, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
