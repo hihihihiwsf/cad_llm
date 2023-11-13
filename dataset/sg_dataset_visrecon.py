@@ -10,7 +10,7 @@ import torch
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 import multiprocessing as mp
 import time 
-
+import pytorch_lightning as pl
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
@@ -89,7 +89,7 @@ class SketchGraphsCollator:
 
     def __call__(self, sketch_dicts):
 
-        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        point_inputs = [get_point_entities(sketch["input_text"]+sketch["output_text"]) for sketch in sketch_dicts]
         input_curves = [get_curves(point_input) for point_input in point_inputs]
         
         # proc = mp.Process(target=visualize_sample(input_curves=input_curves, box_lim=64 + 3))
@@ -121,3 +121,32 @@ def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
+
+class SketchDataModule(pl.LightningDataModule):
+    def __init__(self, tokenizer, args):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.args = args
+
+    def train_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="train",
+                shuffle=True
+        )
+
+    def val_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="val",
+                shuffle=False
+        )
+    def test_dataloader(self):
+        return get_sketchgraphs_dataloader(
+                tokenizer=self.tokenizer,
+                args=self.args,
+                split="test",
+                shuffle=False
+        )

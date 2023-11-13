@@ -14,7 +14,7 @@ from transformers import T5Config, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
 import sys
 
-sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
+#sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
@@ -102,7 +102,8 @@ class VisRecon(pl.LightningModule):
             # print("epoch 0 begin draw image")
         px = batch['images']
         px = px['pixel_values']
-        self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
+        for i in range(self.batch_size):
+            self.vis_vit.visualize(i,batch_idx, torch.unsqueeze(px[i], 0).to(self.model.device))
         #self.vis_vit.visualize(px.to(self.model.device))
         
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,

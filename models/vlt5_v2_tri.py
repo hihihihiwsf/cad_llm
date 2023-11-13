@@ -18,7 +18,7 @@ sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
 from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
-from geometry.visualization import visualize_batch
+from geometry.visualization import visualize_batch, visualize_sample_cv
 from pathlib import Path
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, TaskType
 from PIL import Image
@@ -41,7 +41,7 @@ from transformers.modeling_outputs import (
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
 )
-
+import matplotlib.pyplot as plt
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
@@ -60,7 +60,7 @@ class BlipTextPooler(nn.Module):
 
 
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae, tokenizer,num_train_steps):
+    def __init__(self, args, vit_mae, tokenizer, num_train_steps):
         super().__init__()
         self.save_hyperparameters()
         
@@ -70,7 +70,7 @@ class ByT5Model(pl.LightningModule):
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualization
-
+        self.num_train_steps=num_train_steps
         # if args.untrained_model:
         #     config = T5Config.from_pretrained(args.model_name)
         #     model = T5ForConditionalGeneration(config)
@@ -88,13 +88,13 @@ class ByT5Model(pl.LightningModule):
         self.text_projection = nn.Linear(self.text_embed_dim, self.projection_dim, bias=False)
         
 
-        self.vit_mae = vit_mae
+
         if vit_mae is not None:
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
             #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-            m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
+            #m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
             del m
         
@@ -109,7 +109,7 @@ class ByT5Model(pl.LightningModule):
         self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
-        self.post_layernorm = self.vis_model.vit.layernorm##############unused
+        self.post_layernorm = self.vis_model.vit.layernorm ######
         self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
@@ -224,54 +224,11 @@ class ByT5Model(pl.LightningModule):
         
         
     def evaluation_process(self, batch, batch_idx, validate):
-        model_batch={}
+        '''compare vitru's output
+        '''
+        cols = ["attention_mask", "labels"]
+        model_batch = {col: val for col, val in batch.items() if col in cols}
         
-        '''draw some test samples to compare with vitruvion'''
-        model_batch={}
-        import json
-        import ast
-        from compare_vitru_out import convert_circle, save_entities
-        from preprocess.preprocessing import center_vertices
-        from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv
-        with open('/home/ubuntu/sifan/vitruvion/vitruvion_autocomplete_new_test_prefix.json', 'r') as f:
-            test_prefix = json.load(f)
-        with open('/home/ubuntu/sifan/vitruvion/vitruvion_autocomplete_new_test_label.json', 'r') as f:
-            test_label = json.load(f)
-        
-        idx = np.range(0, 50)
-        point_input_strings = [ast.literal_eval(pre) for pre in test_prefix]
-        point_label = [ast.literal_eval(pre) for pre in test_label]
-            
-
-        point_inputs = [convert_circle(sketch) for sketch in point_input_strings]
-        point_labels =[convert_circle(sketch) for sketch in point_label]
-        
-        
-        _point_inputs=[]
-        input_strings = []
-        _point_labels= []
-        for i in idx:
-            _point_labels.append(point_labels[i])
-            _point_inputs.append(point_inputs[i])
-            input_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in point_inputs[i]) + ';')
-        tokenized_input = self.tokenizer(input_strings, max_length=self.args.max_length, padding=True, truncation=True, return_tensors="pt")
-        model_batch['input_ids'] = tokenized_input.input_ids
-        model_batch['attention_mask'] = tokenized_input.attention_mask
-        
-        
-        prefix_img = visualize_sample_cv(_point_inputs, box_lim=64+3)
-        label_img = visualize_sample_cv(_point_labels, box_lim=64+3)
-        
-        #prefix_img[0].save('path_to_save_image.pdf', 'PDF', resolution=100.0)
-        
-        input_images = self.vitmae_preprocess(prefix_img, return_tensors="pt") 
-        model_batch['images'] = input_images.pixel_values
-        
-        
-        ''''''
-        
-        #cols = ["attention_mask", "labels"]
-        #model_batch = {col: val for col, val in batch.items() if col in cols}
 
         '''img encoder'''
         # image_features = self.clip_model.encode_image(batch['images'])
@@ -304,7 +261,7 @@ class ByT5Model(pl.LightningModule):
 
 
         # adding ones to attention_mask
-        att = batch['attention_mask']
+        att = model_batch['attention_mask']
         model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], 1).to(self.device), att), dim=1)
         # model_batch['attention_mask'] = torch.cat((torch.ones(att.shape[0], code.shape[1]+imm.shape[1]+1).to(self.device), att), dim=1)
         
@@ -337,7 +294,7 @@ class ByT5Model(pl.LightningModule):
             txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
         
         
-        '''image decoder pixel loss
+        '''image decoder pixel loss'''
         img_hidden_state = self.layernorm(output_embed)
         self.post_layernorm = self.vis_model.vit.layernorm
         img_hidden_state = self.gelu(self.post_layernorm(self.back_mapper(img_hidden_state)))
@@ -357,13 +314,13 @@ class ByT5Model(pl.LightningModule):
         logit_scale = self.logit_scale.exp()
         similarity = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         #logits_per_image = logits_per_text.t() # = similarity.t()
-        ###contrastive loss
+        '''contrastive loss'''
         contrastive_loss = nn.functional.cross_entropy(similarity, torch.arange(len(similarity), device=similarity.device))
         
         loss = txt_loss + img_loss + contrastive_loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-        '''
+        
         
         
         # Generate and process samples
@@ -388,10 +345,11 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
-        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        precision,recall,f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
+        self.log_samples(batch, batch_idx)
         
         return loss
 
@@ -445,19 +403,34 @@ class ByT5Model(pl.LightningModule):
 
         fig = visualize_batch(input_curves=input_curves, label_curves=label_curves,
                               sample_curves=batch["sample_curves"], box_lim=self.box_lim + 3)
-        fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
-        fig.savefig(fig_path)
+        point_samples = [out_point+in_point for out_point, in_point in zip(batch["point_samples"], point_inputs)]
+        outputs = visualize_sample_cv(point_samples, box_lim=64+3)
+        try:
+            labels = visualize_sample_cv(batch['point_labels'], 67)
+        except:
+            print(batch['point_labels'])
+        #fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
+        #fig.savefig(fig_path)
+        for i in range(len(outputs)):   
+            plt.imshow(outputs[i])
+            plt.axis('off') 
+            plt.savefig(f'cadvlm/output_{batch_idx*32+i}.pdf', bbox_inches='tight')
+            plt.imshow(labels[i])
+            plt.axis('off') 
+            plt.savefig(f'cadvlm/label_{batch_idx*32+i}.pdf', bbox_inches='tight')
+            # outputs[i].save(f"cadvlm/{batch_idx}_output_{i}.p")
+            # labels[i].save(f"cadvlm/{batch_idx}_label_{i}.png")
 
     def configure_optimizers(self):
-        params = list(self.trainer.model.parameters()) 
+        params = list(self.model.parameters()) + list(self.mapper.parameters()) + list(self.back_mapper.parameters()) + list(self.textpooler.parameters())+ list(self.text_projection.parameters())
+        params2 = list(self.layernorm.parameters()) + list(self.embed_patch.parameters()) +list(self.vit_mae.parameters())+list(self.vision_projection.parameters())
 
-        optimizer = optim.AdamW(params, lr=self.lr)
+        optimizer = optim.AdamW(params+params2, lr=self.lr)
         if not self.args.cosinedecay:
             return optimizer
             
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(self.args.epochs * 1.15), verbose=True)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4,sefsdfsdf verbose=True)
-        #lr_scheduler = AdafactorSchedule(optimizer)
+
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

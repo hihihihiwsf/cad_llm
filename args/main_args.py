@@ -6,8 +6,8 @@ import os
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
-    parser.add_argument("--results_dir", type=str, default="/home/ubuntu/sifan/results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="/home/ubuntu/sifan/data/sg_string_v5_ascii_max64", help="Dataset path") #sg_string_v5_ascii_max64
+    parser.add_argument("--results_dir", type=str, default="/u/wusifan/cadllm/results", help="Directory to save checkpoints and logs")
+    parser.add_argument("--dataset", type=str, default="/Tmp/sifan/cad/data/sg_string_v5_ascii_max64", help="Dataset path") #sg_string_v5_ascii_max64
     parser.add_argument("--num_workers", type=int, default=64, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")

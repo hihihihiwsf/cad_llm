@@ -40,6 +40,12 @@ def compute_metric(string_completed_entities, string_label_entities):
     validity = validity / len(completed_entities)
     return top1_full, top1_ent, validity, f1
 
+def center_vertices(vertices):
+    """Translate the vertices so that bounding box is centered at zero."""
+    vert_min = min(min(pair) for pair in tuples)
+    vert_max = max(max(pair) for pair in tuples)
+    vert_center = 0.5 * (vert_min + vert_max)
+    return vertices - vert_center
 
 def circle_to_four_points(circle):
     x,y,r = circle
@@ -54,6 +60,7 @@ def circle_to_four_points(circle):
     # Bottom point
     x4, y4 = x, y - r
 
+    
     return ((x1, y1), (x2, y2), (x3, y3), (x4, y4))
 
 def find_circle_center(x0, y0, x1, y1, x2, y2):
@@ -188,18 +195,121 @@ from geometry.visualization import render_sketch_opencv
 
 if __name__ == '__main__':
     
-    out_ent_path = '/home/ubuntu/vitruvion/new_test_completed.json'
-    out_label_path = '/home/ubuntu/vitruvion/new_test_label.json'
-    out_prefix_path= '/home/ubuntu/vitruvion/new_test_input.json'
-
-
-    with open(out_ent_path,'r') as f:
-        output_entities = json.load(f)
-
-    with open(out_label_path, 'r') as f:
-        labels = json.load(f)
-
-    with open(out_prefix_path, 'r') as f:
-        prefix = json.load(f)
+    import json
+    import ast
+    import numpy as np
+    from IPython import embed
+    import matplotlib.pyplot as plt
+    from compare_vitru_out import convert_circle, save_entities
+    from preprocess.preprocessing import center_vertices, center_and_scale, normalize_and_quantize_vertices
+    from geometry.visualization import visualize_batch, visualize_sample, visualize_sample_cv, visualize_sample_handraw2
+    with open('/u/wusifan/cadllm/vitruvion/virtruvion_test_prefix.json', 'r') as f:
+        test_prefix = json.load(f)
+    with open('/u/wusifan/cadllm/vitruvion/virtruvion_test_label.json', 'r') as f:
+        test_label = json.load(f)
+    with open('/u/wusifan/cadllm/vitruvion/virtruvion_test_output.json', 'r') as f:
+        test_output = json.load(f)
     
-    visua_vitru(prefix, output_entities, labels)
+    def center_and_normalize(part_data, tuple_data):
+        if not tuple_data:
+            return tuple_data, tuple_data
+        vertices = np.array([item for sublist in tuple_data for item in sublist])
+
+        normalized_quantized_vertices = normalize_and_quantize_vertices(vertices)
+        normalized_quantized_part_data = []
+        output_tuples = []
+        start = 0
+        for t in tuple_data:
+            end = start + len(t)
+            output_tuples.append(tuple(map(tuple, normalized_quantized_vertices[start:end])))
+            if t in part_data:
+                normalized_quantized_part_data.append(tuple(map(tuple, normalized_quantized_vertices[start:end])))
+            start = end
+        return normalized_quantized_part_data,output_tuples
+
+
+    point_input_strings = [ast.literal_eval(pre) for pre in test_prefix]
+    point_label = [ast.literal_eval(pre) for pre in test_label]
+    point_output = [ast.literal_eval(pre) for pre in test_output]
+        
+    print("start convert circle")
+    point_inputs = [convert_circle(sketch) for sketch in point_input_strings]
+    point_labels =[convert_circle(sketch) for sketch in point_label]
+    point_outputs =[convert_circle(sketch) for sketch in point_output]
+    
+    point_inputs = point_inputs[1200:]
+    point_labels = point_labels[1200:]
+    point_outputs = point_outputs[1200:]
+    
+    print("start center and normalize")
+    n_point_inputs = [center_and_normalize(tuple_input, tuple_label)[0] for tuple_input, tuple_label in zip(point_inputs, point_labels)]
+    n_point_labels = [center_and_normalize(tuple_input, tuple_label)[1] for tuple_input, tuple_label in zip(point_inputs, point_labels)]
+    n_point_outputs = [center_and_normalize(tuple_input, tuple_label)[1] for tuple_input, tuple_label in zip(point_inputs, point_outputs)]
+    
+    start = 200
+
+    
+    # hand_draw = visualize_sample_handraw2(n_point_labels[150:200], box_lim=64+3)
+    # shift_fraction = 6 / 128
+    # scale = 0.2
+    # shear = 8
+    # rotation = 8
+    # import torchvision
+    # img_affine = torchvision.transforms.RandomAffine(
+    #     rotation,
+    #     translate=(shift_fraction, shift_fraction),
+    #     scale=(1 - scale, 1 + scale),
+    #     shear=shear,
+    #     fill=255)
+    # noisy_hand_imgs = [img_affine(imgs) for imgs in hand_draw]
+    
+    # prefix_img = visualize_sample_cv(n_point_inputs[start:start+500], box_lim=64+3)
+    # label_img = visualize_sample_cv(n_point_labels[start:start+500], box_lim=64+3)
+    # for i in range(500):
+    #     label_img[i].save(f'label_outputs/{i+start}_label.png')
+    #     prefix_img[i].save(f'prefix_outputs/{i+start}_prefix.png')
+    #    #noisy_hand_imgs[i].save(f'noisy_outputs/{i}_noisy.png')
+
+
+    # saved_idx = [3,6,13,17,28,29, 51, 58, 63, 66, 67, 69,80,82, 86, 91, 92,93,101,110,113,126,127,129,130,132]
+    # 2th_saved_idx = [18, 23, 26,32, 37, 49, 52, 60, 75, 97, 118, 124, 126, 136, 138, 141,146,151,157,158,164,160,163,165,173,181,213,216,217,220,224]
+    th2_saved_idx = [18, 23, 26,32, 37, 49, 52, 60, 75, 97, 118, 124, 126, 136, 138, 141,146,151,157,158,164,160,163,165,173,181,213,216,217,220,224,236,244,247,252,256,257,264,271,275,276,277,279,280,301,302,303,306,309,315,320,322,323,332,336,340,344,347,356,374,376,377,378,379,398,401,404,407,410,416,417,418,419
+    ,425,426,431,436,440,443,455,459,463,464,465,466,471,488,493,492,495,496,503,509,510,514,522,533,535,534
+    ,538,540,545,548,561,565,575,584,593,596,601,602,604,605,608,611,615,618,621,624,646,650,651,652,663,667
+    ,677,681,682,683,697,698]
+    saved_inputs=[]
+    saved_label=[]
+    saved_output = []
+    input_strings = []
+    label_strings = []
+    print("start append strings")
+    for i in th2_saved_idx:
+        saved_inputs.append(n_point_inputs[i])
+        saved_label.append(n_point_labels[i])
+        saved_output.append(n_point_outputs[i])
+        input_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in n_point_inputs[i]) + ';')
+        label_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in n_point_labels[i]) + ';')
+    
+    
+    print("visulizing samples")
+    #prefix_img = visualize_sample_cv(saved_inputs, box_lim=64+3)
+    #label_img = visualize_sample_cv(saved_label, box_lim=64+3)
+    output_img = visualize_sample_cv(saved_output, box_lim=64+3)
+    print("saving samples")
+    for i in range(len(th2_saved_idx)):
+        print(i)
+        # plt.imshow(label_img[i])
+        # plt.axis('off') 
+        # plt.savefig(f'pdfs/{i}_label.pdf', bbox_inches='tight')
+        # plt.imshow(prefix_img[i])
+        # plt.axis('off') 
+        # plt.savefig(f'pdfs/{i}_prefix.pdf', bbox_inches='tight')
+        plt.imshow(output_img[i])
+        plt.axis('off') 
+        plt.savefig(f'pdfs/{i}_vitru.pdf', bbox_inches='tight')
+        
+    embed()
+    with open('pdfs/input_strings.json', 'w') as f:
+        json.dump(input_strings, f)
+    with open('pdfs/label_strings.json', 'w') as f:
+        json.dump(label_strings, f)

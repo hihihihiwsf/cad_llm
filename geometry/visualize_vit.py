@@ -23,7 +23,7 @@ class Visualize_VIT():
         plt.axis('off')
         return
 
-    def visualize(self, pixel_values):
+    def visualize(self, index, batch_idx, pixel_values):
         # forward pass
         outputs = self.model(pixel_values)
         y = self.model.unpatchify(outputs.logits)
@@ -59,4 +59,7 @@ class Visualize_VIT():
         self.show_image(im_paste[0], "reconstruction + visible")
 
         plt.show()
-        plt.savefig('maemask_patch32.png')
+        plt.savefig(f'vitmae_output/{batch_idx}_{index}.pdf')
+        
+
+    

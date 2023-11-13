@@ -16,7 +16,6 @@ class SketchGraphsDataset(Dataset):
         path = Path(args.dataset) / f"{split}.json"
         with open(path, "r") as f:
             self.data = json.load(f)
-        
 
         if split == "train":
             n = int(args.limit_data * len(self.data))
@@ -26,7 +25,6 @@ class SketchGraphsDataset(Dataset):
         self.order = args.train_order if split == "train" else "sorted"
         assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
-        self.constrain_col ="constraints"
 
         # Sanity check text format
         entity_string = self.data[0][self.entities_col][0]
@@ -50,9 +48,8 @@ class SketchGraphsDataset(Dataset):
         """
         sketch_dict = self.data[index]
         entities = sketch_dict[self.entities_col]
-        constraints = sketch_dict[self.constrain_col]
-        
-        
+        if self.order == "random":
+            np.random.shuffle(entities)
         mask = self.get_mask(len(entities))
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
@@ -77,7 +74,27 @@ class SketchGraphsDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+class TestSketchGraphsDataset(Dataset):
+    def __init__(self, args, split):
 
+        
+        with open('pdfs/input_strings.json', 'r') as f:
+            self.input_strings = json.load(f)
+        with open('pdfs/label_strings.json', 'r') as f:
+            self.data = json.load(f)
+
+    def __getitem__(self, index):
+        """
+        Applies a random mask to the entities of sketch
+        Returns (input_text, output_text)
+        """
+        sketch_dict = {}
+        sketch_dict['input_text'] = self.input_strings[index] #input_text  #'<s>'+ 
+        sketch_dict['output_text'] =  self.data[index] #[len(sketch_dict['input_text']):] #output_text #+ '</s>'
+        
+        return sketch_dict
+    def __len__(self):
+        return len(self.data)
 class SketchGraphsCollator:
     def __init__(self, tokenizer, max_length=None, args=None):
         self.tokenizer = tokenizer
@@ -100,8 +117,13 @@ class SketchGraphsCollator:
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
         labels[labels == self.tokenizer.pad_token_id] = -100
 
+        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+
+        list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
+        batch_images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         
-        point_outputs = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts] 
+        point_outputs = [get_point_entities(sketch["output_text"]) for sketch in sketch_dicts]
+
         list_of_out_img = visualize_sample_cv(point_entities=point_outputs, box_lim=64 + 3)
         output_images = self.vitmae_preprocess(list_of_out_img, return_tensors="pt")
         
@@ -120,20 +142,20 @@ class SketchGraphsCollator:
             "attention_mask": tokenized_input.attention_mask,
             "labels": labels,
             "sketches": sketch_dicts,
-            "images": output_images.pixel_values,
+            "images": batch_images.pixel_values,
+            "output_images": output_images.pixel_values,
         }
         return batch
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
-    dataset = SketchGraphsDataset(split=split, args=args)
-    
+    if split=='test':
+        dataset = TestSketchGraphsDataset(split=split, args=args)
+    else:
+        dataset = SketchGraphsDataset(split=split, args=args)
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
-    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle, drop_last=True,
+    return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)
-
-
-
 
 class SketchDataModule(pl.LightningDataModule):
     def __init__(self, tokenizer, args):
