@@ -7,9 +7,9 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
-# from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
-from dataset.sg_dataset import get_sketchgraphs_dataloader
-from models.byt5 import ByT5Model
+from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
+# from dataset.sg_dataset import get_sketchgraphs_dataloader
+# from models.byt5 import ByT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
 from util import get_loggers, get_checkpoint_callbacks
@@ -50,8 +50,8 @@ def main():
 
     from transformers import ViTMAEForPreTraining 
     # vitmae_model = ViTMAEForPreTraining.from_pretrained("facebook/vit-mae-base")
-    model = ByT5Model(args=args, vit_mae=None)
-    # model.tokenizer = None
+    model = VisRecon(args=args)
+    model.tokenizer = None
 
     print("Loading data...")
     train_dataloader = get_sketchgraphs_dataloader(tokenizer=model.tokenizer, args=args, split="train", shuffle=True)
@@ -81,10 +81,12 @@ def main():
         # limit_val_batches=0.1,
     )
     if not args.eval: 
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        #trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        trainer.validate(model, dataloaders=val_dataloader)
     else:
         # loading the model from exp_name/best.ckpt
-        ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
+        #ckpt_dir = args.checkpoint_dir + "/{}/best.ckpt".format(args.exp_name)
+        ckpt_dir = '/Tmp/sifan/cad/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_dir, dataloaders=val_dataloader)
 
 

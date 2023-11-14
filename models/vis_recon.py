@@ -61,11 +61,11 @@ class VisRecon(pl.LightningModule):
 
 
         # If using single token encoding - adjust tokenizer and model embeddings
-        if not args.ascii_encoding:
-            self.adjust_to_use_new_tokens()
+        # if not args.ascii_encoding:
+        #     self.adjust_to_use_new_tokens()
 
-        if args.lora:
-            self.add_lora()
+        # if args.lora:
+        #     self.add_lora()
 
     def add_lora(self):
         lora_config = LoraConfig(
@@ -123,9 +123,10 @@ class VisRecon(pl.LightningModule):
         outputs = self.model(**batch['images'])
         loss = outputs.loss
         
-        # px = batch['images']
-        # px = px['pixel_values']
-        # self.vis_vit.visualize(torch.unsqueeze(px[0], 0).to(self.model.device))
+        px = batch['images']
+        px = px['pixel_values']
+        for i in range(self.batch_size):
+            self.vis_vit.visualize(i, batch_idx, torch.unsqueeze(px[i], 0).to(self.model.device))
         
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)

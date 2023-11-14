@@ -23,7 +23,7 @@ class Visualize_VIT():
         plt.axis('off')
         return
 
-    def visualize(self, pixel_values):
+    def visualize(self, i, batch_idx, pixel_values):
         # forward pass
         outputs = self.model(pixel_values)
         y = self.model.unpatchify(outputs.logits)
@@ -47,16 +47,16 @@ class Visualize_VIT():
         plt.rcParams['figure.figsize'] = [24, 24]
 
         plt.subplot(1, 4, 1)
-        self.show_image(x[0], "original")
+        self.show_image(x[0])
 
         plt.subplot(1, 4, 2)
-        self.show_image(im_masked[0], "masked")
+        self.show_image(im_masked[0])
 
         plt.subplot(1, 4, 3)
-        self.show_image(y[0], "reconstruction")
+        self.show_image(y[0])
 
         plt.subplot(1, 4, 4)
-        self.show_image(im_paste[0], "reconstruction + visible")
+        self.show_image(im_paste[0])
 
         plt.show()
-        plt.savefig('maemask.png')
+        plt.savefig(f'untuned_vitmae_output/{batch_idx}_{i}.pdf')

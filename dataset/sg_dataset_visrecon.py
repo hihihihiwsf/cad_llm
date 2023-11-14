@@ -89,7 +89,7 @@ class SketchGraphsCollator:
 
     def __call__(self, sketch_dicts):
 
-        point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
+        point_inputs = [get_point_entities(sketch["input_text"]+sketch['output_text']) for sketch in sketch_dicts]
         input_curves = [get_curves(point_input) for point_input in point_inputs]
         
         # proc = mp.Process(target=visualize_sample(input_curves=input_curves, box_lim=64 + 3))
