@@ -10,29 +10,30 @@ virt_full=[0.059, 0.71,3.5,14.6]
 
 cad_f1=[16.9, 36.4, 53.2, 62.7]
 virt_f1=[8.5,11.0,11.9,12.5]
-
+plt.rcParams.update({'font.size': 20})
 # Plotting the data
-plt.plot(input_token_ratio, virt_f1, marker='o', label='Vitruvion')
-plt.plot(input_token_ratio, cad_f1, marker='*', label='CAD-LIP')
+plt.plot(input_token_ratio, cad_any, marker='*', label='CadVLM', color='orange')
+plt.plot(input_token_ratio, virt_any, marker='o', label='Vitruvion',color='royalblue')
+
 
 # # Adding labels for each y-value
 # for i in range(len(hit_rate)):
 #     plt.text(input_token_ratio[i], hit_rate[i] + 1, f"{hit_rate[i]:.2f}%", ha='center')
 
 # Adding labels and title
-plt.xlabel('Input entity ratio (%)',fontsize=14)
-plt.ylabel('CAD F1 (%)',fontsize=14)
+plt.xlabel('Input entity ratio (%)',fontsize=20)
+plt.ylabel('Entity Accuracy (%)',fontsize=20)
 
 # Setting x-axis ticks
 plt.xticks([20, 40, 60, 80])
-plt.ylim(0, 100)
+plt.ylim(15, 100)
 
 # Adding a legend
-plt.legend(fontsize=14)
+plt.legend(fontsize=20, loc='upper left')
 
 # Display grid
 plt.grid(False)
 
 # Save the figure as a PDF
-plt.savefig('ratio_f1_acc.pdf', bbox_inches='tight')
+plt.savefig('ratio_ent_acc.pdf', bbox_inches='tight')
 
