@@ -10,8 +10,8 @@ import numpy as np
 import importlib
 
 from sketch_point import SketchPoint
-import sketch_base
-importlib.reload(sketch_base)
+# import sketch_base
+# importlib.reload(sketch_base)
 from sketch_base import SketchBase
 
 from sketchgraphs.data._entity import Arc, Circle, Line

@@ -1,5 +1,9 @@
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import io
+import PIL
+import PIL.Image
+
 import random
 import json
 from pathlib import Path
@@ -10,22 +14,25 @@ import torch
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 import pytorch_lightning as pl
-
+from preprocess.sketchgraphs.data import flat_array, sketch_from_sequence, sketch
 import torchvision
+
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
+        self.image_file = '/Tmp/sifan/cad/vitr_data/data/sg_string_renders/test_images.npy'
+        self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
         with open(path, "r") as f:
 
             self.data = json.load(f)
         
 
-        if split == "train":
-            n = int(args.limit_data * len(self.data))
-            random.shuffle(self.data)
-            self.data = self.data[:n]
-
+        # if split == "train":
+        #     n = int(args.limit_data * len(self.data))
+        #     random.shuffle(self.data)
+        #     self.data = self.data[:n]
+        self.args = args
         self.order = args.train_order if split == "train" else "sorted"
         assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
@@ -60,6 +67,25 @@ class SketchGraphsDataset(Dataset):
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
         sketch_dict['input_text'] = input_text  #'<s>'+ 
         sketch_dict['output_text'] = output_text #+ '</s>'
+
+        
+        if self.args.hand_draw ==1:
+            self.image_data = flat_array.load_dictionary_flat(self.image_file)
+            self.image_indexes = self.image_data['indexes']
+            segment_start, segment_end = np.searchsorted(self.image_indexes, [index, index + 1])
+
+            num_images = segment_end - segment_start
+            idx_in_array = segment_start 
+        
+            img = self.image_data['imgs'][idx_in_array:idx_in_array + num_images]
+            image_bytes = img[1]
+            _img = PIL.Image.open(io.BytesIO(image_bytes))
+            _img = np.asarray(_img)
+            _img = np.repeat(np.expand_dims(_img, -1), 3, axis=2)
+            #img_tensor = torch.from_numpy(np.asarray(img).copy()).unsqueeze_(0).to(torch.float32).div_(255).sub_(0.5).mul_(2)
+            sketch_dict['img'] = _img
+   
+        
         return sketch_dict
 
     def get_mask(self, n):
@@ -102,11 +128,15 @@ class SketchGraphsCollator:
         labels[labels == self.tokenizer.pad_token_id] = -100
 
         point_inputs = [get_point_entities(sketch["input_text"]+sketch['output_text']) for sketch in sketch_dicts]
-        
-        if self.args.hand_draw ==1:
-            hand_imgs = visualize_sample_handraw2(point_inputs, 64+3)
+        if self.args.hand_draw==1:
+            images = [sketch['img'] for sketch in sketch_dicts]
         else:
-            hand_imgs = visualize_sample_cv(point_inputs, 64+3)
+            images = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
+
+        # if self.args.hand_draw ==1:
+        #     hand_imgs = [img[1] for img in images]#images[torch.randint(1, len(images), (), generator=self.generator)]
+        # else:
+        #     hand_imgs = [img[0] for img in images]#visualize_sample_cv(point_inputs, 64+3)
         
         # for i in range(24):
         #     hand_imgs[i].save(f'images_sample/hand_imgs_{i}.png')
@@ -122,10 +152,10 @@ class SketchGraphsCollator:
                 scale=(1 - scale, 1 + scale),
                 shear=shear,
                 fill=255)
-            hand_imgs = [img_affine(imgs) for imgs in hand_imgs]
+            images = [img_affine(imgs) for imgs in images]
         
-        #list_of_img = visualize_sample_cv(point_entities=point_inputs, box_lim=64 + 3)
-        batch_images = self.vitmae_preprocess(hand_imgs, return_tensors="pt")
+        
+        batch_images = self.vitmae_preprocess(images, return_tensors="pt")
         
         
         # batch_images['pixel_values'] = torch.zeros_like(batch_images['pixel_values'])

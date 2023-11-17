@@ -22,14 +22,14 @@ import json
 from tqdm import tqdm
 from sketchgraphs.data import flat_array, sketch_from_sequence, sketch
 
-import sketch_sg
+#import sketch_sg
 from preprocessing import preprocess_sketch
 from deduplicate import deduplicate_splits
 
-importlib.reload(sketch_sg)
+#importlib.reload(sketch_sg)
 from sketch_sg import SketchSG
 
-
+import numpy as np
 
 
 def get_files(args):
@@ -120,11 +120,56 @@ def convert_split(file, split_name, filter_filenames, limit, quantize_bits, new_
         seq = seq_data["sequences"][index]
         sketch_dict = convert_sketch(index=index, seq=seq, split_name=split_name, quantize_bits=quantize_bits,
                                      new_tokens=new_tokens)
+        
         if not sketch_dict:
             continue
         sketch_str_dicts.append(sketch_dict)
 
     return sketch_str_dicts
+
+def convert_split_filtered(file, image_file, split_name, limit=None, quantize_bits=6, new_tokens=0):
+    """Convert the sketches of a given SketchGraphs dataset split"""
+    image_data = flat_array.load_dictionary_flat(image_file)
+    image_indexes = image_data['indexes']
+    seq_data = flat_array.load_dictionary_flat(file)
+    seq_count = len(seq_data["sequences"])
+    seq_limit = seq_count
+
+    if limit is not None:
+        if split_name == "test" or split_name == "val":
+            seq_limit = int(limit * 0.2)
+        elif split_name == "train":
+            seq_limit = int(limit * 0.6)
+
+    print(f"Converting {seq_limit} {split_name} designs...")
+    sketch_str_dicts = []
+    for index in tqdm(range(seq_count)):
+        seq = seq_data["sequences"][index]
+        
+        segment_start, segment_end = np.searchsorted(image_indexes, [index, index + 1])
+
+        num_images = segment_end - segment_start
+        idx_in_array = segment_start 
+        img = image_data['imgs'][idx_in_array:idx_in_array + num_images]
+        import PIL
+        import io
+        image_bytes = img[1]
+        _img = PIL.Image.open(io.BytesIO(image_bytes))
+        #_images = self.vitmae_preprocess(img, return_tensors="pt")
+        sketch_dict = convert_sketch(index=index, seq=seq, split_name=split_name, quantize_bits=quantize_bits,
+                                     new_tokens=new_tokens)
+        if index==10:
+            import pdb;pdb.set_trace()
+        if not sketch_dict:
+            continue
+        try:
+            sketch_dict['img'] = img
+        except:
+            import pdb;pdb.set_trace()
+        sketch_str_dicts.append(sketch_dict)
+
+    return sketch_str_dicts
+
 
 def save_splits(output_dir, split_to_sketches):
     for split_name, sketches in split_to_sketches.items():
@@ -157,10 +202,13 @@ def filter_main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tok
 
     print(f"Processing Time: {time.time() - start_time} secs")
 
-def main(sg_file, output_dir, limit, quantize_bits, new_tokens, split_name):
-    sketches = convert_split(file=sg_file, split_name=split_name, 
+def main(sg_file, img_file, output_dir, limit, quantize_bits, new_tokens, split_name):
+    sketches = convert_split_filtered(file=sg_file, image_file=img_file, split_name=split_name, 
                                 limit=limit, quantize_bits=quantize_bits, new_tokens=new_tokens)
-    
+    filename = output_dir / f"{split_name}.json"
+    with open(filename, "w") as f:
+        json.dump(sketches, f)
+        
 def count_constraint_length(sketch):
     list_cons_length = []
     for each_s in tqdm(sketch):
@@ -180,11 +228,11 @@ def draw_list_leng(data, split):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="/home/ubuntu/vitr_data/data/sg_strings",
+    parser.add_argument("--input", type=str, default="/Tmp/sifan/cad/data/sg_strings",
                         help="Input folder containing the SketchGraphs filter sequence .npy files")
-    parser.add_argument("--output", type=str, default='/home/ubuntu/sifan/data/sg_strings_v7_with_constraints/',
+    parser.add_argument("--output", type=str, default='/Tmp/sifan/cad/data/sg_strings_v8_with_hand_drawn/',
                         help="Output folder to save the data [default: output]")
-    parser.add_argument("--filter", type=str, default="/home/ubuntu/sifan/cad_llm/split_to_filenames_v4.json",
+    parser.add_argument("--filter", type=str, default="/Tmp/sifan/cad/data/split_to_filenames_v4.json",
                         help="File containing indices of deduped sketches ('train_test.json')")
     parser.add_argument("--limit", type=int, help="Only process this number of designs")
     parser.add_argument("--quantize_bits", type=int, default=6,
@@ -194,7 +242,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     output_dir = get_output_dir(args)
-    sg_files = get_files(args)
+    #sg_files = get_files(args)
 
-    filter_main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter, limit=args.limit,
-         quantize_bits=args.quantize_bits, new_tokens=args.new_tokens)
+    sg_files = '/Tmp/sifan/cad/vitr_data/data/sg_string_v4_npy/test.npy'
+    img_file = '/Tmp/sifan/cad/vitr_data/data/sg_string_renders/test_images.npy'
+    main(sg_file=sg_files, img_file= img_file, output_dir=output_dir, limit=args.limit,
+         quantize_bits=args.quantize_bits, new_tokens=args.new_tokens, split_name='test')

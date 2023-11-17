@@ -222,7 +222,7 @@ def render_sketch_opencv(point_entities, size, quantize_bins, linewidth):
     assert all(curve for curve in curves)
 
     for curve in curves:
-        curve.draw_np(np_image, draw_points=False, linewidth=linewidth, cell_size=cell_size, color="black")
+        curve.draw_np(np_image, draw_points=True, linewidth=linewidth, cell_size=cell_size)
 
     return np_image
 

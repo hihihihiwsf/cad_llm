@@ -6,6 +6,7 @@ try:
     import comet_ml  # Import before torch
 except ImportError:
     pass
+import time
 import torch
 import torch.optim as optim
 # import lightning.pytorch as pl
@@ -45,7 +46,7 @@ class ByT5Model(pl.LightningModule):
         model = T5ForConditionalGeneration.from_pretrained(args.model_name)
 
         self.model = model
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.tokenizer = tokenizer
         # self.tokenizer.add_special_tokens(["<IMAGE>"])
 
         self.args = args
@@ -70,14 +71,18 @@ class ByT5Model(pl.LightningModule):
         else:
             m = VisRecon(args=args)
             #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-            #m.load_from_checkpoint('/Tmp/sifan/cad/best.ckpt')
+            #m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
         
         self.vis_model = self.vit_mae
         self.vis_model.config.mask_ratio = 0.
         self.vis_model.requires_grad_(False)
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
+       
         
+        # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
+        # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
+        # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
         self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
 
         self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
@@ -177,7 +182,7 @@ class ByT5Model(pl.LightningModule):
         _images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
         batch['images'] = _images.pixel_values.to(device)
         '''
-
+        st = time.time()
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
         
@@ -227,16 +232,18 @@ class ByT5Model(pl.LightningModule):
 
         batch['attention_mask'] = model_batch['attention_mask']
         batch['inputs_embeds'] = model_batch['inputs_embeds']
-        
+        et = time.time()
+        print("before generate:", et-st)
         # Generate and process samples
         self.generate_samples(batch)
 
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
-        self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+        # outputs = self.model(**model_batch)
+        loss = 0#outputs.loss
+        # self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
         
-    
+        gt = time.time()
+        print("generate time:", gt-et)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
@@ -253,13 +260,13 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
-        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        precision,recall,f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
-        # # # Plot sketches
-        # if batch_idx < 5:
-        #     self.log_samples(batch=batch, batch_idx=batch_idx)
+        # # Plot sketches
+        if batch_idx < 5:
+            self.log_samples(batch=batch, batch_idx=batch_idx)
         
         return loss
 
@@ -291,7 +298,21 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr, weight_decay=0.05)
+        params = list(self.model.parameters()) + list(self.mapper.parameters()) #+ list(self.vis_model.parameters())
+        #params2= list(self.embed_patch.parameters()) + list(self.layernorm.parameters())+list(self.post_layernorm.parameters())
+        # optimizer = Adafactor(
+        #         params,
+        #         lr=None,
+        #         eps=(1e-30, 1e-3),
+        #         clip_threshold=1.0,
+        #         decay_rate=-0.8,
+        #         beta1=None,
+        #         weight_decay=0.0,
+        #         relative_step=True, #
+        #         scale_parameter=True, #
+        #         warmup_init=True, #
+        #     )
+        optimizer = optim.AdamW(params, lr=self.lr, weight_decay=0.05)
         #optimizer = Adafactor(params+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
 
         if not self.args.cosinedecay:

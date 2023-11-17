@@ -76,8 +76,8 @@ class Arc(Curve):
         cv2.ellipse(np_image, center=center, axes=(radius, radius), angle=0, startAngle=start_angle, endAngle=end_angle,
                     color=CV2_COLORS[color], thickness=linewidth)
 
-        if draw_points:
-            self.draw_points_np(np_image, cell_size)
+        #if draw_points:
+        self.draw_points_np(np_image, cell_size=cell_size)
 
         return np_image
 

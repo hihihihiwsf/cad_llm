@@ -17,7 +17,7 @@ class Curve:
         for x, y in self.points:
             ax.plot(x, y, 'b.')
 
-    def draw_points_np(self, np_image, cell_size, radius=2):
+    def draw_points_np(self, np_image, cell_size, radius=20): #radius=2, thickness=-1
         """
         Draw markers for the points using opencv
         """

@@ -290,7 +290,16 @@ if __name__ == '__main__':
         input_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in n_point_inputs[i]) + ';')
         label_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in n_point_labels[i]) + ';')
     
-    
+    saved_inputs[58].append(((18, 27), (31, 17), (44, 27)))
+    prefix_img = visualize_sample_cv(saved_inputs[53:59], box_lim=64+3)
+    label_img = visualize_sample_cv(saved_label[53:59], box_lim=64+3)
+    plt.imshow(prefix_img[0])
+    plt.axis('off') 
+    plt.savefig('_img2.pdf')
+    plt.imshow(label_img[0])
+    plt.axis('off') 
+    plt.savefig('_img3.pdf')
+    embed()
     print("visulizing samples")
     #prefix_img = visualize_sample_cv(saved_inputs, box_lim=64+3)
     #label_img = visualize_sample_cv(saved_label, box_lim=64+3)
@@ -308,7 +317,7 @@ if __name__ == '__main__':
         plt.axis('off') 
         plt.savefig(f'pdfs/{i}_vitru.pdf', bbox_inches='tight')
         
-    embed()
+    
     with open('pdfs/input_strings.json', 'w') as f:
         json.dump(input_strings, f)
     with open('pdfs/label_strings.json', 'w') as f:
