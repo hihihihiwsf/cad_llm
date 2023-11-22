@@ -63,7 +63,7 @@ def main():
     else:
         dataset = sg_dataset
     
-    dataset = sg_dataset_imageconditional
+    #dataset = sg_dataset_imageconditional
     sketchdata = dataset.SketchDataModule(tokenizer, args)
     
     '''
@@ -225,7 +225,7 @@ def main():
     elif args.arch == "vlt5_wo_ITC_IDL":
         architecture = vlt5_wo_ITC_IDL
     
-    architecture=conditional_vision_only1
+    #architecture=conditional_vision_only1
     if not args.untrained_model:
         model = architecture.ByT5Model(args=args, vit_mae=None, tokenizer=tokenizer, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
@@ -258,7 +258,7 @@ def main():
         gradient_clip_val=1.0, 
         gradient_clip_algorithm="value",
         #limit_train_batches=0.01,
-        limit_val_batches=0.003,
+        limit_val_batches=0.1,
         #limit_test_batches=0.1,
     )
     
@@ -274,9 +274,9 @@ def main():
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
 
         #ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraint_with_embedding/best.ckpt'
-        #ckpt_path = '/Tmp/sifan/cad/sg_multimodal_v2_triloss/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
+        ckpt_path = '/Tmp/sifan/cad/sg_multimodal_v2_triloss/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         #ckpt_path = '/u/wusifan/cadllm/results/eval_vitmae/best.ckpt'
-        ckpt_path = '/Tmp/sifan/cad/best.ckpt'
+        #ckpt_path = '/Tmp/sifan/cad/best.ckpt'
         trainer.validate(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
     '''  
     all_input_lengths = model.prediction_len
