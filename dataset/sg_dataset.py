@@ -62,7 +62,7 @@ class SketchGraphsDataset(Dataset):
         """
         Sample a random size for mask and a random mask of size n
         """
-        mask_percent = random.uniform(self.min_input_percent, self.max_input_percent)
+        mask_percent = 0.4#random.uniform(self.min_input_percent, self.max_input_percent)
         mask_size = round(mask_percent * n)
         mask_size = min(max(1, mask_size), n - 1)
 
@@ -77,11 +77,16 @@ class SketchGraphsDataset(Dataset):
 class TestSketchGraphsDataset(Dataset):
     def __init__(self, args, split):
 
-        
-        with open('pdfs/input_strings.json', 'r') as f:
-            self.input_strings = json.load(f)
-        with open('pdfs/label_strings.json', 'r') as f:
-            self.data = json.load(f)
+        if args.beam_sampling:
+            with open('pdfs/input_strings.json', 'r') as f:
+                self.input_strings = json.load(f)
+            with open('pdfs/label_strings.json', 'r') as f:
+                self.data = json.load(f)       
+        else:
+            with open('pdfs/input_strings2.json', 'r') as f:
+                self.input_strings = json.load(f)
+            with open('pdfs/label_strings2.json', 'r') as f:
+                self.data = json.load(f)
 
     def __getitem__(self, index):
         """
@@ -95,6 +100,7 @@ class TestSketchGraphsDataset(Dataset):
         return sketch_dict
     def __len__(self):
         return len(self.data)
+    
 class SketchGraphsCollator:
     def __init__(self, tokenizer, max_length=None, args=None):
         self.tokenizer = tokenizer
@@ -149,10 +155,10 @@ class SketchGraphsCollator:
 
 
 def get_sketchgraphs_dataloader(tokenizer, args, split, shuffle):
-    if split=='test':
-        dataset = TestSketchGraphsDataset(split=split, args=args)
-    else:
-        dataset = SketchGraphsDataset(split=split, args=args)
+    # if args.=='test':
+    #     dataset = TestSketchGraphsDataset(split=split, args=args)
+    # else:
+    dataset = SketchGraphsDataset(split=split, args=args)
     collator = SketchGraphsCollator(tokenizer=tokenizer, max_length=args.max_length, args=args)
     return DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator, shuffle=shuffle,
                       num_workers=args.num_workers)

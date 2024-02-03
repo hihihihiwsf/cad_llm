@@ -8,7 +8,7 @@ import requests
 import numpy as np
 from geometry.parse import get_curves
 from PIL import Image, ImageDraw
-
+from IPython import embed
 from geometry import parse2
 
 def visualize_batch(input_curves, label_curves, sample_curves, box_lim):
@@ -168,7 +168,9 @@ def visualize_sample_cv(point_entities, box_lim):
     out = []
     
     for entities in point_entities:
+        entities = [item for item in entities if item is not None]
         np_image = render_sketch_opencv(entities, size=3000, quantize_bins=64,linewidth=40) #size=224
+
         pil_image = np_image[:, :, ::-1]  # BGR to RGB
         img = Image.fromarray(pil_image, mode='RGB')
         out.append(img)

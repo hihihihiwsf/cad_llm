@@ -41,6 +41,8 @@ def get_parser():
     parser.add_argument("--hand_draw", type=int, default=0)
     parser.add_argument("--type_token", type=int, default=0)
     parser.add_argument("--constraint_model", type=int, default=0)
+    parser.add_argument("--beam_sampling", type=int, default=0)
+    parser.add_argument("--samples_dir", type=str)
     return parser
 
 

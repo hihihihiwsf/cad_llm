@@ -263,12 +263,13 @@ if __name__ == '__main__':
     #     fill=255)
     # noisy_hand_imgs = [img_affine(imgs) for imgs in hand_draw]
     
-    # prefix_img = visualize_sample_cv(n_point_inputs[start:start+500], box_lim=64+3)
-    # label_img = visualize_sample_cv(n_point_labels[start:start+500], box_lim=64+3)
-    # for i in range(500):
-    #     label_img[i].save(f'label_outputs/{i+start}_label.png')
-    #     prefix_img[i].save(f'prefix_outputs/{i+start}_prefix.png')
-    #    #noisy_hand_imgs[i].save(f'noisy_outputs/{i}_noisy.png')
+    # start = 10000
+    # prefix_img = visualize_sample_cv(n_point_inputs[start:start+100], box_lim=64+3)
+    # label_img = visualize_sample_cv(n_point_labels[start:start+100], box_lim=64+3)
+    # for i in range(100):
+    #     label_img[i].save(f'label_outputs/{i}_label.png')
+    #     prefix_img[i].save(f'prefix_outputs/{i}_prefix.png')
+       #noisy_hand_imgs[i].save(f'noisy_outputs/{i}_noisy.png')
 
 
     # saved_idx = [3,6,13,17,28,29, 51, 58, 63, 66, 67, 69,80,82, 86, 91, 92,93,101,110,113,126,127,129,130,132]
@@ -277,48 +278,57 @@ if __name__ == '__main__':
     ,425,426,431,436,440,443,455,459,463,464,465,466,471,488,493,492,495,496,503,509,510,514,522,533,535,534
     ,538,540,545,548,561,565,575,584,593,596,601,602,604,605,608,611,615,618,621,624,646,650,651,652,663,667
     ,677,681,682,683,697,698]
+    b = [2,5,6,10,13,16,20,33,39,40,42,43,44,51,53,57,61,64,65,67,72,73,88,89,96,97,98,100,102,103,105,113,117,118,
+                121,129,133,135,139,150,156,157,163,169,186,193,196,404,407,414,417,429,432,433,434,441,455,469,474,486,491,
+                499,519,529,535,557]
+    a = [198,195,188,166,164,162,158,155,149,138,135,132,127,123,118,113,110,102,96,93,91,80,78,68,48,45,44,41,40,38,32,26,22,20,15,14,12,5]
+    a = [item+10200 for item in a]
+    b = [item+10000 for item in b]
+    supp_idx = a+b
+    embed()
+    
     saved_inputs=[]
     saved_label=[]
     saved_output = []
     input_strings = []
     label_strings = []
     print("start append strings")
-    for i in th2_saved_idx:
+    for i in supp_idx:
         saved_inputs.append(n_point_inputs[i])
         saved_label.append(n_point_labels[i])
         saved_output.append(n_point_outputs[i])
         input_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in n_point_inputs[i]) + ';')
         label_strings.append(';'.join(','.join(str(item) for pair in tup_set for item in pair) for tup_set in n_point_labels[i]) + ';')
     
-    saved_inputs[58].append(((18, 27), (31, 17), (44, 27)))
-    prefix_img = visualize_sample_cv(saved_inputs[53:59], box_lim=64+3)
-    label_img = visualize_sample_cv(saved_label[53:59], box_lim=64+3)
-    plt.imshow(prefix_img[0])
-    plt.axis('off') 
-    plt.savefig('_img2.pdf')
-    plt.imshow(label_img[0])
-    plt.axis('off') 
-    plt.savefig('_img3.pdf')
+    # saved_inputs[58].append(((18, 27), (31, 17), (44, 27)))
+    # prefix_img = visualize_sample_cv(saved_inputs[53:59], box_lim=64+3)
+    # label_img = visualize_sample_cv(saved_label[53:59], box_lim=64+3)
+    # plt.imshow(prefix_img[0])
+    # plt.axis('off') 
+    # plt.savefig('_img2.pdf')
+    # plt.imshow(label_img[0])
+    # plt.axis('off') 
+    # plt.savefig('_img3.pdf')
     embed()
     print("visulizing samples")
-    #prefix_img = visualize_sample_cv(saved_inputs, box_lim=64+3)
-    #label_img = visualize_sample_cv(saved_label, box_lim=64+3)
-    output_img = visualize_sample_cv(saved_output, box_lim=64+3)
+    prefix_img = visualize_sample_cv(saved_inputs, box_lim=64+3)
+    label_img = visualize_sample_cv(saved_label, box_lim=64+3)
+    #output_img = visualize_sample_cv(saved_output, box_lim=64+3)
     print("saving samples")
-    for i in range(len(th2_saved_idx)):
+    for i in range(len(supp_idx)):
         print(i)
-        # plt.imshow(label_img[i])
-        # plt.axis('off') 
-        # plt.savefig(f'pdfs/{i}_label.pdf', bbox_inches='tight')
-        # plt.imshow(prefix_img[i])
-        # plt.axis('off') 
-        # plt.savefig(f'pdfs/{i}_prefix.pdf', bbox_inches='tight')
-        plt.imshow(output_img[i])
+        plt.imshow(label_img[i])
         plt.axis('off') 
-        plt.savefig(f'pdfs/{i}_vitru.pdf', bbox_inches='tight')
+        plt.savefig(f'pdfs/{i}_label.pdf', bbox_inches='tight')
+        plt.imshow(prefix_img[i])
+        plt.axis('off') 
+        plt.savefig(f'pdfs/{i}_prefix.pdf', bbox_inches='tight')
+        # plt.imshow(output_img[i])
+        # plt.axis('off') 
+        # plt.savefig(f'pdfs/{i}_vitru.pdf', bbox_inches='tight')
         
     
-    with open('pdfs/input_strings.json', 'w') as f:
+    with open('pdfs/input_strings2.json', 'w') as f:
         json.dump(input_strings, f)
-    with open('pdfs/label_strings.json', 'w') as f:
+    with open('pdfs/label_strings2.json', 'w') as f:
         json.dump(label_strings, f)

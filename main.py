@@ -258,7 +258,7 @@ def main():
         gradient_clip_val=1.0, 
         gradient_clip_algorithm="value",
         #limit_train_batches=0.01,
-        limit_val_batches=0.1,
+        #limit_val_batches=0.1,
         #limit_test_batches=0.1,
     )
     

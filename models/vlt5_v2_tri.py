@@ -42,6 +42,7 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 import matplotlib.pyplot as plt
+from IPython import embed
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
@@ -328,7 +329,7 @@ class ByT5Model(pl.LightningModule):
         encoder_outputs = BaseModelOutput(last_hidden_state=output_embed)
         batch['encoder_outputs'] = encoder_outputs
         
-        self.generate_samples(batch)
+        self.generate_samples(batch,batch_idx)
 
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
@@ -349,26 +350,71 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
-        self.log_samples(batch, batch_idx)
         
         return loss
 
 
     
-    def generate_samples(self, batch):
+    def generate_samples(self, batch, batch_idx):
         # Recursively unwrap the model from potential distributed training containers
         generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(encoder_outputs=batch["encoder_outputs"], attention_mask=batch["attention_mask"],
-                                         do_sample=True, max_new_tokens=self.args.max_length+10)
-
-        batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
-        batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
-
-        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
+        # batch["samples"] = generate_func(encoder_outputs=batch["encoder_outputs"], attention_mask=batch["attention_mask"],
+        #                                  do_sample=False, max_new_tokens=self.args.max_length+10)
+        # batch["samples"] = generate_func(encoder_outputs=encoder_outputs, attention_mask=batch["attention_mask"],
+        #                              max_new_tokens=self.args.max_length+10, do_sample=True,top_k=0,top_p=0.9, num_return_sequences=5)
+        batch["string_labels"] = [sketch["output_text"]+sketch['input_text'] for sketch in batch["sketches"]]
+        batch["string_labels"] = [sketch.replace('</s>', '') for sketch in batch["string_labels"]]
         batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
+        labels = visualize_sample_cv(batch['point_labels'], 67)
+        
+        batch["string_inputs"] = [sketch['input_text'] for sketch in batch["sketches"]]
+        batch["string_inputs"] = [sketch.replace('</s>', '') for sketch in batch["string_inputs"]]
+        batch["point_inputs"] = [get_point_entities(string_label) for string_label in batch["string_inputs"]]
+        labels = visualize_sample_cv(batch['point_labels'], 67)
+        inputs_img = visualize_sample_cv(batch['point_inputs'], 67)
+        
+        if self.args.beam_sampling:
+            for i in range(len(labels)):   
+                plt.imshow(labels[i])
+                plt.axis('off') 
+                plt.savefig(f'cadvlm/necleus1/{batch_idx*self.batch_size+i}_label.pdf', bbox_inches='tight')
+                plt.imshow(inputs_img[i])
+                plt.axis('off') 
+                plt.savefig(f'cadvlm/necleus1/{batch_idx*self.batch_size+i}_input.pdf', bbox_inches='tight')
+            # beam_outputs = generate_func(encoder_outputs=batch['encoder_outputs'], attention_mask=batch["attention_mask"],
+            #                             max_new_tokens=self.args.max_length+10,num_beams=5,no_repeat_ngram_size=2,num_return_sequences=5)
+            beam_outputs = generate_func(encoder_outputs=batch['encoder_outputs'], attention_mask=batch["attention_mask"],
+                             max_new_tokens=self.args.max_length+10, do_sample=True,top_k=10,top_p=0.9, num_return_sequences=8)        
+            output_samples = beam_outputs.reshape(8, self.batch_size, -1)
 
-        batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
+                
+            for idx, beam_output in enumerate(output_samples):
+                #batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+                batch["string_samples"] = self.tokenizer.batch_decode(beam_output, skip_special_tokens=True)
+                
 
+                batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
+
+                batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
+
+                self.log_samples(idx, batch, batch_idx)
+        else:
+            batch["samples"] = generate_func(encoder_outputs=batch["encoder_outputs"], attention_mask=batch["attention_mask"],
+                                    do_sample=False, max_new_tokens=self.args.max_length+10)
+            batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
+            batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch["string_samples"]]
+
+            batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
+            
+            for i in range(len(labels)):   
+                plt.imshow(labels[i])
+                plt.axis('off') 
+                plt.savefig(f'pdfs/{batch_idx*self.batch_size+i}_label.pdf', bbox_inches='tight')
+                plt.imshow(inputs_img[i])
+                plt.axis('off') 
+                plt.savefig(f'pdfs/{batch_idx*self.batch_size+i}_input.pdf', bbox_inches='tight')
+
+            self.log_samples(0, batch, batch_idx)
     def forward_loss(self, pixel_values, pred):
         """
         Args:
@@ -395,7 +441,7 @@ class ByT5Model(pl.LightningModule):
         loss = loss.mean()
         return loss
     
-    def log_samples(self, batch, batch_idx):
+    def log_samples(self, beam_idx, batch, batch_idx):
         label_curves = [get_curves(point_label) for point_label in batch["point_labels"]]
 
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in batch["sketches"]]
@@ -404,20 +450,25 @@ class ByT5Model(pl.LightningModule):
         fig = visualize_batch(input_curves=input_curves, label_curves=label_curves,
                               sample_curves=batch["sample_curves"], box_lim=self.box_lim + 3)
         point_samples = [out_point+in_point for out_point, in_point in zip(batch["point_samples"], point_inputs)]
-        outputs = visualize_sample_cv(point_samples, box_lim=64+3)
+
         try:
-            labels = visualize_sample_cv(batch['point_labels'], 67)
+            outputs = visualize_sample_cv(point_samples, box_lim=64+3)
+            #labels = visualize_sample_cv(batch['point_labels'], 67)
         except:
+            embed()
             print(batch['point_labels'])
         #fig_path = Path(self.args.samples_dir) / f"epoch_{self.current_epoch}_batch_{batch_idx}.png"
         #fig.savefig(fig_path)
         for i in range(len(outputs)):   
             plt.imshow(outputs[i])
             plt.axis('off') 
-            plt.savefig(f'cadvlm/output_{batch_idx*32+i}.pdf', bbox_inches='tight')
-            plt.imshow(labels[i])
-            plt.axis('off') 
-            plt.savefig(f'cadvlm/label_{batch_idx*32+i}.pdf', bbox_inches='tight')
+            if self.args.beam_sampling:
+                plt.savefig(f'cadvlm/necleus1/{batch_idx*self.batch_size+i}_{beam_idx}_output_beam.pdf', bbox_inches='tight')
+            else:
+                plt.savefig(f'pdfs/{batch_idx*self.batch_size+i}_output.pdf', bbox_inches='tight')
+            # plt.imshow(labels[i])
+            # plt.axis('off') 
+            # plt.savefig(f'cadvlm/label_{batch_idx*32+i}.pdf', bbox_inches='tight')
             # outputs[i].save(f"cadvlm/{batch_idx}_output_{i}.p")
             # labels[i].save(f"cadvlm/{batch_idx}_label_{i}.png")
 
