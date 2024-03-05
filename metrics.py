@@ -54,6 +54,9 @@ def calculate_accuracy(labels, samples):
     """
     count_accurate = 0
     for label_entities, sample_entities in zip(labels, samples):
+        
+        if not sample_entities:
+            continue
         label_entities = tuple(sorted([ent for ent in label_entities if ent]))
         sample_entities = tuple(sorted([ent for ent in sample_entities if ent]))
         if label_entities == sample_entities:

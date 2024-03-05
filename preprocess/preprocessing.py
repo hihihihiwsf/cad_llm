@@ -127,13 +127,22 @@ def get_entities_string(entities, new_tokens):
         for ent in entities:
             all_points = []
             for p in ent:
-                
                 all_points.append(",".join(str(x+33) for x in p))
-            str_entities.append(",".join(p for p in all_points) + ";")
+            new_entity = ",".join(p for p in all_points) + ";"
+            '''deepcad representations'''
+            if len(all_points)==2:
+                new_entity='L,'+new_entity
+            elif len(all_points)==3:
+                new_entity='A,'+new_entity
+            elif len(all_points)==4:
+                new_entity='C,'+new_entity
+            
+            str_entities.append(new_entity)
 
         # str_entities = [",".join([str(x) for x in ent]) + ";" for ent in flat_entities]
     else:
         str_entities = ["".join([f"<{x}>" for x in ent]) + ";" for ent in flat_entities]
+
     return str_entities
 
 

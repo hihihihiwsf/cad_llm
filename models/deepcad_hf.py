@@ -7,6 +7,7 @@ try:
 except ImportError:
     pass
 import torch
+import torch.nn as nn
 import torch.optim as optim
 # import lightning.pytorch as pl
 import pytorch_lightning as pl
@@ -32,8 +33,27 @@ from geometry.visualization import visualize_sample_cv
 import transformers
 from transformers.optimization import Adafactor, AdafactorSchedule
 
+import math
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=0.1)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+
+
 class ByT5Model(pl.LightningModule):
-    def __init__(self, args, vit_mae, tokenizer,num_train_steps):
+    def __init__(self, args, vit_mae, tokenizer, num_train_steps):
         super().__init__()
         self.save_hyperparameters()
 
@@ -42,57 +62,59 @@ class ByT5Model(pl.LightningModule):
         #     model = T5ForConditionalGeneration(config)
         #     model._init_weights(model)  # maybe redundant
         # else:
-        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        #########
+        #self.model = torch.nn.Transformer(d_model=256, nhead=8, num_encoder_layers=4, num_decoder_layers=4, dim_feedforward=512, dropout=0.1) #, activation=<function relu>, custom_encoder=None, custom_decoder=None, layer_norm_eps=1e-05, batch_first=False, norm_first=False, bias=True, device=None, dtype=None)
+        model 
+        d_model = 256
+        nhead = 8
+        num_encoder_layers=4
+        num_decoder_layers=4
+        dim_feedforward=512
+        vocab_size = 64 * 100
+        self.pos_encoder = PositionalEncoding(d_model, args.max_length)
+        encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_encoder_layers)
+        self.encoder = nn.Embedding(vocab_size, d_model)
+        self.d_model = d_model
+        self.decoder = nn.Linear(d_model, vocab_size)
+
         self.num_train_steps=num_train_steps
-        self.model = model
+        
         self.tokenizer = tokenizer
-        self.model.resize_token_embeddings(len(self.tokenizer))
-
+        #self.model.resize_token_embeddings(len(self.tokenizer))
+        
         self.args = args
-
+        
         self.lr = self.args.lr
         self.batch_size = self.args.batch_size  # to fix logging warning
         self.quantization_bits = 6  # Hard code for now
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualizationx
+        self.init_weights()
 
-        # self.vit_mae = vit_mae
-        # if vit_mae is not None:
-        #     self.vit_mae = vit_mae
-        # else:
-        #     m = VisRecon(args=args)
-        #     #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        #     m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
-        #     self.vit_mae = m.model 
-        
-        # self.vis_model = self.vit_mae
-        # self.vis_model.config.mask_ratio = 0.
-        # self.vis_model.requires_grad_(False)
-        # self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
-       
-        
-        # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
+    def init_weights(self):
+        initrange = 0.1
+        self.encoder.weight.data.uniform_(-initrange, initrange)
+        self.decoder.bias.data.zero_()
+        self.decoder.weight.data.uniform_(-initrange, initrange)
 
-        # self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
-        # self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
-
-        # self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
-
-        # self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
-        #self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, kernel_size=3, padding='same')
-        #self.bn = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
-        #self.lkrelu = torch.nn.LeakyReLU()
-        self.gelu = torch.nn.GELU()
-
+    def forward(self, src, src_mask):
+        src = self.encoder(src) * math.sqrt(self.d_model)
+        src = self.pos_encoder(src)
+        encoded_src = self.transformer_encoder(src, src_mask)
+        # Apply average pooling across the sequence length dimension
+        pooled_output = torch.mean(encoded_src, dim=1)
+        output = self.decoder(pooled_output)
+        return output
 
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
-        model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+        #src_mask = generate_square_subsequent_mask(batch['input_ids'].size(0)).to(batch['input_ids'].device)
+        output = self.model(batch['input_ids'], batch['attention_mask'])
+        # Adjust output dimensions and calculate loss
+        output = output.view(-1, output.size(-1))
+        labels = batch['labels'].view(-1)
+        loss = F.cross_entropy(output, labels)
         
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
@@ -126,39 +148,52 @@ class ByT5Model(pl.LightningModule):
         
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+        output = self(batch['input_ids'], batch['attention_mask'])
+        output = output.view(-1, output.size(-1))
+        labels = batch['labels'].view(-1)
+        loss = F.cross_entropy(output, labels)
         
         # Generate and process samples
-        self.generate_samples(batch)
+        # self.generate_dc(batch)
 
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
-    
+        # # Calculate metrics
+        # top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        # Calculate metrics
-        top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        # self.log(f"{validate}_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #          batch_size=self.batch_size, sync_dist=True)
 
-        self.log(f"{validate}_top1_full_sketch", top1_full_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-                 batch_size=self.batch_size, sync_dist=True)
+        # top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
-        top1_ent = calculate_first_ent_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
+        # self.log(f"{validate}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #     batch_size=self.batch_size, sync_dist=True)
 
-        self.log(f"{validate}_top1_ent", top1_ent, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-            batch_size=self.batch_size, sync_dist=True)
-
-        precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
-        self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-            batch_size=self.batch_size, sync_dist=True)
-        self.log(f"{validate}_precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-            batch_size=self.batch_size, sync_dist=True)
-        self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
-            batch_size=self.batch_size, sync_dist=True)
+        # precision, recall, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        # self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #     batch_size=self.batch_size, sync_dist=True)
+        # self.log(f"{validate}_precision", precision, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #     batch_size=self.batch_size, sync_dist=True)
+        # self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+        #     batch_size=self.batch_size, sync_dist=True)
         return loss
 
+    def generate_dc(self, batch):
+        generated =[0]
+        input_ids = batch['input_ids']
+        src_mask = batch['attention_mask']
+        for _ in range(self.args.max_length+10):
+            input_ids = torch.tensor([generated], dtype=torch.long).to(self.transformer_encoder.device)
+            output = self(input_ids, src_mask=src_mask[:, :len(generated), :len(generated)])
+            next_token_logits = output[:, -1, :]
+            next_token = torch.argmax(next_token_logits, dim=-1).item()
+            generated.append(next_token)
+            if next_token == self.tokenizer.eos_token_id:
+                break
+
+        from IPython import embed; embed()
+        
 
     
     def generate_samples(self, batch):

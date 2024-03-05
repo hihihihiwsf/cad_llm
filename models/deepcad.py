@@ -32,21 +32,37 @@ from geometry.visualization import visualize_sample_cv
 import transformers
 from transformers.optimization import Adafactor, AdafactorSchedule
 
+from IPython import embed
+
+import torch.nn.functional as F
+from x_transformers import XTransformer
+
 class ByT5Model(pl.LightningModule):
     def __init__(self, args, vit_mae, tokenizer,num_train_steps):
         super().__init__()
         self.save_hyperparameters()
+        vocab_size = tokenizer.vocab_size
 
-        # if args.untrained_model:
-        #     config = T5Config.from_pretrained(args.model_name)
-        #     model = T5ForConditionalGeneration(config)
-        #     model._init_weights(model)  # maybe redundant
-        # else:
-        model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+        #model = torch.nn.Transformer(d_model=256, nhead=8, num_encoder_layers=4, num_decoder_layers=4, dim_feedforward=512, dropout=0.1)
+        model = XTransformer(
+            dim = 256,
+            enc_num_tokens = vocab_size,
+            enc_depth = 4,
+            enc_heads = 8,
+            enc_max_seq_len = 192,
+            dec_num_tokens = vocab_size,
+            dec_depth = 4,
+            dec_heads = 8,
+            dec_max_seq_len = 192,
+            tie_token_emb = True      # tie embeddings of encoder and decoder
+        )
         self.num_train_steps=num_train_steps
         self.model = model
         self.tokenizer = tokenizer
-        self.model.resize_token_embeddings(len(self.tokenizer))
+        #self.model.resize_token_embeddings(len(self.tokenizer))
+
+        
+        self.embedding = torch.nn.Embedding(vocab_size, 256)
 
         self.args = args
 
@@ -56,48 +72,32 @@ class ByT5Model(pl.LightningModule):
         self.quantized_range = get_quantized_range(self.quantization_bits)
         self.box_lim = max(self.quantized_range)  # for visualizationx
 
-        # self.vit_mae = vit_mae
-        # if vit_mae is not None:
-        #     self.vit_mae = vit_mae
-        # else:
-        #     m = VisRecon(args=args)
-        #     #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-        #     m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
-        #     self.vit_mae = m.model 
-        
-        # self.vis_model = self.vit_mae
-        # self.vis_model.config.mask_ratio = 0.
-        # self.vis_model.requires_grad_(False)
-        # self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
-       
-        
-        # self.mapper =torch.nn.Linear(self.clip_model.visual.output_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.projection_dim, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.clip_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
-        # self.mapper =torch.nn.Linear(self.vis_model.config.hidden_size, self.model.get_input_embeddings().weight.shape[1])
-
-        # self.post_layernorm = torch.nn.LayerNorm(self.vis_model.config.hidden_size, eps=1e-5)
-        # self.layernorm = torch.nn.LayerNorm(self.model.get_input_embeddings().weight.shape[1], eps=1e-5)
-
-        # self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
-
-        # self.embed_patch = torch.nn.Linear(self.patch_num*self.patch_num, self.patch_num)
-        #self.conv = torch.nn.Conv1d(self.patch_num*self.patch_num, self.patch_num, kernel_size=3, padding='same')
-        #self.bn = torch.nn.BatchNorm1d(self.vis_model.config.hidden_size)
-        #self.lkrelu = torch.nn.LeakyReLU()
         self.gelu = torch.nn.GELU()
 
 
     def training_step(self, batch, batch_idx):
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+        src = self.embedding(batch['input_ids']).permute(1,0,2)
+        tgt = self.embedding(batch['labels']).permute(1,0,2)
+        
+        mask = batch['attention_mask'][:, None, None, :]
+        mask = (1-mask)
+        mask = mask.expand(-1,8,192,-1)
+        mask = mask.reshape(-1,192,192)
+
+        # tgt_mask = batch['labels']!=0
+        # tgt_mask = tgt_mask.repeat(8,1)
+        # tgt_mask = tgt_mask.unsqueeze(2).repeat(1, 1, 192).bool()
+
+        #outputs = self.model(src=src, tgt=tgt, mask=mask.bool()) #, tgt_mask = tgt_mask)
+
+        loss = self.model(src=batch['input_ids'], tgt=batch['labels'], mask=batch['attention_mask'].bool())
+
         
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
         
- 
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -111,34 +111,45 @@ class ByT5Model(pl.LightningModule):
         
     def evaluation_process(self, batch, batch_idx, validate):
         
-        ''' compare some sample with vitruvion'''
-        '''
-        device = batch['input_ids'].device
-        strings =  ['0,38,16,24;0,24,0,38;0,11,0,24;21,29,32,43;'] #'63,32,63,51;53,51,63,51;0,32,0,51;46,44,46,51;46,44,53,44;53,44,53,51;53,44,53,51;0,32,63,32;'
-        token_in = self.tokenizer(strings, padding=True, truncation=True, max_length=96, return_tensors="pt")
-        batch['input_ids'] = token_in.input_ids.to(device)
-        batch['attention_mask'] =token_in.attention_mask.to(device)
-        point_input=get_point_entities(strings[0])
-        list_of_img = visualize_sample_cv(point_entities=[point_input], box_lim=64 + 3)
-        _images = self.vitmae_preprocess(list_of_img, return_tensors="pt")
-        batch['images'] = _images.pixel_values.to(device)
-        '''
-        
         cols = ["input_ids", "attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
+        src = self.embedding(batch['input_ids']).permute(1,0,2)
+        tgt = self.embedding(batch['labels']).permute(1,0,2)
         
+        mask = batch['attention_mask'][:, None, None, :]
+        mask = (1-mask)
+        mask = mask.expand(-1,8,192,-1)
+        mask = mask.reshape(-1,192,192)
+
+        # tgt_mask = batch['labels']!=0
+        # tgt_mask = tgt_mask.repeat(8,1)
+        # tgt_mask = tgt_mask.unsqueeze(2).repeat(1, 1, 192).bool()
+
+        #outputs = self.model(src=src, tgt=tgt, mask=mask.bool()) #, tgt_mask = tgt_mask)
+
+        loss = self.model(src=batch['input_ids'], tgt=batch['labels'], mask=batch['attention_mask'].bool())
+
+        
+
+        generate_func = unwrap_model(self.model).generate
+        seq_out_start=torch.ones(batch['input_ids'].shape[0], 1).long().to(batch['input_ids'].device)
+
+        batch["samples"] = generate_func(seq_in=batch["input_ids"], seq_out_start=seq_out_start,attn_mask=batch["attention_mask"],
+                                         seq_len=self.args.max_length, eos_token=0)
+
+        # token_ids = torch.argmax(outputs, dim=-1)
+        # batch["string_samples"] = self.tokenizer.batch_decode(token_ids, skip_special_tokens=False)
+
+        # batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
+        # batch["point_samples"] = [get_pair_constraints(string_sample) for string_sample in batch["string_samples"]]
+        # batch["point_labels"] = [get_pair_constraints(string_label) for string_label in batch["string_labels"]]
+
         # Generate and process samples
         self.generate_samples(batch)
 
-        outputs = self.model(**model_batch)
-        loss = outputs.loss
         self.log(f"{validate}_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
-        
-    
-
+        #embed()
         # Calculate metrics
         top1_full_sketch = calculate_accuracy(samples=batch["point_samples"], labels=batch["point_labels"])
 
@@ -162,17 +173,12 @@ class ByT5Model(pl.LightningModule):
 
     
     def generate_samples(self, batch):
-        # Recursively unwrap the model from potential distributed training containers
-        generate_func = unwrap_model(self.model).generate
-        batch["samples"] = generate_func(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
-                                         do_sample=False, max_new_tokens=self.args.max_length+10)
 
         batch["string_samples"] = self.tokenizer.batch_decode(batch["samples"], skip_special_tokens=True)
         batch["string_labels"] = [sketch["output_text"].replace ('</s>', '') for sketch in batch["sketches"]]
 
-        batch["point_samples"] = [get_pair_constraints(string_sample) for string_sample in batch["string_samples"]]
-        batch["point_labels"] = [get_pair_constraints(string_label) for string_label in batch["string_labels"]]
-
+        batch["point_samples"] = [get_point_entities(string_sample) for string_sample in batch['string_samples']]
+        batch["point_labels"] = [get_point_entities(string_label) for string_label in batch["string_labels"]]
         #batch["sample_curves"] = [get_curves(point_sample) for point_sample in batch["point_samples"]]
 
     def log_samples(self, batch, batch_idx):
@@ -187,22 +193,8 @@ class ByT5Model(pl.LightningModule):
         fig.savefig(fig_path)
 
     def configure_optimizers(self):
-        #params = list(self.model.parameters()) + list(self.mapper.parameters()) #+ list(self.vis_model.parameters())
-        #params2= list(self.embed_patch.parameters()) + list(self.layernorm.parameters())+list(self.post_layernorm.parameters())
-        # optimizer = Adafactor(
-        #         params,
-        #         lr=None,
-        #         eps=(1e-30, 1e-3),
-        #         clip_threshold=1.0,
-        #         decay_rate=-0.8,
-        #         beta1=None,
-        #         weight_decay=0.0,
-        #         relative_step=True, #
-        #         scale_parameter=True, #
-        #         warmup_init=True, #
-        #     )
+
         optimizer = optim.AdamW(self.trainer.model.parameters(), lr=self.lr, weight_decay=0.05)
-        #optimizer = Adafactor(params+params2, scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
 
         if not self.args.cosinedecay:
             return optimizer

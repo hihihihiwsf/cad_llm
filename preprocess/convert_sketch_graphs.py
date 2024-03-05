@@ -195,7 +195,7 @@ def filter_main(sg_files, output_dir, filter_path, limit, quantize_bits, new_tok
         list_cons_len[split_name] = count_constraint_length(sketches)
         
     split_to_sketches = deduplicate_splits(split_to_sketches)
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     #draw_list_leng(list_cons_len['train'], 'train')
     
     save_splits(output_dir, split_to_sketches)
@@ -228,9 +228,9 @@ def draw_list_leng(data, split):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="/Tmp/sifan/cad/data/sg_strings",
+    parser.add_argument("--input", type=str, default="/Tmp/sifan/cad/vitr_data/data/sg_strings",
                         help="Input folder containing the SketchGraphs filter sequence .npy files")
-    parser.add_argument("--output", type=str, default='/Tmp/sifan/cad/data/sg_strings_v8_with_hand_drawn/',
+    parser.add_argument("--output", type=str, default='/Tmp/sifan/cad/data/sg_strings_v9_deepcad/',
                         help="Output folder to save the data [default: output]")
     parser.add_argument("--filter", type=str, default="/Tmp/sifan/cad/data/split_to_filenames_v4.json",
                         help="File containing indices of deduped sketches ('train_test.json')")
@@ -242,9 +242,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     output_dir = get_output_dir(args)
-    #sg_files = get_files(args)
-
-    sg_files = '/Tmp/sifan/cad/vitr_data/data/sg_string_v4_npy/test.npy'
-    img_file = '/Tmp/sifan/cad/vitr_data/data/sg_string_renders/test_images.npy'
-    main(sg_file=sg_files, img_file= img_file, output_dir=output_dir, limit=args.limit,
-         quantize_bits=args.quantize_bits, new_tokens=args.new_tokens, split_name='test')
+    sg_files = get_files(args)
+    filter_main(sg_files=sg_files, output_dir=output_dir, filter_path=args.filter, limit=args.limit,
+         quantize_bits=args.quantize_bits, new_tokens=args.new_tokens)
+    # sg_files = '/Tmp/sifan/cad/vitr_data/data/sg_string_v4_npy/train.npy'
+    # img_file = '/Tmp/sifan/cad/vitr_data/data/sg_string_renders/train_images.npy'
+    # main(sg_file=sg_files, img_file= img_file, output_dir=output_dir, limit=args.limit,
+    #      quantize_bits=args.quantize_bits, new_tokens=args.new_tokens, split_name='test')

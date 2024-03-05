@@ -10,6 +10,7 @@ import torch
 from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 import pytorch_lightning as pl
+from IPython import embed
 
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
@@ -54,15 +55,18 @@ class SketchGraphsDataset(Dataset):
         sketch_dict["mask"] = mask
         input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+
         sketch_dict['input_text'] = input_text  #'<s>'+ 
         sketch_dict['output_text'] = output_text #+ '</s>'
+
+        
         return sketch_dict
 
     def get_mask(self, n):
         """
         Sample a random size for mask and a random mask of size n
         """
-        mask_percent = 0.4 #random.uniform(self.min_input_percent, self.max_input_percent)
+        mask_percent = random.uniform(self.min_input_percent, self.max_input_percent)
         mask_size = round(mask_percent * n)
         mask_size = min(max(1, mask_size), n - 1)
 
@@ -111,17 +115,18 @@ class SketchGraphsCollator:
         self.vitmae_preprocess = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
     def tokenize(self, strings):
-        return self.tokenizer(strings, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt")
+        return self.tokenizer(strings, padding='max_length', truncation=True, max_length=self.max_length, return_tensors="pt")
 
     def __call__(self, sketch_dicts):
         input_strings = [sketch['input_text'] for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
+
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
 
         labels = tokenized_output.input_ids
         # replace padding token id's of the labels by ignore_index=-100 so it's ignored by the loss
-        labels[labels == self.tokenizer.pad_token_id] = -100
+        #labels[labels == self.tokenizer.pad_token_id] = -100
 
         point_inputs = [get_point_entities(sketch["input_text"]) for sketch in sketch_dicts]
 
@@ -141,7 +146,6 @@ class SketchGraphsCollator:
 
         # for im in list_of_img:
         #     im.close()
-        
               
         batch = {
             "input_ids": tokenized_input.input_ids,

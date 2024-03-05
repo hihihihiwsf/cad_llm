@@ -7,12 +7,12 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name", type=str, required=True, help="Experiment name for file names")
     parser.add_argument("--results_dir", type=str, default="/u/wusifan/cadllm/results", help="Directory to save checkpoints and logs")
-    parser.add_argument("--dataset", type=str, default="/Tmp/sifan/cad/data/sg_string_v5_ascii_max64", help="Dataset path") #sg_string_v5_ascii_max64
+    parser.add_argument("--dataset", type=str, default="/Tmp/sifan/cad/data/sg_strings_v9_deepcad/", help="Dataset path") #sg_string_v5_ascii_max64   #sg_strings_v9_deepcad/
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers to use in the torch dataloader")
     parser.add_argument("--accelerator", type=str, default="auto", help="Lightning Trainer accelerator parameter")
     parser.add_argument("--devices", type=str, default="auto", help="Lightning Trainer devices parameter")
     parser.add_argument("--strategy", type=str, default="ddp", help="Lightning Trainer strategy parameter")
-    parser.add_argument("--comet", type=int, default=0, help="Use comet.ml for experiment tracking")
+    parser.add_argument("--comet", type=int, default=1, help="Use comet.ml for experiment tracking")
     parser.add_argument("--ascii_encoding", type=int, default=1,
                         help="Use ascii ByT5 encoding instead of single token encoding")
     parser.add_argument("--model_name", type=str, default="Salesforce/Codet5p-770m", help="Huggingface model name")

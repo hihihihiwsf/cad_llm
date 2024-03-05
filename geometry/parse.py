@@ -35,6 +35,7 @@ def get_point_entities(entities_string, sort=True):
     If sort is True, sort the points in each entity
     """
     entity_strings = [s.replace(" ", "") + ';' for s in entities_string.split(';') if s]
+
     point_entities = [get_point_entity(entity_string) for entity_string in entity_strings]
     if sort:
         point_entities = [sort_points(points) for points in point_entities]

@@ -8,10 +8,10 @@ try:
 except ImportError:
     pass
 # from dataset.sg_dataset_visrecon import get_sketchgraphs_dataloader
-from dataset import sg_dataset_for_constraint, sg_dataset, sg_dataset_imageconditional, sg_dataset_visrecon #import get_sketchgraphs_dataloader, SketchDataModule
+from dataset import sg_dataset_for_constraint, sg_dataset, sg_dataset_imageconditional, sg_dataset_visrecon,sg_dataset_dc #import get_sketchgraphs_dataloader, SketchDataModule
 #from models.byt5 import ByT5Model
 from models import vlt5, vlt5_v2_tri, byt5,vlt5_for_cons_type, vlt5_v2_tri_2_wo_IDL, vlt5_wo_ITC, vlt5_wo_ITC_IDL
-from models import conditional_vision_only1
+from models import conditional_vision_only1,deepcad
 from models.vl_t5_biencoder import VLT5Model
 from models.vis_recon import VisRecon
 from torch.utils.data import DataLoader
@@ -56,12 +56,15 @@ def main():
         special_tokens_dict = {'additional_special_tokens':["e" + str(i) for i in range(0, 31)]}
         tokenizer.add_special_tokens(special_tokens_dict)
     
+    if args.arch=='deepcad':
+        special_tokens_dict = {'additional_special_tokens':['C','A','L']}
+        tokenizer.add_special_tokens(special_tokens_dict)
 
     print("Loading data...")
     if args.constraint_model:
         dataset = sg_dataset_for_constraint
     else:
-        dataset = sg_dataset
+        dataset = sg_dataset_dc
     
     #dataset = sg_dataset_imageconditional
     sketchdata = dataset.SketchDataModule(tokenizer, args)
@@ -224,6 +227,10 @@ def main():
         architecture = vlt5_wo_ITC
     elif args.arch == "vlt5_wo_ITC_IDL":
         architecture = vlt5_wo_ITC_IDL
+    elif args.arch == "deepcad":
+        architecture = deepcad
+    elif args.arch =='byt5':
+        architecture = byt5
     
     #architecture=conditional_vision_only1
     if not args.untrained_model:
@@ -266,7 +273,8 @@ def main():
         
         print("Start training")
         trainer.fit(model, datamodule=sketchdata) #, ckpt_path='/home/ubuntu/sifan/results/contraint_with_embedding/last.ckpt')
-        #trainer.validate(model, dataloaders=sketchdata.test_dataloader())
+        trainer.validate(model, dataloaders=sketchdata.validate_dataloader())
+        trainer.test(model, dataloaders=sketchdata.test_dataloader())
        
     else:
         # loading the model from exp_name/best.ckpt
