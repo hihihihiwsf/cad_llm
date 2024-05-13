@@ -83,7 +83,7 @@ def main():
     
 
     if not args.untrained_model:
-        model = architecture.ByT5Model(args=args, vit_mae=None, tokenizer=tokenizer, num_train_steps=total_train_steps)
+        model = architecture.ByT5Model(args=args, vit_mae=None) #, tokenizer=tokenizer, num_train_steps=total_train_steps)
         #model = model.load_from_checkpoint('s3://cad-llm-katzm/jobs/sifan-vit-mae-pd-14-precision16-07-09-23-1627/checkpoints/model/vit_mae_pd_14_precision16/last.ckpt')  #('s3://cad-llm-katzm/jobs/sifan-vlt5-fp16-adafactor-specialtoken-07-11-23-1544/checkpoints/model/vlt5_fp16_adafactor_specialtoken/last.ckpt')
     else:
         print("train_mae", args.untrained_model)
@@ -128,7 +128,8 @@ def main():
         ckpt_dir = args.checkpoint_dir + "/{}/checkpoints/best.ckpt".format(args.exp_name)
 
         #ckpt_path = '/home/ubuntu/sifan/results/vlt5_2_constraint_with_embedding/best.ckpt'
-        ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
+        #ckpt_path = 's3://cad-llm-katzm/jobs/sifan-sg-multimodal-v2-triloss-09-06-23-2344/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
+        ckpt_path = '/Tmp/sifan/cad/sg_multimodal_v2_triloss/checkpoints/model/sg_multimodal_v2_triloss/best.ckpt'
         trainer.test(model, ckpt_path=ckpt_path, dataloaders=sketchdata.test_dataloader())
     '''  
     all_input_lengths = model.prediction_len

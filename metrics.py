@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-
+from IPython import embed
 def calculate_f1(labels, samples):
     """
     Count number of exact matches of decoded and sorted entities
@@ -87,3 +87,40 @@ def calculate_validity(batch_sample_curves):
     percent_valid = valid_count / max(curve_count, 1)
 
     return percent_valid
+
+def remove_trailing_zeros_from_sublist(sublist):
+    """
+    Remove trailing zeros from a sublist.
+    
+    Args:
+    sublist (list): A sublist from which to remove trailing zeros.
+    
+    Returns:
+    list: The sublist with trailing zeros removed.
+    """
+    # Reverse the sublist to find the first non-zero element from the end
+    for i in range(len(sublist) - 1, -1, -1):
+        if sublist[i] != 0:
+            return sublist[:i + 1]
+    return [] 
+
+def calculate_vitruvion(loss, batch):
+    output_ids = batch['samples'].cpu()
+    np_loss = np.array(loss)
+    bits_per_primitive = []
+    for batch_index, ids in enumerate(output_ids):
+        # Find indices where the ID is '31', signifying the end of a primitive
+        separator_indices = np.where(ids == 31)[0]
+        # Add the starting index and the length of the loss array for this batch
+        indices = np.concatenate(([0], separator_indices + 1, [len(loss[batch_index])]))
+        
+        # Compute the sum of losses for each primitive by slicing the loss array
+        sum_loss_per_primitive = [np.sum(np_loss[batch_index][start:end]) for start, end in zip(indices[:-1], indices[1:])]
+        sum_loss_per_primitive = remove_trailing_zeros_from_sublist(sum_loss_per_primitive)
+        bits_per_primitive.append(sum_loss_per_primitive)
+    
+    bits_per_sketch = [sum(sublist) for sublist in bits_per_primitive]
+    bits_per_primitive = [np.array(a).mean() for a in bits_per_primitive]
+    
+    return np.array(bits_per_primitive).mean(), np.array(bits_per_sketch).mean()
+

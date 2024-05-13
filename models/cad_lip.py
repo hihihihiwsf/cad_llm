@@ -15,7 +15,7 @@ from transformers.modeling_utils import unwrap_model
 import sys
 from models.vis_recon import VisRecon
 sys.path.insert(0, '/home/ec2-user/SageMaker/efs/code/cad_llm')
-from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1
+from metrics import calculate_accuracy, calculate_first_ent_accuracy, calculate_validity, calculate_f1, calculate_vitruvion
 from util import get_quantized_range
 from geometry.parse import get_curves, get_point_entities
 from geometry.visualization import visualize_batch
@@ -42,6 +42,20 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 
+import torchmetrics
+from IPython import embed
+
+def scatter_sum(src: torch.Tensor, batch: torch.Tensor, dim: int = -1, dim_size: int=None) -> torch.Tensor:
+    size = list(src.size())
+
+    if dim_size is not None:
+        size[dim] = dim_size
+    elif index.numel() == 0:
+        size[dim] = 0
+    else:
+        size[dim] = int(index.max()) + 1
+    out = torch.zeros(size, dtype=src.dtype, device=src.device)
+    return out.scatter_add_(dim, index, src)
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
@@ -94,7 +108,7 @@ class ByT5Model(pl.LightningModule):
         else:
             m = VisRecon(args=args)
             #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-            m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
+            #m.load_from_checkpoint('/Tmp/sifan/cad/vis_recon.ckpt')
             self.vit_mae = m.model 
             del m
         
@@ -109,7 +123,7 @@ class ByT5Model(pl.LightningModule):
         self.mapper = torch.nn.Linear(self.vis_model.config.hidden_size, self.model.config.d_model)
         self.back_mapper = torch.nn.Linear(self.model.config.d_model, self.vis_model.config.hidden_size)
 
-        #self.post_layernorm = self.vis_model.vit.layernorm
+        self.post_layernorm = self.vis_model.vit.layernorm
         self.layernorm = torch.nn.LayerNorm(self.model.config.d_model, eps=1e-5)
 
         self.patch_num = int(self.vis_model.config.image_size/self.vis_model.config.patch_size)
@@ -229,10 +243,7 @@ class ByT5Model(pl.LightningModule):
         '''draw some test samples to compare with vitruvion'''
         
         
-        
-        
-        
-        
+
         ''''''
         cols = ["attention_mask", "labels"]
         model_batch = {col: val for col, val in batch.items() if col in cols}
@@ -298,8 +309,15 @@ class ByT5Model(pl.LightningModule):
         if model_batch['labels'] is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             txt_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), model_batch['labels'].view(-1))
-        
-        
+            bits_loss = nn.functional.cross_entropy(
+                lm_logits.swapaxes(-1, -2), model_batch['labels'],
+                ignore_index=-100,
+                reduction='none')
+            # loss_per_primitive = scatter_sum(
+            #     loss, batch, dim_size=16 + 3)
+
+            
+
         '''image decoder pixel loss'''
         img_hidden_state = self.layernorm(output_embed)
         self.post_layernorm = self.vis_model.vit.layernorm
@@ -351,11 +369,24 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_validity", validity, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                  batch_size=self.batch_size, sync_dist=True)
 
-        f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
+        p, r, f1 = calculate_f1(samples=batch["point_samples"], labels=batch["point_labels"])
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
+        bits_per_primitive, bits_per_sketch = calculate_vitruvion(bits_loss.cpu(), batch)
+        metrics = torchmetrics.Accuracy(task='multiclass', num_classes=len(self.tokenizer), compute_on_step=False)
+        relevant_idxs = (batch['labels'] != -100)
+        preds = torch.distributions.Categorical(logits=lm_logits).sample()
         
+        vitruvion_acc = metrics(preds[relevant_idxs].cpu(), batch['labels'][relevant_idxs].cpu())
+
+        self.log(f"{validate}_bits_pri", bits_per_primitive, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"{validate}_bits_ske", bits_per_sketch, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+        self.log(f"{validate}_vitru_acc", vitruvion_acc, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
+
         return loss
 
 

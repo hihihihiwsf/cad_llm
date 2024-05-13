@@ -11,6 +11,8 @@ from transformers import CLIPImageProcessor, AutoImageProcessor, ViTMAEModel
 
 import pytorch_lightning as pl
 
+from IPython import embed
+
 class SketchGraphsDataset(Dataset):
     def __init__(self, args, split):
         path = Path(args.dataset) / f"{split}.json"
@@ -59,6 +61,7 @@ class SketchGraphsDataset(Dataset):
         output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
         sketch_dict['input_text'] = input_text  #'<s>'+ 
         sketch_dict['output_text'] = output_text #+ '</s>'
+        
         return sketch_dict
 
     def get_mask(self, n):
@@ -93,6 +96,7 @@ class SketchGraphsCollator:
     def __call__(self, sketch_dicts):
         input_strings = [sketch['input_text'] for sketch in sketch_dicts]
         output_strings = [sketch['output_text'] for sketch in sketch_dicts]
+        
         tokenized_input = self.tokenize(input_strings)
         tokenized_output = self.tokenize(output_strings)
 
