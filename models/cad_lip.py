@@ -107,8 +107,7 @@ class ByT5Model(pl.LightningModule):
             self.vit_mae = vit_mae
         else:
             m = VisRecon(args=args)
-            #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-            #m.load_from_checkpoint('/Tmp/sifan/cad/vis_recon.ckpt')
+            m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
             self.vit_mae = m.model 
             del m
         
@@ -373,11 +372,12 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_f1", f1, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
+
+        ''' vitruvion metrics
         bits_per_primitive, bits_per_sketch = calculate_vitruvion(bits_loss.cpu(), batch)
         metrics = torchmetrics.Accuracy(task='multiclass', num_classes=len(self.tokenizer), compute_on_step=False)
         relevant_idxs = (batch['labels'] != -100)
         preds = torch.distributions.Categorical(logits=lm_logits).sample()
-        
         vitruvion_acc = metrics(preds[relevant_idxs].cpu(), batch['labels'][relevant_idxs].cpu())
 
         self.log(f"{validate}_bits_pri", bits_per_primitive, on_step=False, on_epoch=True, prog_bar=True, logger=True,
@@ -386,6 +386,7 @@ class ByT5Model(pl.LightningModule):
             batch_size=self.batch_size, sync_dist=True)
         self.log(f"{validate}_vitru_acc", vitruvion_acc, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
+        '''
 
         return loss
 

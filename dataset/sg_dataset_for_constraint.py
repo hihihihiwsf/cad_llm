@@ -91,11 +91,11 @@ class SketchGraphsDataset(Dataset):
         input_text = "".join([ent for i, ent in enumerate(entities)])
         type_token = np.arange(len(Token))+65
         type_token_string = ','.join(map(str,type_token))
-        if self.args.type_token:
+        if self.args.type_token:    
             sketch_dict['input_text'] = input_text +'</s>'+type_token_string+'</s>'
         else:
-            sketch_dict['input_text'] = input_text
-        sketch_dict['output_text'] = constraints
+            sketch_dict['input_text'] = input_text   ## ['e0,17,1,17,25;','e1,17,1,47,1;','e2,17,25,47,25;','e3,17,39,17,64;']
+        sketch_dict['output_text'] = constraints   ## 'e5,e4,73;e4,69;e4,e3,74;e5,e3,65;e4,e3,65;e3,e7,73;e5,e7,65;'
         sketch_dict['constraints_mask'] = constraints_with_mask_str
         
         ent_string = sketch_dict[self.entities_col]

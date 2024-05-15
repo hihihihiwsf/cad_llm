@@ -42,8 +42,12 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 
+import torchmetrics
 import matplotlib.pyplot as plt
 import time
+
+from models.sketchgraphs_models.summary import CohenKappa
+from IPython import embed
 
 class BlipTextPooler(nn.Module):
     def __init__(self, hidden_size):
@@ -97,7 +101,7 @@ class ByT5Model(pl.LightningModule):
         else:
             m = VisRecon(args=args)
             #m.load_from_checkpoint('s3://cad-llm-katzm/jobs/vitmae_deepmind/checkpoints/best.ckpt')
-            m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
+            #m.load_from_checkpoint('s3://cad-llm-katzm/checkpoints/vitmae_sg/best.ckpt')
             self.vit_mae = m.model 
             del m
         
@@ -381,8 +385,16 @@ class ByT5Model(pl.LightningModule):
         self.log(f"{validate}_recall", recall, on_step=False, on_epoch=True, prog_bar=True, logger=True,
             batch_size=self.batch_size, sync_dist=True)
 
+        metrics = torchmetrics.Accuracy(task='multiclass', num_classes=len(self.tokenizer), compute_on_step=False)
+        relevant_idxs = (batch['labels'] != -100)
+        preds = torch.distributions.Categorical(logits=lm_logits).sample()
+        vitruvion_acc = metrics(preds[relevant_idxs].cpu(), batch['labels'][relevant_idxs].cpu())
+        self.log(f"{validate}_vitru_acc", vitruvion_acc, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            batch_size=self.batch_size, sync_dist=True)
         
-        
+        embed()
+        kappa_metric = CohenKappa(77)
+
         return loss
 
     def generate_constraints(self,batch):
