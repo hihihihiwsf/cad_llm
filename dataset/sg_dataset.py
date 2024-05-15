@@ -63,7 +63,7 @@ class SketchGraphsDataset(Dataset):
         list_output = [entity for entity, m in zip(entities, mask) if m == 0]
         if self.order=='random':
             random.shuffle(list_input)
-            random.shuffle(list_output)
+            
         # input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
         # output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
         input_text = "".join(list_input)
