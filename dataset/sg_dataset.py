@@ -28,6 +28,7 @@ class SketchGraphsDataset(Dataset):
         self.order = args.train_order if split == "train" else "sorted"
         assert self.order in ["sorted", "user", "random"]
         self.entities_col = "user_ordered_entities" if self.order == "user" else "entities"
+
         self.constrain_col ="constraints"
 
         # Sanity check text format
@@ -57,8 +58,16 @@ class SketchGraphsDataset(Dataset):
         
         mask = self.get_mask(len(entities))
         sketch_dict["mask"] = mask
-        input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
-        output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+
+        list_input = [entity for entity, m in zip(entities, mask) if m == 1]
+        list_output = [entity for entity, m in zip(entities, mask) if m == 0]
+        if self.order=='random':
+            random.shuffle(list_input)
+            random.shuffle(list_output)
+        # input_text = "".join([ent for i, ent in enumerate(entities) if mask[i]])
+        # output_text = "".join([ent for i, ent in enumerate(entities) if not mask[i]])
+        input_text = "".join(list_input)
+        output_text = "".join(list_output)
         sketch_dict['input_text'] = input_text  #'<s>'+ 
         sketch_dict['output_text'] = output_text #+ '</s>'
         
